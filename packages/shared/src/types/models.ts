@@ -1,4 +1,11 @@
-import type { AccountType, BillType, BillSource, BillVisibility, AIConfidence, FamilyRole } from './enums';
+import type {
+  AccountType,
+  BillType,
+  BillSource,
+  BillVisibility,
+  AIConfidence,
+  FamilyRole,
+} from './enums';
 
 export interface User {
   id: string;

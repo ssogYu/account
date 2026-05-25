@@ -1,3 +1,5 @@
+import type { AccountType, BillType, BillSource, BillVisibility, AIConfidence, FamilyRole } from './enums';
+
 export interface User {
   id: string;
   phone: string;
@@ -10,14 +12,14 @@ export interface Account {
   id: string;
   userId: string;
   name: string;
-  type: import('./enums').AccountType;
+  type: AccountType;
 }
 
 export interface Category {
   id: string;
   userId: string | null;
   name: string;
-  type: import('./enums').BillType;
+  type: BillType;
   icon: string;
   isSystem: boolean;
 }
@@ -26,15 +28,15 @@ export interface Bill {
   id: string;
   userId: string;
   amount: number;
-  type: import('./enums').BillType;
+  type: BillType;
   categoryId: string;
   accountId: string | null;
   date: string;
   remark: string;
-  source: import('./enums').BillSource;
+  source: BillSource;
   payerId: string | null;
-  visibility: import('./enums').BillVisibility;
-  aiConfidence: import('./enums').AIConfidence | null;
+  visibility: BillVisibility;
+  aiConfidence: AIConfidence | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,7 +61,7 @@ export interface FamilyMember {
   id: string;
   familyId: string;
   userId: string;
-  role: import('./enums').FamilyRole;
+  role: FamilyRole;
   joinedAt: string;
 }
 

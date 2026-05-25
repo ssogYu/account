@@ -3,8 +3,6 @@ import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
 import { ConfigType } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { appConfig } from './config/configuration/app.config';
-import { AllExceptionsFilter } from './common/filters';
-import { TransformInterceptor } from './common/interceptors';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,12 +12,6 @@ async function bootstrap() {
   app.useLogger(logger);
   app.useGlobalInterceptors(new LoggerErrorInterceptor());
 
-  // 全局响应拦截器：统一包装 { code, message, data }
-  app.useGlobalInterceptors(new TransformInterceptor());
-
-  // 全局异常过滤器：统一异常响应格式
-  app.useGlobalFilters(new AllExceptionsFilter());
-
   await app.listen(appSettings.port);
 
   logger.log(
@@ -27,4 +19,4 @@ async function bootstrap() {
     'Bootstrap',
   );
 }
-void bootstrap().catch((error: unknown) => {});
+void bootstrap();

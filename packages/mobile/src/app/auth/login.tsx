@@ -1,19 +1,14 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input, Button } from '@/components/ui';
-import { ModeSwitch, AUTH_MODE_OPTIONS, type AuthMode } from '@/components/ModeSwitch';
 import { useAuthStore } from '@/stores/auth';
 import { AppError } from '@/services/api';
-import { colors, spacing, radius, typography } from '@/theme';
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { colors, spacing, radius, typography, shadows } from '@/theme';
 
 export default function LoginScreen() {
-  const [mode, setMode] = useState<AuthMode>('phone');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState('');
@@ -22,12 +17,7 @@ export default function LoginScreen() {
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (mode === 'phone') {
-      if (!phone.trim()) errors.phone = '请输入手机号';
-    } else {
-      if (!email.trim()) errors.email = '请输入邮箱';
-      else if (!EMAIL_RE.test(email.trim())) errors.email = '邮箱格式不正确';
-    }
+    if (!phone.trim()) errors.phone = '请输入手机号';
     if (!password) errors.password = '请输入密码';
 
     setFieldErrors(errors);
@@ -40,8 +30,7 @@ export default function LoginScreen() {
 
     try {
       await login({
-        phone: mode === 'phone' ? phone.trim() : undefined,
-        email: mode === 'email' ? email.trim() : undefined,
+        phone: phone.trim(),
         password,
       });
     } catch (err) {
@@ -52,34 +41,25 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.inner}
       >
-        {/* 品牌 */}
+        {/* 品牌区域 - 大量留白，Apple式呼吸感 */}
         <View style={styles.brand}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>A</Text>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoGlyph}>A</Text>
           </View>
           <Text style={styles.appName}>AI 记账</Text>
           <Text style={styles.tagline}>智能记账，轻松生活</Text>
         </View>
 
-        {/* 表单 */}
+        {/* 表单区域 */}
         <View style={styles.form}>
-          <ModeSwitch
-            mode={mode}
-            options={AUTH_MODE_OPTIONS}
-            onChange={(key) => {
-              setMode(key as AuthMode);
-              setFieldErrors({});
-              setServerError('');
-            }}
-          />
-
-          {mode === 'phone' ? (
+          <View style={styles.fields}>
             <Input
-              placeholder="请输入手机号"
+              placeholder="手机号"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
@@ -87,37 +67,31 @@ export default function LoginScreen() {
               autoComplete="tel"
               error={fieldErrors.phone}
             />
-          ) : (
+
             <Input
-              placeholder="请输入邮箱"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              error={fieldErrors.email}
+              placeholder="密码"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="password"
+              error={fieldErrors.password}
             />
+          </View>
+
+          {!!serverError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{serverError}</Text>
+            </View>
           )}
-
-          <Input
-            placeholder="请输入密码"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="password"
-            error={fieldErrors.password}
-          />
-
-          {!!serverError && <Text style={styles.serverError}>{serverError}</Text>}
 
           <Button title="登录" loading={isLoading} onPress={handleLogin} />
         </View>
 
-        {/* 注册入口 */}
+        {/* 底部注册入口 */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>还没有账号？</Text>
+          <Text style={styles.footerHint}>还没有账号？</Text>
           <Link href="/auth/register" asChild>
-            <Text style={styles.link}>立即注册</Text>
+            <Text style={styles.footerLink}>创建账号</Text>
           </Link>
         </View>
       </KeyboardAvoidingView>
@@ -132,41 +106,53 @@ const styles = StyleSheet.create({
   },
   inner: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
   },
   brand: {
     alignItems: 'center',
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.xxl,
   },
-  logoCircle: {
-    width: 72,
-    height: 72,
+  logoContainer: {
+    width: 88,
+    height: 88,
     borderRadius: radius.xl,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xl,
+    ...shadows.elevated,
   },
-  logoText: {
-    fontSize: 36,
+
+  logoGlyph: {
+    fontSize: 42,
     fontWeight: '700',
-    color: '#fff',
+    color: '#FFFFFF',
+    letterSpacing: -1,
   },
   appName: {
-    ...typography.h2,
+    ...typography.largeTitle,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   tagline: {
-    ...typography.caption,
+    ...typography.subheadline,
     color: colors.textSecondary,
   },
   form: {
+    gap: spacing.lg,
+  },
+  fields: {
     gap: spacing.md,
   },
-  serverError: {
-    ...typography.caption,
+  errorBanner: {
+    backgroundColor: 'rgba(255, 69, 58, 0.12)',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  errorText: {
+    ...typography.footnote,
     color: colors.error,
     textAlign: 'center',
   },
@@ -177,13 +163,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.xs,
   },
-  footerText: {
-    ...typography.caption,
-    color: colors.textSecondary,
+  footerHint: {
+    ...typography.footnote,
+    color: colors.textTertiary,
   },
-  link: {
-    ...typography.caption,
-    color: colors.primaryLight,
+  footerLink: {
+    ...typography.footnote,
+    color: colors.accent,
     fontWeight: '600',
   },
 });

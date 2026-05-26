@@ -1,22 +1,18 @@
-import {
-  TouchableOpacity,
-  ActivityIndicator,
-  Text,
-  StyleSheet,
-  type TouchableOpacityProps,
-} from 'react-native';
+import { TouchableOpacity, ActivityIndicator, Text, StyleSheet, type TouchableOpacityProps } from 'react-native';
 import { colors, radius, spacing, typography } from '@/theme';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
   loading?: boolean;
-  variant?: 'primary' | 'ghost';
+  variant?: 'filled' | 'tinted' | 'ghost';
+  size?: 'default' | 'small';
 }
 
 export function Button({
   title,
   loading = false,
-  variant = 'primary',
+  variant = 'filled',
+  size = 'default',
   disabled,
   style,
   ...props
@@ -25,11 +21,13 @@ export function Button({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={0.6}
       disabled={isDisabled}
       style={[
         styles.base,
-        variant === 'primary' && styles.primary,
+        size === 'small' && styles.small,
+        variant === 'filled' && styles.filled,
+        variant === 'tinted' && styles.tinted,
         variant === 'ghost' && styles.ghost,
         isDisabled && styles.disabled,
         style,
@@ -37,9 +35,22 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'ghost' ? colors.primary : '#fff'} />
+        <ActivityIndicator
+          size="small"
+          color={variant === 'filled' ? '#FFFFFF' : colors.accent}
+        />
       ) : (
-        <Text style={[styles.text, variant === 'ghost' && styles.ghostText]}>{title}</Text>
+        <Text
+          style={[
+            styles.text,
+            size === 'small' && styles.smallText,
+            variant === 'filled' && styles.filledText,
+            variant === 'tinted' && styles.tintedText,
+            variant === 'ghost' && styles.ghostText,
+          ]}
+        >
+          {title}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -48,27 +59,45 @@ export function Button({
 const styles = StyleSheet.create({
   base: {
     borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: 15,
+    paddingHorizontal: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
   },
-  primary: {
-    backgroundColor: colors.primary,
+  small: {
+    paddingVertical: 9,
+    paddingHorizontal: spacing.lg,
+    minHeight: 36,
+    borderRadius: radius.sm,
+  },
+  filled: {
+    backgroundColor: colors.accent,
+  },
+  tinted: {
+    backgroundColor: colors.accentSubtle,
   },
   ghost: {
     backgroundColor: 'transparent',
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.35,
   },
   text: {
-    ...typography.body,
-    color: '#fff',
+    ...typography.headline,
+    color: '#FFFFFF',
+  },
+  smallText: {
+    ...typography.subheadline,
     fontWeight: '600',
   },
+  filledText: {
+    color: '#FFFFFF',
+  },
+  tintedText: {
+    color: colors.accent,
+  },
   ghostText: {
-    color: colors.primaryLight,
+    color: colors.accent,
   },
 });

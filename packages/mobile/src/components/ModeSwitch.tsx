@@ -8,69 +8,56 @@ export const AUTH_MODE_OPTIONS = [
 
 export type AuthMode = (typeof AUTH_MODE_OPTIONS)[number]['key'];
 
-interface ModeTabProps {
-  active: boolean;
-  title: string;
-  onPress: () => void;
-}
-
-export function ModeTab({ active, title, onPress }: ModeTabProps) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      style={[styles.tab, active && styles.tabActive]}
-      onPress={onPress}
-    >
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{title}</Text>
-    </TouchableOpacity>
-  );
-}
-
-export function ModeSwitch({
-  mode,
-  options,
-  onChange,
-}: {
+interface ModeSwitchProps {
   mode: string;
   options: ReadonlyArray<{ key: string; title: string }>;
   onChange: (key: string) => void;
-}) {
+}
+
+export function ModeSwitch({ mode, options, onChange }: ModeSwitchProps) {
   return (
-    <View style={styles.switch}>
-      {options.map((opt) => (
-        <ModeTab
-          key={opt.key}
-          active={mode === opt.key}
-          title={opt.title}
-          onPress={() => onChange(opt.key)}
-        />
-      ))}
+    <View style={styles.container}>
+      {options.map((opt) => {
+        const isActive = mode === opt.key;
+        return (
+          <TouchableOpacity
+            key={opt.key}
+            activeOpacity={0.7}
+            style={[styles.tab, isActive && styles.tabActive]}
+            onPress={() => onChange(opt.key)}
+          >
+            <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{opt.title}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  switch: {
+  container: {
     flexDirection: 'row',
-    backgroundColor: colors.bgInput,
-    borderRadius: radius.md,
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.sm,
     padding: 3,
   },
   tab: {
     flex: 1,
     paddingVertical: spacing.sm,
     alignItems: 'center',
-    borderRadius: radius.sm,
+    justifyContent: 'center',
+    borderRadius: radius.xs,
   },
   tabActive: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.fillPrimary,
   },
   tabText: {
-    ...typography.caption,
+    ...typography.subheadline,
     color: colors.textTertiary,
     fontWeight: '500',
   },
   tabTextActive: {
     color: colors.text,
+    fontWeight: '600',
   },
 });

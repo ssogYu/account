@@ -12,3 +12,7 @@ export function isValidPhone(phone: string): boolean {
 export function isValidMonth(month: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
 }
+
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+/.test(email);
+}

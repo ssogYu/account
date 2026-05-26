@@ -1,17 +1,23 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+} from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input, Button } from '@/components/ui';
-import { ModeSwitch, AUTH_MODE_OPTIONS, type AuthMode } from '@/components/ModeSwitch';
 import { useAuthStore } from '@/stores/auth';
 import { AppError } from '@/services/api';
-import { colors, spacing, typography } from '@/theme';
+import { colors, spacing, radius, typography } from '@/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
-  const [mode, setMode] = useState<AuthMode>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,12 +30,9 @@ export default function RegisterScreen() {
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (mode === 'phone') {
-      if (!phone.trim()) errors.phone = '请输入手机号';
-    } else {
-      if (!email.trim()) errors.email = '请输入邮箱';
-      else if (!EMAIL_RE.test(email.trim())) errors.email = '邮箱格式不正确';
-    }
+    if (!phone.trim()) errors.phone = '请输入手机号';
+    if (!email.trim()) errors.email = '请输入邮箱';
+    else if (!EMAIL_RE.test(email.trim())) errors.email = '邮箱格式不正确';
     if (!password) {
       errors.password = '请设置密码';
     } else if (password.length < 6) {
@@ -49,8 +52,8 @@ export default function RegisterScreen() {
 
     try {
       await register({
-        phone: mode === 'phone' ? phone.trim() : undefined,
-        email: mode === 'email' ? email.trim() : undefined,
+        phone: phone.trim(),
+        email: email.trim(),
         password,
         nickname: nickname.trim() || undefined,
       });
@@ -62,6 +65,7 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.inner}
@@ -69,6 +73,7 @@ export default function RegisterScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {/* 标题 */}
           <View style={styles.header}>
@@ -76,40 +81,27 @@ export default function RegisterScreen() {
             <Text style={styles.subtitle}>开始你的智能记账之旅</Text>
           </View>
 
-          {/* 切换模式 */}
-          <ModeSwitch
-            mode={mode}
-            options={AUTH_MODE_OPTIONS}
-            onChange={(key) => {
-              setMode(key as AuthMode);
-              setFieldErrors({});
-              setServerError('');
-            }}
-          />
-
           {/* 表单 */}
-          <View style={styles.form}>
-            {mode === 'phone' ? (
-              <Input
-                placeholder="请输入手机号"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                autoCapitalize="none"
-                autoComplete="tel"
-                error={fieldErrors.phone}
-              />
-            ) : (
-              <Input
-                placeholder="请输入邮箱"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                error={fieldErrors.email}
-              />
-            )}
+          <View style={styles.fields}>
+            <Input
+              placeholder="手机号"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoComplete="tel"
+              error={fieldErrors.phone}
+            />
+
+            <Input
+              placeholder="邮箱"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              error={fieldErrors.email}
+            />
 
             <Input
               placeholder="昵称（选填）"
@@ -120,7 +112,7 @@ export default function RegisterScreen() {
             />
 
             <Input
-              placeholder="设置密码（至少6位）"
+              placeholder="密码（至少6位）"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -136,17 +128,21 @@ export default function RegisterScreen() {
               autoComplete="password-new"
               error={fieldErrors.confirmPassword}
             />
-
-            {!!serverError && <Text style={styles.serverError}>{serverError}</Text>}
-
-            <Button title="注册" loading={isLoading} onPress={handleRegister} />
           </View>
+
+          {!!serverError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{serverError}</Text>
+            </View>
+          )}
+
+          <Button title="注册" loading={isLoading} onPress={handleRegister} />
 
           {/* 登录入口 */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>已有账号？</Text>
+            <Text style={styles.footerHint}>已有账号？</Text>
             <Link href="/auth/login" asChild>
-              <Text style={styles.link}>立即登录</Text>
+              <Text style={styles.footerLink}>登录</Text>
             </Link>
           </View>
         </ScrollView>
@@ -164,28 +160,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
   },
   header: {
     paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   title: {
-    ...typography.h2,
+    ...typography.largeTitle,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   subtitle: {
-    ...typography.caption,
+    ...typography.subheadline,
     color: colors.textSecondary,
   },
-  form: {
+  fields: {
     gap: spacing.md,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  serverError: {
-    ...typography.caption,
+  errorBanner: {
+    backgroundColor: 'rgba(255, 69, 58, 0.12)',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  errorText: {
+    ...typography.footnote,
     color: colors.error,
     textAlign: 'center',
   },
@@ -195,13 +199,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     gap: spacing.xs,
   },
-  footerText: {
-    ...typography.caption,
-    color: colors.textSecondary,
+  footerHint: {
+    ...typography.footnote,
+    color: colors.textTertiary,
   },
-  link: {
-    ...typography.caption,
-    color: colors.primaryLight,
+  footerLink: {
+    ...typography.footnote,
+    color: colors.accent,
     fontWeight: '600',
   },
 });

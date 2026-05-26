@@ -19,7 +19,6 @@ function AuthGuard() {
     }
   }, []);
 
-  // 路由守卫：未加载完不跳转，避免闪烁
   useEffect(() => {
     if (!isHydrated) return;
 
@@ -38,7 +37,7 @@ function AuthGuard() {
 function LoadingScreen() {
   return (
     <View style={styles.loading}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color={colors.accent} />
     </View>
   );
 }
@@ -57,6 +56,7 @@ export default function RootLayout() {
             headerShown: false,
             contentStyle: { backgroundColor: colors.bg },
             animation: 'slide_from_right',
+            animationDuration: 250,
           }}
         />
       )}

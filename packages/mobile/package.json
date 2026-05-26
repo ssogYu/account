@@ -6,6 +6,7 @@
   "dependencies": {
     "@ai-account/shared": "workspace:*",
     "@expo/metro-runtime": "~55.0.11",
+    "@expo/vector-icons": "15.0.3",
     "axios": "^1.7.0",
     "expo": "~55.0.0",
     "expo-constants": "~55.0.16",

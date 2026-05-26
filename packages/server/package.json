@@ -19,7 +19,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "prisma:reset": "prisma migrate reset",
     "db:setup": "docker compose up -d && sleep 2 && prisma migrate dev",
+    "start:local":"docker compose up -d && sleep 2 && prisma migrate dev && sleep 2 && NODE_ENV=development nest start --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -33,6 +35,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.4.4",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
@@ -44,7 +47,8 @@
     "pino-pretty": "^13.1.3",
     "prisma": "^6.19.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "swagger-ui-dist": "^5.32.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

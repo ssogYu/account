@@ -4,7 +4,7 @@
   "private": true,
   "description": "AI智能记账助手",
   "scripts": {
-    "dev:server": "pnpm --filter @ai-account/server dev",
+    "dev:server": "pnpm --filter @ai-account/server start:local",
     "dev:mobile": "pnpm --filter @ai-account/mobile start",
     "dev:desktop": "pnpm --filter @ai-account/desktop dev",
     "build:shared": "pnpm --filter @ai-account/shared build",

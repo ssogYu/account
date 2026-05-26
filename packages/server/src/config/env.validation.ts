@@ -11,7 +11,7 @@ const appConfigSchema = {
   APP_ORIGIN: Joi.string()
     .trim()
     .uri({ scheme: ['http', 'https'] })
-    .default('http://localhost:3000'),
+    .default('http://localhost:3001'),
   DATABASE_URL: Joi.string().trim().required(),
 };
 

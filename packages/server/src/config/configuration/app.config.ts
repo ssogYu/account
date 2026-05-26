@@ -10,6 +10,6 @@ export const appConfig = registerAs('app', () => {
     isProduction: nodeEnv === 'production',
     port: parseNumber(process.env.PORT, 3000),
     apiPrefix: process.env.API_PREFIX ?? 'api/v1',
-    appOrigin: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    appOrigin: process.env.APP_ORIGIN ?? 'http://localhost:3001',
   };
 });

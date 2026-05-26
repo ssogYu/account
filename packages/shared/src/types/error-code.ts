@@ -1,0 +1,14 @@
+// 业务错误码枚举
+// 0 = 成功，其余直接对应 HTTP Status Code
+export enum ErrorCode {
+  SUCCESS = 0,
+  BAD_REQUEST = 400,
+  UNAUTHORIZED = 401,
+  FORBIDDEN = 403,
+  NOT_FOUND = 404,
+  CONFLICT = 409,
+  TOO_MANY_REQUESTS = 429,
+  INTERNAL_ERROR = 500,
+  BAD_GATEWAY = 502,
+  SERVICE_UNAVAILABLE = 503,
+}

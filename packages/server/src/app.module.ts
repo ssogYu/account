@@ -3,11 +3,12 @@ import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerErrorInterceptor } from 'nestjs-pino';
 import { AppConfigModule } from './config/config.module';
 import { AppLoggerModule } from './logger/logger.module';
+import { PrismaModule } from './prisma';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
 
 @Module({
-  imports: [AppConfigModule, AppLoggerModule],
+  imports: [AppConfigModule, AppLoggerModule, PrismaModule],
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -12,6 +12,7 @@ const appConfigSchema = {
     .trim()
     .uri({ scheme: ['http', 'https'] })
     .default('http://localhost:3000'),
+  DATABASE_URL: Joi.string().trim().required(),
 };
 
 const loggerConfigSchema = {

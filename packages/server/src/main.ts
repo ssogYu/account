@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { appConfig } from './config/configuration/app.config';
@@ -7,6 +8,14 @@ import { appConfig } from './config/configuration/app.config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const appSettings = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   const logger = app.get(Logger);
   app.useLogger(logger);

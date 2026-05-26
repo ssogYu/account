@@ -1,19 +1,21 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerErrorInterceptor } from 'nestjs-pino';
 import { AppConfigModule } from './config/config.module';
-import { AppLoggerModule } from './logger/logger.module';
-import { PrismaModule } from './prisma';
+import { AppLoggerModule } from './modules/logger';
+import { PrismaModule } from './modules/prisma';
+import { AuthModule, JwtAuthGuard } from './modules/auth';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
 
 @Module({
-  imports: [AppConfigModule, AppLoggerModule, PrismaModule],
+  imports: [AppConfigModule, AppLoggerModule, PrismaModule, AuthModule],
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggerErrorInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule {}

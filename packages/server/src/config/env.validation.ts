@@ -23,7 +23,15 @@ const loggerConfigSchema = {
   LOG_IGNORED_PATHS: Joi.string().allow('').default(''),
 };
 
+const jwtConfigSchema = {
+  JWT_ACCESS_SECRET: Joi.string().min(16).required(),
+  JWT_REFRESH_SECRET: Joi.string().min(16).required(),
+  JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+};
+
 export const envValidationSchema = Joi.object({
   ...appConfigSchema,
   ...loggerConfigSchema,
+  ...jwtConfigSchema,
 });

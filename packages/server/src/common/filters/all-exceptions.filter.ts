@@ -5,10 +5,17 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  ConflictException,
+  NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { ErrorCode, ApiResponse } from '@ai-account/shared';
 import { BusinessException } from '../exceptions';
+type PrismaKnownError = {
+  name?: string;
+  code?: string;
+};
 
 // HTTP Status → ErrorCode 映射
 function httpStatusToErrorCode(status: number): ErrorCode {
@@ -25,6 +32,13 @@ function httpStatusToErrorCode(status: number): ErrorCode {
   };
   return mapping[status] ?? ErrorCode.INTERNAL_ERROR;
 }
+function isPrismaKnownError(exception: unknown): exception is PrismaKnownError {
+  if (typeof exception !== 'object' || exception == null) {
+    return false;
+  }
+  const candidate = exception as PrismaKnownError;
+  return candidate.name === 'PrismaClientKnownRequestError';
+}
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -38,6 +52,31 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let code: ErrorCode;
     let message: string;
     let httpStatus: number;
+    if (isPrismaKnownError(exception)) {
+      let data: HttpException;
+      switch (exception.code) {
+        case 'P2002':
+          data = new ConflictException('资源已存在');
+          break;
+        case 'P2003':
+          data = new ConflictException('关联资源约束失败');
+          break;
+        case 'P2025':
+          data = new NotFoundException('资源不存在');
+          break;
+        default:
+          data = new InternalServerErrorException('数据库请求失败');
+      }
+      httpStatus = data.getStatus();
+      code = httpStatusToErrorCode(httpStatus);
+      const exceptionResponse = data.getResponse();
+      message =
+        typeof exceptionResponse === 'string'
+          ? exceptionResponse
+          : ((
+              exceptionResponse as Record<string, unknown>
+            ).message?.toString() ?? data.message);
+    }
 
     if (exception instanceof BusinessException) {
       // 自定义业务异常

@@ -4,6 +4,7 @@ import {
   MinLength,
   IsEmail,
   ValidateIf,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -43,4 +44,17 @@ export class LoginDto {
   @ApiProperty({ description: '密码' })
   @IsString()
   password!: string;
+}
+
+export class UpdateProfileDto {
+  @ApiPropertyOptional({ description: '昵称', example: '小明' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  nickname?: string;
+
+  @ApiPropertyOptional({ description: '头像URL' })
+  @IsOptional()
+  @IsString()
+  avatar?: string;
 }

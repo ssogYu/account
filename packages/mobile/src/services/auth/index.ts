@@ -1,6 +1,6 @@
 import api from '../api';
 import type { ApiResponse } from '@ai-account/shared';
-import type { LoginRequest, RegisterRequest, AuthResponse } from './types';
+import type { LoginRequest, RegisterRequest, AuthResponse, UpdateProfileRequest } from './types';
 
 export const authService = {
   login(data: LoginRequest) {
@@ -9,5 +9,9 @@ export const authService = {
 
   register(data: RegisterRequest) {
     return api.post<ApiResponse<AuthResponse>>('/auth/register', data);
+  },
+
+  updateProfile(data: UpdateProfileRequest) {
+    return api.patch<ApiResponse<AuthResponse['user']>>('/auth/profile', data);
   },
 };

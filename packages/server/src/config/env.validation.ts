@@ -30,8 +30,18 @@ const jwtConfigSchema = {
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 };
 
+const minioConfigSchema = {
+  MINIO_ENDPOINT: Joi.string().trim().default('localhost'),
+  MINIO_PORT: Joi.number().port().default(9000),
+  MINIO_ACCESS_KEY: Joi.string().trim().default('minioadmin'),
+  MINIO_SECRET_KEY: Joi.string().trim().default('minioadmin'),
+  MINIO_USE_SSL: Joi.string().valid('true', 'false').default('false'),
+  MINIO_BUCKET: Joi.string().trim().default('account'),
+};
+
 export const envValidationSchema = Joi.object({
   ...appConfigSchema,
   ...loggerConfigSchema,
   ...jwtConfigSchema,
+  ...minioConfigSchema,
 });

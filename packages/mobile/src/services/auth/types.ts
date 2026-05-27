@@ -22,3 +22,8 @@ export interface AuthResponse {
   };
   token: string;
 }
+
+export interface UpdateProfileRequest {
+  nickname?: string;
+  avatar?: string;
+}

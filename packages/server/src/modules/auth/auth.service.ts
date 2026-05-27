@@ -4,7 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma';
 import { BusinessException } from '../../common/exceptions';
 import { ErrorCode } from '@ai-account/shared';
-import { RegisterDto, LoginDto } from './dto';
+import { RegisterDto, LoginDto, UpdateProfileDto } from './dto';
 
 @Injectable()
 export class AuthService {
@@ -93,5 +93,33 @@ export class AuthService {
 
   private generateToken(userId: string): string {
     return this.jwt.sign({ sub: userId });
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const data: { nickname?: string; avatar?: string } = {};
+    if (dto.nickname !== undefined) data.nickname = dto.nickname;
+    if (dto.avatar !== undefined) data.avatar = dto.avatar;
+
+    if (Object.keys(data).length === 0) {
+      throw new BusinessException(
+        ErrorCode.BAD_REQUEST,
+        '至少需要更新一个字段',
+      );
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        phone: true,
+        email: true,
+        nickname: true,
+        avatar: true,
+        createdAt: true,
+      },
+    });
+
+    return user;
   }
 }

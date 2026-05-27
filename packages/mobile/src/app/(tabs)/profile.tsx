@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  StatusBar,
+  Image,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/stores/auth';
 import { useFamilyStore } from '@/stores/family';
 import { FamilyModal } from '@/components/FamilyModal';
+import { EditProfileModal } from '@/components/EditProfileModal';
 import { colors, spacing, radius, typography } from '@/theme';
 import AntDesign from '@expo/vector-icons/AntDesign';
 
@@ -13,7 +22,6 @@ const MENU_ITEMS = [
   { key: 'budget', title: '预算设置', subtitle: '月度预算与分类预算' },
   { key: 'reminder', title: '提醒设置', subtitle: '记账提醒与预算预警' },
   { key: 'export', title: '数据导出', subtitle: '导出CSV格式' },
-  // { key: 'settings', title: '设置', subtitle: '' },
 ];
 
 export default function ProfileScreen() {
@@ -23,6 +31,7 @@ export default function ProfileScreen() {
   const family = useFamilyStore((s) => s.family);
 
   const [familyModalVisible, setFamilyModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
   const handleMenuPress = (key: string) => {
     if (key === 'settings') {
@@ -39,20 +48,34 @@ export default function ProfileScreen() {
         <View style={styles.pageTitleContainer}>
           <Text style={styles.pageTitle}>我的</Text>
           <TouchableOpacity onPress={() => handleMenuPress('settings')}>
-            <AntDesign name="setting" size={18} color="white" />
+            <AntDesign name="setting" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* 用户信息卡片 */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.nickname?.[0] || 'U'}</Text>
+        <TouchableOpacity
+          style={styles.profileCard}
+          onPress={() => setEditModalVisible(true)}
+          activeOpacity={0.6}
+        >
+          <View style={styles.avatarWrap}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} resizeMode="cover" />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{user?.nickname?.[0] || 'U'}</Text>
+              </View>
+            )}
+            <View style={styles.avatarBadge}>
+              <AntDesign name="camera" size={10} color="#FFFFFF" />
+            </View>
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user?.nickname || '用户'}</Text>
             <Text style={styles.profileSub}>{user?.phone || '未设置手机号'}</Text>
           </View>
-        </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
 
         {/* 家庭组入口 */}
         <TouchableOpacity
@@ -94,6 +117,7 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <FamilyModal visible={familyModalVisible} onClose={() => setFamilyModalVisible(false)} />
+      <EditProfileModal visible={editModalVisible} onClose={() => setEditModalVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -128,19 +152,35 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },
+  avatarWrap: {
+    position: 'relative',
+    marginRight: spacing.md,
+  },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
   avatarText: {
     ...typography.title3,
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bgElevated,
   },
   profileInfo: {
     flex: 1,
@@ -153,6 +193,11 @@ const styles = StyleSheet.create({
   profileSub: {
     ...typography.subheadline,
     color: colors.textSecondary,
+  },
+  chevron: {
+    ...typography.title2,
+    color: colors.textTertiary,
+    fontWeight: '300',
   },
 
   // ── 家庭组入口 ──
@@ -175,11 +220,6 @@ const styles = StyleSheet.create({
   familySubtitle: {
     ...typography.subheadline,
     color: colors.textSecondary,
-  },
-  chevron: {
-    ...typography.title2,
-    color: colors.textTertiary,
-    fontWeight: '300',
   },
 
   // ── 菜单 ──

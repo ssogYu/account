@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authService } from '@/services/auth';
-import type { AuthResponse } from '@/services/auth/types';
+import type { AuthResponse, UpdateProfileRequest } from '@/services/auth/types';
 import { registerTokenGetter, registerUnauthorizedHandler } from '@/services/api';
 import { router } from 'expo-router';
 
@@ -24,6 +24,7 @@ interface AuthState {
   }) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -94,6 +95,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
         hydrating = false;
         set({ isHydrated: true });
       }
+    },
+
+    async updateProfile(data: UpdateProfileRequest) {
+      const { data: res } = await authService.updateProfile(data);
+      const updatedUser = res.data;
+      set({ user: updatedUser });
+      await SecureStore?.setItemAsync(USER_KEY, JSON.stringify(updatedUser));
     },
   };
 });

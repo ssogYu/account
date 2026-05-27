@@ -1,8 +1,8 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto';
+import { RegisterDto, LoginDto, UpdateProfileDto } from './dto';
 import { ResponseMessage } from '../../common/decorators';
-import { Public } from './decorators';
+import { Public, CurrentUser } from './decorators';
 import {
   ApiResponse,
   ApiBadRequestResponse,
@@ -16,13 +16,14 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiResponse({ status: 201, description: '注册成功，返回用户信息与 JWT' })
+  @ApiResponse({ status: 200, description: '注册成功，返回用户信息与 JWT' })
   @ApiBadRequestResponse({ description: '参数错误或手机号/邮箱格式不正确' })
   @ApiConflictResponse({ description: '手机号或邮箱已被注册' })
   @ResponseMessage('注册成功')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
+
   @Public()
   @Post('login')
   @ApiResponse({ status: 200, description: '登录成功，返回用户信息与 JWT' })
@@ -31,5 +32,16 @@ export class AuthController {
   @ResponseMessage('登录成功')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Patch('profile')
+  @ApiResponse({ status: 200, description: '更新成功' })
+  @ApiBadRequestResponse({ description: '参数错误' })
+  @ResponseMessage('更新成功')
+  updateProfile(
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, dto);
   }
 }

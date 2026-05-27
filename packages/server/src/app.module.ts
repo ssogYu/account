@@ -6,6 +6,7 @@ import { AppLoggerModule } from './modules/logger';
 import { PrismaModule } from './modules/prisma';
 import { AuthModule, JwtAuthGuard } from './modules/auth';
 import { FamilyModule } from './modules/family';
+import { UploadModule } from './modules/upload';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
 
@@ -16,6 +17,7 @@ import { TransformInterceptor } from './common/interceptors';
     PrismaModule,
     AuthModule,
     FamilyModule,
+    UploadModule,
   ],
   controllers: [],
   providers: [

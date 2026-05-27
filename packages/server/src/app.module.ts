@@ -5,11 +5,18 @@ import { AppConfigModule } from './config/config.module';
 import { AppLoggerModule } from './modules/logger';
 import { PrismaModule } from './modules/prisma';
 import { AuthModule, JwtAuthGuard } from './modules/auth';
+import { FamilyModule } from './modules/family';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
 
 @Module({
-  imports: [AppConfigModule, AppLoggerModule, PrismaModule, AuthModule],
+  imports: [
+    AppConfigModule,
+    AppLoggerModule,
+    PrismaModule,
+    AuthModule,
+    FamilyModule,
+  ],
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -23,6 +23,8 @@ export class AuthController {
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
+  @Public()
+  @Post('login')
   @ApiResponse({ status: 200, description: '登录成功，返回用户信息与 JWT' })
   @ApiUnauthorizedResponse({ description: '账号或密码错误' })
   @ApiBadRequestResponse({ description: '参数错误' })

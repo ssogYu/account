@@ -17,5 +17,36 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  familyMemberships FamilyMember[]
+  createdFamilies   Family[]
+
   @@map("users")
+}
+
+model Family {
+  id        String   @id @default(cuid())
+  name      String
+  creatorId String   @map("creator_id")
+  inviteCode String  @unique @map("invite_code")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  creator  User           @relation(fields: [creatorId], references: [id])
+  members  FamilyMember[]
+
+  @@map("families")
+}
+
+model FamilyMember {
+  id       String   @id @default(cuid())
+  familyId String   @map("family_id")
+  userId   String   @map("user_id")
+  role     String   @default("member") // owner | member
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  family Family @relation(fields: [familyId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([familyId, userId])
+  @@map("family_members")
 }

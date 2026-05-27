@@ -19,7 +19,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.glass,
+          backgroundColor: colors.bgElevated,
           borderTopColor: colors.separator,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: 83,

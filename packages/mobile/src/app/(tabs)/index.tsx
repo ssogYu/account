@@ -15,359 +15,16 @@ import { useChatStore } from '@/stores/chat';
 import { useBillStore } from '@/stores/bill';
 import { useCategoryStore } from '@/stores/category';
 import { AddBillModal } from '@/components/AddBillModal';
-import { TodaySummaryCard } from '@/components/TodaySummaryCard';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
-import AntDesign from '@expo/vector-icons/AntDesign';
-import { CategoryIcon } from '@/components/icons';
-import type { ChatMessage, ParseResult } from '@/services/chat/types';
-
-// ── 确认卡片组件 ──
-
-function ConfirmCard({
-  parseResult,
-  messageId,
-  confirmed,
-  onConfirm,
-  onReject,
-}: {
-  parseResult: ParseResult;
-  messageId: string;
-  confirmed: boolean;
-  onConfirm: (messageId: string) => void;
-  onReject: (messageId: string) => void;
-}) {
-  const typeLabel = parseResult.type === 'expense' ? '支出' : '收入';
-  const typeColor = parseResult.type === 'expense' ? colors.error : colors.success;
-
-  if (confirmed) {
-    return (
-      <View style={cardStyles.card}>
-        <View style={cardStyles.confirmedRow}>
-          <Text style={cardStyles.confirmedIcon}>✓</Text>
-          <Text style={cardStyles.confirmedText}>
-            {parseResult.categoryName} {typeLabel} ¥{parseResult.amount.toFixed(2)} 已记录
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={cardStyles.card}>
-      {/* 金额行 */}
-      <View style={cardStyles.amountRow}>
-        <View style={cardStyles.categoryBadge}>
-          <CategoryIcon iconKey={parseResult.categoryIcon} size={24} color={colors.text} />
-          <Text style={cardStyles.categoryName}>{parseResult.categoryName}</Text>
-        </View>
-        <View style={cardStyles.amountRight}>
-          <Text style={[cardStyles.typeTag, { color: typeColor }]}>{typeLabel}</Text>
-          <Text style={cardStyles.amount}>¥{parseResult.amount.toFixed(2)}</Text>
-        </View>
-      </View>
-
-      {/* 详情行 */}
-      <View style={cardStyles.detailRow}>
-        <Text style={cardStyles.detailText}>{formatDate(parseResult.date)}</Text>
-        {parseResult.confidence !== 'high' && (
-          <Text style={cardStyles.hintText}>
-            {parseResult.confidence === 'medium' ? '分类待确认' : '请确认信息'}
-          </Text>
-        )}
-      </View>
-
-      {/* 操作按钮 */}
-      <View style={cardStyles.actionRow}>
-        <TouchableOpacity
-          style={cardStyles.rejectBtn}
-          onPress={() => onReject(messageId)}
-          activeOpacity={0.6}
-        >
-          <Text style={cardStyles.rejectText}>取消</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={cardStyles.confirmBtn}
-          onPress={() => onConfirm(messageId)}
-          activeOpacity={0.6}
-        >
-          <Text style={cardStyles.confirmText}>确认记账</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-const cardStyles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.separator,
-    ...shadows.card,
-  },
-  amountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  categoryName: {
-    ...typography.headline,
-    color: colors.text,
-  },
-  amountRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  typeTag: {
-    ...typography.caption1,
-    fontWeight: '600',
-  },
-  amount: {
-    ...typography.title3,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  detailText: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-  hintText: {
-    ...typography.caption1,
-    color: colors.warning,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  rejectBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.fillTertiary,
-  },
-  rejectText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  confirmBtn: {
-    flex: 2,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.accent,
-  },
-  confirmText: {
-    ...typography.footnote,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  confirmedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  confirmedIcon: {
-    fontSize: 16,
-    color: colors.success,
-    fontWeight: '700',
-  },
-  confirmedText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-});
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (d.toDateString() === today.toDateString()) return '今天';
-  if (d.toDateString() === yesterday.toDateString()) return '昨天';
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
-// ── 对话气泡组件 ──
-
-function ChatBubble({
-  message,
-  onConfirm,
-  onReject,
-}: {
-  message: ChatMessage;
-  onConfirm: (messageId: string) => void;
-  onReject: (messageId: string) => void;
-}) {
-  const isUser = message.role === 'user';
-  const meta = !isUser ? message.metadata : null;
-
-  // 确认卡片类型
-  const isConfirmCard = meta?.type === 'confirm_card';
-  const isConfirmed = meta?.type === 'confirmed' && !!message.billId;
-  const isRejected = meta?.type === 'rejected';
-
-  // 已取消的确认卡片不显示操作按钮
-  const showConfirmCard = (isConfirmCard || isConfirmed) && meta?.parseResult;
-
-  return (
-    <View style={[bubbleStyles.row, isUser ? bubbleStyles.rowUser : bubbleStyles.rowAssistant]}>
-      {!isUser && (
-        <View style={bubbleStyles.avatar}>
-          <Text style={bubbleStyles.avatarIcon}>🤖</Text>
-        </View>
-      )}
-      <View
-        style={[
-          bubbleStyles.bubble,
-          isUser ? bubbleStyles.bubbleUser : bubbleStyles.bubbleAssistant,
-        ]}
-      >
-        {showConfirmCard ? (
-          <ConfirmCard
-            parseResult={meta!.parseResult!}
-            messageId={message.id}
-            confirmed={isConfirmed}
-            onConfirm={onConfirm}
-            onReject={onReject}
-          />
-        ) : isRejected && meta?.parseResult ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <CategoryIcon
-              iconKey={meta.parseResult.categoryIcon}
-              size={16}
-              color={colors.textTertiary}
-            />
-            <Text
-              style={[
-                bubbleStyles.text,
-                { color: colors.textTertiary, textDecorationLine: 'line-through' },
-              ]}
-            >
-              {meta.parseResult.categoryName} ¥{meta.parseResult.amount.toFixed(2)}（已取消）
-            </Text>
-          </View>
-        ) : (
-          <Text style={[bubbleStyles.text, isUser && bubbleStyles.textUser]}>
-            {message.content}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-}
-
-const bubbleStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  rowUser: {
-    justifyContent: 'flex-end',
-  },
-  rowAssistant: {
-    justifyContent: 'flex-start',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.fillSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-    marginTop: 2,
-  },
-  avatarIcon: {
-    fontSize: 16,
-  },
-  bubble: {
-    maxWidth: '80%',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.lg,
-  },
-  bubbleUser: {
-    backgroundColor: colors.accent,
-    borderBottomRightRadius: radius.xs,
-  },
-  bubbleAssistant: {
-    backgroundColor: colors.bgSecondary,
-    borderBottomLeftRadius: radius.xs,
-  },
-  text: {
-    ...typography.body,
-    fontSize: 15,
-    lineHeight: 21,
-    color: colors.text,
-  },
-  textUser: {
-    color: '#FFFFFF',
-  },
-});
-
-// ── 打字指示器 ──
-
-function TypingIndicator() {
-  return (
-    <View style={typingStyles.container}>
-      <View style={bubbleStyles.avatar}>
-        <Text style={bubbleStyles.avatarIcon}>🤖</Text>
-      </View>
-      <View style={[bubbleStyles.bubble, bubbleStyles.bubbleAssistant]}>
-        <Text style={typingStyles.text}>思考中...</Text>
-      </View>
-    </View>
-  );
-}
-
-const typingStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  text: {
-    ...typography.body,
-    fontSize: 15,
-    color: colors.textTertiary,
-    fontStyle: 'italic',
-  },
-});
-
-// ── 欢迎消息 ──
-
-const WELCOME_MESSAGES: ChatMessage[] = [
-  {
-    id: 'welcome',
-    userId: '',
-    role: 'assistant',
-    content:
-      '你好！我是你的记账助手 🤖\n\n直接告诉我你的消费，比如：\n• "午饭花了25"\n• "打车15元"\n• "收到工资8000"\n\n我会帮你自动识别并记录。',
-    billId: null,
-    metadata: { type: 'guide' },
-    createdAt: new Date().toISOString(),
-  },
-];
-
-// ── 首页 ──
+import { colors, spacing, radius, typography } from '@/theme';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import {
+  ChatBubble,
+  TypingIndicator,
+  FloatingNav,
+  FabButton,
+  WELCOME_MESSAGES,
+  QUICK_INPUTS,
+} from '@/components/chat';
 
 export default function HomeScreen() {
   const messages = useChatStore((s) => s.messages);
@@ -384,6 +41,7 @@ export default function HomeScreen() {
 
   const [inputText, setInputText] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [navVisible, setNavVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -397,10 +55,17 @@ export default function HomeScreen() {
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
     if (!text || isSending) return;
-
     setInputText('');
     await sendMessage(text);
   }, [inputText, isSending, sendMessage]);
+
+  const handleQuickInput = useCallback(
+    (text: string) => {
+      if (isSending) return;
+      setInputText(text);
+    },
+    [isSending],
+  );
 
   const handleConfirm = useCallback(
     async (messageId: string) => {
@@ -423,27 +88,51 @@ export default function HomeScreen() {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
+  const totalExpense = todaySummary?.totalExpense ?? 0;
+  const totalIncome = todaySummary?.totalIncome ?? 0;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
 
-      {/* 顶部标题栏 */}
+      {/* 顶部栏 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>记账助手</Text>
+        <View style={styles.logoWrap}>
+          <View style={styles.logoIcon}>
+            <MaterialCommunityIcons name="robot-happy-outline" size={18} color={colors.accent} />
+          </View>
+          <Text style={styles.logoText}>AI 记账</Text>
+        </View>
         <TouchableOpacity
-          style={styles.manualBtn}
-          onPress={() => setAddModalVisible(true)}
-          activeOpacity={0.6}
+          style={styles.menuBtn}
+          onPress={() => setNavVisible(!navVisible)}
+          activeOpacity={0.7}
         >
-          <AntDesign name="edit" size={16} color={colors.accent} />
-          <Text style={styles.manualBtnText}>手动记账</Text>
+          <MaterialCommunityIcons name="menu" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
 
-      {/* 今日收支浮动卡片 */}
-      <View style={styles.summaryWrapper}>
-        <TodaySummaryCard summary={todaySummary} />
-      </View>
+      {/* 今日汇总条 */}
+      {(totalExpense > 0 || totalIncome > 0) && (
+        <View style={styles.summaryBar}>
+          {totalExpense > 0 && (
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>支出</Text>
+              <Text style={[styles.summaryValue, { color: colors.error }]}>
+                ¥{totalExpense.toFixed(0)}
+              </Text>
+            </View>
+          )}
+          {totalIncome > 0 && (
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>收入</Text>
+              <Text style={[styles.summaryValue, { color: colors.success }]}>
+                ¥{totalIncome.toFixed(0)}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* 对话区域 */}
       <FlatList
@@ -466,28 +155,51 @@ export default function HomeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.inputArea}
       >
+        {/* 快捷输入 */}
+        <View style={styles.quickRow}>
+          {QUICK_INPUTS.map((q) => (
+            <TouchableOpacity
+              key={q.label}
+              style={styles.quickBtn}
+              onPress={() => handleQuickInput(q.text)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.quickBtnText}>{q.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 输入框 */}
         <View style={styles.inputRow}>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="告诉我你的消费..."
-            placeholderTextColor={colors.textTertiary}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            editable={!isSending}
-            maxLength={200}
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, (!inputText.trim() || isSending) && styles.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || isSending}
-            activeOpacity={0.7}
-          >
-            <AntDesign name="arrow-up" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="告诉我你的消费..."
+              placeholderTextColor={colors.textTertiary}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+              editable={!isSending}
+              maxLength={200}
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, (!inputText.trim() || isSending) && styles.sendBtnDisabled]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isSending}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="arrow-up" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 悬浮手动记账按钮 */}
+      <FabButton onPress={() => setAddModalVisible(true)} />
+
+      {/* 悬浮导航菜单 */}
+      <FloatingNav visible={navVisible} onToggle={() => setNavVisible(!navVisible)} />
 
       {/* 手动记账弹窗 */}
       <AddBillModal
@@ -506,70 +218,122 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.separator,
   },
-  headerTitle: {
-    ...typography.headline,
-    color: colors.text,
-  },
-  manualBtn: {
+  logoWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-    backgroundColor: colors.accentSubtle,
-    borderRadius: radius.sm,
-    gap: 4,
+    gap: spacing.sm,
   },
-  manualBtnText: {
+  logoIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(10, 132, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: {
+    ...typography.headline,
+    color: colors.text,
+    fontSize: 17,
+  },
+  menuBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.fillSecondary,
+  },
+  summaryBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xxl,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator,
+    backgroundColor: colors.bgSecondary,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  summaryLabel: {
+    ...typography.caption1,
+    color: colors.textTertiary,
+  },
+  summaryValue: {
     ...typography.footnote,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  summaryWrapper: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    fontWeight: '700',
   },
   chatContent: {
     paddingVertical: spacing.md,
     paddingBottom: spacing.xl,
   },
   inputArea: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.separator,
-    backgroundColor: colors.bgSecondary,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.bg,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  quickBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 1,
+    borderRadius: radius.full,
+    backgroundColor: colors.bgElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.separator,
+  },
+  quickBtnText: {
+    ...typography.caption1,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+  },
+  inputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.xl,
+    paddingLeft: spacing.md + 4,
+    paddingRight: spacing.xs + 2,
+    paddingVertical: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.separator,
   },
   textInput: {
     flex: 1,
     ...typography.body,
     fontSize: 16,
     color: colors.text,
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.md + 4,
     paddingVertical: spacing.sm + 2,
     maxHeight: 100,
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: spacing.xs,
   },
   sendBtnDisabled: {
     backgroundColor: colors.textQuaternary,

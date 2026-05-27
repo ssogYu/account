@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma';
+import { LlmService } from '../llm';
 import { SendMessageDto, QueryChatDto } from './dto';
+import { createBillGraph } from './bill-graph';
 
 /**
  * 对话记账服务
  *
- * 流程：用户发消息 → 本地关键词解析 → AI回复确认卡片（解析结果存metadata）→ 用户确认 → 创建账单入库
- *
- * 后续接入 LLM 后，将替换本地解析为 LangGraph.js 编排
+ * 流程：用户发消息 → LangGraph编排(LLM语义解析→分类匹配→置信度评估) → AI回复确认卡片 → 用户确认 → 创建账单入库
  */
 
 /** 解析结果结构 */
@@ -20,17 +20,23 @@ export interface ParseResult {
   note: string;
   date: string;
   confidence: 'high' | 'medium' | 'low';
+  warning?: string;
 }
 
 /** AI消息的metadata结构 */
 interface AssistantMetadata {
-  type: 'confirm_card' | 'guide' | 'confirmed';
+  type: 'confirm_card' | 'guide' | 'confirmed' | 'rejected';
   parseResult?: ParseResult;
 }
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ChatService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly llmService: LlmService,
+  ) {}
 
   /** 发送消息并返回AI回复 */
   async sendMessage(userId: string, dto: SendMessageDto) {
@@ -39,24 +45,44 @@ export class ChatService {
       data: { userId, role: 'user', content: dto.content },
     });
 
-    // 2. 本地关键词解析
-    const parseResult = await this.localParse(userId, dto.content);
+    // 2. 获取用户可用分类
+    const categories = await this.prisma.category.findMany({
+      where: {
+        OR: [{ isSystem: true }, { userId }],
+      },
+      select: { id: true, name: true, icon: true, type: true },
+      orderBy: [{ isSystem: 'desc' }, { type: 'asc' }, { name: 'asc' }],
+    });
 
-    // 3. 生成AI回复
+    const categoriesJson = JSON.stringify(
+      categories.map((c) => ({
+        name: c.name,
+        type: c.type,
+        icon: c.icon,
+        id: c.id,
+      })),
+    );
+
+    // 3. 使用 LangGraph 编排处理
+    const parseResult = await this.runBillGraph(
+      userId,
+      dto.content,
+      categoriesJson,
+    );
+
+    // 4. 生成AI回复
     let assistantContent: string;
     let metadata: AssistantMetadata;
 
     if (parseResult) {
-      // 解析成功 → 展示确认卡片（不创建账单，等用户确认）
       assistantContent = this.buildConfirmMessage(parseResult);
       metadata = { type: 'confirm_card', parseResult };
     } else {
-      // 解析失败 → 引导用户
       assistantContent = this.buildGuideMessage(dto.content);
       metadata = { type: 'guide' };
     }
 
-    // 4. 保存AI消息（解析结果存metadata，前端据此渲染确认卡片）
+    // 5. 保存AI消息
     const assistantMessage = await this.prisma.chatMessage.create({
       data: {
         userId,
@@ -66,11 +92,93 @@ export class ChatService {
       },
     });
 
-    return {
-      userMessage,
-      assistantMessage,
-      parseResult,
-    };
+    return { userMessage, assistantMessage, parseResult };
+  }
+
+  /** 运行 LangGraph 记账编排图 */
+  private async runBillGraph(
+    userId: string,
+    input: string,
+    categoriesJson: string,
+  ): Promise<ParseResult | null> {
+    try {
+      const chatModel = this.llmService.getModel();
+      const graph = createBillGraph(chatModel);
+
+      const today = new Date().toISOString().split('T')[0];
+
+      const result = await graph.invoke({
+        input,
+        userId,
+        categoriesJson,
+        parsed: false,
+        type: null,
+        amount: null,
+        note: '',
+        date: today,
+        categoryName: '',
+        confidence: 'low',
+        warning: '',
+        needsConfirm: true,
+        error: '',
+      });
+
+      if (!result.parsed || !result.amount) {
+        this.logger.log(`LangGraph: 解析失败或非记账意图 - input="${input}"`);
+        return null;
+      }
+
+      // 从数据库匹配分类ID和图标
+      const category = await this.prisma.category.findFirst({
+        where: {
+          name: result.categoryName,
+          type: result.type ?? 'expense',
+          OR: [{ isSystem: true }, { userId }],
+        },
+      });
+
+      let categoryId: string;
+      let categoryName: string;
+      let categoryIcon: string;
+
+      if (category) {
+        categoryId = category.id;
+        categoryName = category.name;
+        categoryIcon = category.icon;
+      } else {
+        // 回退到"其他"分类
+        const fallback = await this.prisma.category.findFirst({
+          where: {
+            name: '其他',
+            type: result.type ?? 'expense',
+            isSystem: true,
+          },
+        });
+        if (!fallback) return null;
+        categoryId = fallback.id;
+        categoryName = '其他';
+        categoryIcon = fallback.icon;
+        result.confidence = 'medium';
+      }
+
+      return {
+        type: result.type ?? 'expense',
+        amount: result.amount,
+        categoryName,
+        categoryIcon,
+        categoryId,
+        note: result.note || input,
+        date: result.date || today,
+        confidence: result.confidence,
+        warning: result.warning || undefined,
+      };
+    } catch (err) {
+      this.logger.error(
+        `LangGraph 执行失败: ${err instanceof Error ? err.message : err}`,
+      );
+      // 降级到本地关键词解析
+      return this.localParse(userId, input);
+    }
   }
 
   /** 获取对话历史 */
@@ -99,19 +207,15 @@ export class ChatService {
       nextCursor = nextItem.id;
     }
 
-    return {
-      items: messages.reverse(),
-      nextCursor,
-    };
+    return { items: messages.reverse(), nextCursor };
   }
 
-  /** 确认账单（用户确认AI解析结果后，创建账单入库） */
+  /** 确认账单 */
   async confirmBill(
     userId: string,
     messageId: string,
     edits?: Partial<Pick<ParseResult, 'categoryId' | 'amount' | 'note'>>,
   ) {
-    // 1. 找到AI消息，取出metadata中的解析结果
     const aiMessage = await this.prisma.chatMessage.findFirst({
       where: { id: messageId, userId, role: 'assistant' },
     });
@@ -127,7 +231,6 @@ export class ChatService {
 
     const parse = { ...meta.parseResult, ...edits };
 
-    // 2. 创建账单
     const membership = await this.prisma.familyMember.findFirst({
       where: { userId },
       select: { familyId: true },
@@ -147,7 +250,6 @@ export class ChatService {
       include: { category: true },
     });
 
-    // 3. 更新AI消息metadata为已确认
     await this.prisma.chatMessage.update({
       where: { id: messageId },
       data: {
@@ -156,7 +258,6 @@ export class ChatService {
       },
     });
 
-    // 4. 保存确认对话
     await this.prisma.chatMessage.create({
       data: { userId, role: 'user', content: '确认', billId: bill.id },
     });
@@ -190,15 +291,11 @@ export class ChatService {
       return { rejected: false, message: '该消息不是确认卡片' };
     }
 
-    // 更新metadata标记为已取消
     await this.prisma.chatMessage.update({
       where: { id: messageId },
-      data: {
-        metadata: { ...meta, type: 'rejected' } as any,
-      },
+      data: { metadata: { ...meta, type: 'rejected' } as any },
     });
 
-    // 保存取消对话
     await this.prisma.chatMessage.create({
       data: { userId, role: 'user', content: '取消' },
     });
@@ -214,33 +311,24 @@ export class ChatService {
     return { rejected: true };
   }
 
-  // ── 私有方法 ──
+  // ── 降级：本地关键词解析 ──
 
-  /** 本地关键词解析（简易版，后续替换为LLM） */
   private async localParse(
     userId: string,
     content: string,
   ): Promise<ParseResult | null> {
-    // 匹配金额
     let amount: number | null = null;
 
-    // 模式1: 数字 + 单位（元/块/rmb/¥）
     const unitMatch = content.match(/(\d+\.?\d*)\s*(元|块|rmb|¥)/i);
-    if (unitMatch) {
-      amount = parseFloat(unitMatch[1]);
-    }
+    if (unitMatch) amount = parseFloat(unitMatch[1]);
 
-    // 模式2: 动词 + 数字
     if (!amount) {
       const verbMatch = content.match(
         /(花了|花费|支出|收入|赚了|收到|付了|给了)\s*(\d+\.?\d*)/,
       );
-      if (verbMatch) {
-        amount = parseFloat(verbMatch[2]);
-      }
+      if (verbMatch) amount = parseFloat(verbMatch[2]);
     }
 
-    // 模式3: 纯数字（需有上下文关键词）
     if (!amount) {
       const contextKeywords = [
         '午饭',
@@ -256,15 +344,12 @@ export class ChatService {
       ];
       if (contextKeywords.some((k) => content.includes(k))) {
         const numMatch = content.match(/(\d+\.?\d*)/);
-        if (numMatch) {
-          amount = parseFloat(numMatch[1]);
-        }
+        if (numMatch) amount = parseFloat(numMatch[1]);
       }
     }
 
     if (!amount || isNaN(amount) || amount <= 0) return null;
 
-    // 判断收支类型
     const incomeKeywords = [
       '收入',
       '赚了',
@@ -279,7 +364,6 @@ export class ChatService {
       ? 'income'
       : 'expense';
 
-    // 匹配分类（从数据库查询用户可用的分类）
     const categoryMap: Record<string, string[]> = {
       餐饮: [
         '午饭',
@@ -340,7 +424,6 @@ export class ChatService {
     };
 
     let categoryName = '其他';
-    let categoryIcon = 'other_exp';
     for (const [cat, keywords] of Object.entries(categoryMap)) {
       if (keywords.some((k) => content.includes(k))) {
         categoryName = cat;
@@ -348,21 +431,16 @@ export class ChatService {
       }
     }
 
-    // 从数据库查找分类ID和图标
     const category = await this.prisma.category.findFirst({
-      where: {
-        name: categoryName,
-        type,
-        OR: [{ isSystem: true }, { userId }],
-      },
+      where: { name: categoryName, type, OR: [{ isSystem: true }, { userId }] },
     });
 
     let categoryId: string;
+    let categoryIcon: string;
     if (category) {
       categoryId = category.id;
       categoryIcon = category.icon;
     } else {
-      // 回退到"其他"分类
       const fallback = await this.prisma.category.findFirst({
         where: { name: '其他', type, isSystem: true },
       });
@@ -372,19 +450,22 @@ export class ChatService {
       categoryName = '其他';
     }
 
-    // 判断置信度
-    const confidence = this.assessConfidence(content, amount, categoryName);
+    const confidence =
+      categoryName !== '其他' && amount > 0
+        ? 'high'
+        : amount > 0
+          ? 'medium'
+          : 'low';
 
-    // 判断日期
-    let date = new Date().toISOString();
+    let date = new Date().toISOString().split('T')[0];
     if (content.includes('昨天')) {
       const d = new Date();
       d.setDate(d.getDate() - 1);
-      date = d.toISOString();
+      date = d.toISOString().split('T')[0];
     } else if (content.includes('前天')) {
       const d = new Date();
       d.setDate(d.getDate() - 2);
-      date = d.toISOString();
+      date = d.toISOString().split('T')[0];
     }
 
     return {
@@ -399,36 +480,19 @@ export class ChatService {
     };
   }
 
-  /** 评估解析置信度 */
-  private assessConfidence(
-    content: string,
-    amount: number,
-    categoryName: string,
-  ): 'high' | 'medium' | 'low' {
-    // 高置信度：金额明确 + 分类明确
-    if (categoryName !== '其他' && amount > 0) {
-      return 'high';
-    }
-    // 中置信度：金额明确但分类模糊
-    if (amount > 0 && categoryName === '其他') {
-      return 'medium';
-    }
-    return 'low';
-  }
-
   private buildConfirmMessage(parse: ParseResult): string {
     const typeLabel = parse.type === 'expense' ? '支出' : '收入';
     const confidenceHint =
-      parse.confidence === 'high'
-        ? ''
-        : parse.confidence === 'medium'
-          ? '\n分类不太确定，请确认或修改。'
-          : '\n请确认信息是否正确。';
-
-    return `${parse.categoryName}\n${typeLabel} ¥${parse.amount.toFixed(2)}${confidenceHint}`;
+      parse.confidence === 'medium'
+        ? '\n分类待确认，请检查。'
+        : parse.confidence === 'low'
+          ? '\n信息可能不完整，请确认。'
+          : '';
+    const warningHint = parse.warning ? `\n⚠️ ${parse.warning}` : '';
+    return `${parse.categoryName}\n${typeLabel} ¥${parse.amount.toFixed(2)}${confidenceHint}${warningHint}`;
   }
 
   private buildGuideMessage(_content: string): string {
-    return `我还没理解你的意思 😅\n\n你可以这样告诉我：\n• "午饭花了25"\n• "打车15元"\n• "收到工资8000"\n• "奶茶18块"\n\n或者点击下方手动记账按钮直接填写。`;
+    return `我还没理解你的记账意图？\n\n你可以这样告诉我：\n• "午饭花了25"\n• "打车15元"\n• "收到工资8000"\n• "奶茶18块"\n\n或者直接描述你的消费，我会帮你自动识别。`;
   }
 }

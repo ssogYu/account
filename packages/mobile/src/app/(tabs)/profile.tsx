@@ -17,6 +17,7 @@ import { EditProfileModal } from '@/components/EditProfileModal';
 import { CategoryManageModal } from '@/components/CategoryManageModal';
 import { colors, spacing, radius, typography } from '@/theme';
 import AntDesign from '@expo/vector-icons/AntDesign';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 const MENU_ITEMS = [
   { key: 'category', title: '分类管理', subtitle: '自定义支出与收入分类' },
@@ -51,6 +52,13 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* 页面标题 */}
         <View style={styles.pageTitleContainer}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.6}
+          >
+            <MaterialCommunityIcons name="chevron-left" size={24} color={colors.text} />
+          </TouchableOpacity>
           <Text style={styles.pageTitle}>我的</Text>
           <TouchableOpacity onPress={() => handleMenuPress('settings')}>
             <AntDesign name="setting" size={18} color={colors.textSecondary} />
@@ -146,6 +154,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.md,
     marginBottom: spacing.xl,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.fillSecondary,
   },
   pageTitle: {
     ...typography.largeTitle,

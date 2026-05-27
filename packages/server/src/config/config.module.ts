@@ -6,6 +6,7 @@ import { loggerConfig } from './configuration/logger.config';
 import { authConfig } from './configuration/auth.config';
 import { swaggerConfig } from './configuration/swagger.config';
 import { minioConfig } from './configuration/minio.config';
+import { llmConfig } from './configuration/llm.config';
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 // 统一封装应用配置入口：
@@ -29,7 +30,14 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
       // - .env
       envFilePath: [`.env.${nodeEnv}`, '.env'],
       // 按领域拆分配置命名空间，后续通过 appConfig.KEY / loggerConfig.KEY 注入使用。
-      load: [appConfig, loggerConfig, authConfig, swaggerConfig, minioConfig],
+      load: [
+        appConfig,
+        loggerConfig,
+        authConfig,
+        swaggerConfig,
+        minioConfig,
+        llmConfig,
+      ],
       // 启动阶段统一做 Joi 校验，缺失或非法配置会直接阻止应用启动。
       validationSchema: envValidationSchema,
       validationOptions: {

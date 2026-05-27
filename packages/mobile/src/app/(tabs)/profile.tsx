@@ -14,14 +14,16 @@ import { useAuthStore } from '@/stores/auth';
 import { useFamilyStore } from '@/stores/family';
 import { FamilyModal } from '@/components/FamilyModal';
 import { EditProfileModal } from '@/components/EditProfileModal';
+import { CategoryManageModal } from '@/components/CategoryManageModal';
 import { colors, spacing, radius, typography } from '@/theme';
 import AntDesign from '@expo/vector-icons/AntDesign';
 
 const MENU_ITEMS = [
-  { key: 'accounts', title: '账户管理', subtitle: '微信、支付宝、银行卡' },
-  { key: 'budget', title: '预算设置', subtitle: '月度预算与分类预算' },
-  { key: 'reminder', title: '提醒设置', subtitle: '记账提醒与预算预警' },
-  { key: 'export', title: '数据导出', subtitle: '导出CSV格式' },
+  { key: 'category', title: '分类管理', subtitle: '自定义支出与收入分类' },
+  // { key: 'accounts', title: '账户管理', subtitle: '微信、支付宝、银行卡' },
+  // { key: 'budget', title: '预算设置', subtitle: '月度预算与分类预算' },
+  // { key: 'reminder', title: '提醒设置', subtitle: '记账提醒与预算预警' },
+  // { key: 'export', title: '数据导出', subtitle: '导出CSV格式' },
 ];
 
 export default function ProfileScreen() {
@@ -32,10 +34,13 @@ export default function ProfileScreen() {
 
   const [familyModalVisible, setFamilyModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const handleMenuPress = (key: string) => {
     if (key === 'settings') {
       router.push('/setting');
+    } else if (key === 'category') {
+      setCategoryModalVisible(true);
     }
   };
 
@@ -118,6 +123,10 @@ export default function ProfileScreen() {
 
       <FamilyModal visible={familyModalVisible} onClose={() => setFamilyModalVisible(false)} />
       <EditProfileModal visible={editModalVisible} onClose={() => setEditModalVisible(false)} />
+      <CategoryManageModal
+        visible={categoryModalVisible}
+        onClose={() => setCategoryModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }

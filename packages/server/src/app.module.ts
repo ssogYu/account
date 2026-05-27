@@ -7,6 +7,9 @@ import { PrismaModule } from './modules/prisma';
 import { AuthModule, JwtAuthGuard } from './modules/auth';
 import { FamilyModule } from './modules/family';
 import { UploadModule } from './modules/upload';
+import { BillModule } from './modules/bill';
+import { CategoryModule } from './modules/category';
+import { ChatModule } from './modules/chat';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
 
@@ -18,6 +21,9 @@ import { TransformInterceptor } from './common/interceptors';
     AuthModule,
     FamilyModule,
     UploadModule,
+    BillModule,
+    CategoryModule,
+    ChatModule,
   ],
   controllers: [],
   providers: [

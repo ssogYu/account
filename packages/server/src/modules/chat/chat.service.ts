@@ -102,7 +102,7 @@ export class ChatService {
             !!r.warning ||
             !r.amount ||
             !r.categoryId ||
-            !r.accountName,
+            (r.type === 'expense' && !r.accountName),
         );
 
         if (needsConfirm) {
@@ -354,7 +354,8 @@ export class ChatService {
         data: {
           userId,
           role: 'user',
-          content: `确认第${billIndex + 1}笔`,
+          content:
+            parseResults.length === 1 ? '确认' : `确认第${billIndex + 1}笔`,
           billId: bill.id,
         },
       });

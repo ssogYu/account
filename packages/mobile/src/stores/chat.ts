@@ -78,26 +78,43 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await chatService.confirmBill(params);
       if (result.confirmed) {
+        const parseResults = get().messages.find((m) => m.id === params.messageId)?.metadata
+          ?.parseResults;
+        const isSingle = parseResults?.length === 1;
+        const confirmContent = isSingle ? '确认' : `确认第${params.billIndex + 1}笔`;
         set((state) => ({
-          messages: state.messages.map((msg) =>
-            msg.id === params.messageId
-              ? {
-                  ...msg,
-                  billId: result.billId ?? null,
-                  metadata: {
-                    ...msg.metadata!,
-                    type: msg.metadata!.parseResults!.every(
-                      (pr, i) => i === params.billIndex || pr.needsConfirm === false,
-                    )
-                      ? ('confirmed' as const)
-                      : ('confirm_card' as const),
-                    parseResults: msg.metadata!.parseResults!.map((pr, i) =>
-                      i === params.billIndex ? { ...pr, ...params.edits, needsConfirm: false } : pr,
-                    ),
-                  },
-                }
-              : msg,
-          ),
+          messages: [
+            ...state.messages.map((msg) =>
+              msg.id === params.messageId
+                ? {
+                    ...msg,
+                    billId: result.billId ?? null,
+                    metadata: {
+                      ...msg.metadata!,
+                      type: msg.metadata!.parseResults!.every(
+                        (pr, i) => i === params.billIndex || pr.needsConfirm === false,
+                      )
+                        ? ('confirmed' as const)
+                        : ('confirm_card' as const),
+                      parseResults: msg.metadata!.parseResults!.map((pr, i) =>
+                        i === params.billIndex
+                          ? { ...pr, ...params.edits, needsConfirm: false }
+                          : pr,
+                      ),
+                    },
+                  }
+                : msg,
+            ),
+            {
+              id: `confirm-${params.messageId}-${params.billIndex}`,
+              userId: '',
+              role: 'user' as const,
+              content: confirmContent,
+              billId: result.billId ?? null,
+              metadata: null,
+              createdAt: new Date().toISOString(),
+            },
+          ],
         }));
         useBillStore.getState().fetchTodaySummary();
       }
@@ -114,26 +131,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const result = await chatService.confirmAllBills(params);
       if (result.confirmed) {
         set((state) => ({
-          messages: state.messages.map((msg) =>
-            msg.id === params.messageId
-              ? {
-                  ...msg,
-                  billId: result.billIds?.[0] ?? null,
-                  metadata: {
-                    ...msg.metadata!,
-                    type: 'confirmed' as const,
-                    parseResults: msg.metadata!.parseResults!.map((pr, i) => {
-                      const billEdits = params.edits?.[i];
-                      return {
-                        ...pr,
-                        ...(billEdits || {}),
-                        needsConfirm: false,
-                      };
-                    }),
-                  },
-                }
-              : msg,
-          ),
+          messages: [
+            ...state.messages.map((msg) =>
+              msg.id === params.messageId
+                ? {
+                    ...msg,
+                    billId: result.billIds?.[0] ?? null,
+                    metadata: {
+                      ...msg.metadata!,
+                      type: 'confirmed' as const,
+                      parseResults: msg.metadata!.parseResults!.map((pr, i) => {
+                        const billEdits = params.edits?.[i];
+                        return {
+                          ...pr,
+                          ...(billEdits || {}),
+                          needsConfirm: false,
+                        };
+                      }),
+                    },
+                  }
+                : msg,
+            ),
+            {
+              id: `confirm-all-${params.messageId}`,
+              userId: '',
+              role: 'user' as const,
+              content: '全部确认',
+              billId: result.billIds?.[0] ?? null,
+              metadata: null,
+              createdAt: new Date().toISOString(),
+            },
+          ],
         }));
         useBillStore.getState().fetchTodaySummary();
       }
@@ -155,7 +183,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
               ? { ...msg, metadata: { ...msg.metadata!, type: 'rejected' as const } }
               : msg,
           );
-          return { messages: updated };
+          return {
+            messages: [
+              ...updated,
+              {
+                id: `reject-${messageId}`,
+                userId: '',
+                role: 'user' as const,
+                content: '取消',
+                billId: null,
+                metadata: null,
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: `reject-reply-${messageId}`,
+                userId: '',
+                role: 'assistant' as const,
+                content: '好的，已取消这些记录。有需要随时告诉我。',
+                billId: null,
+                metadata: null,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          };
         });
       }
       return result.rejected;

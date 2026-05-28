@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   Animated,
@@ -15,6 +16,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { AddBillModal } from '@/components/AddBillModal';
 import { useStatsStore, type DayGroup } from '@/stores/stats';
+import { useCategoryStore } from '@/stores/category';
 import { billService } from '@/services/bill';
 import type { Bill } from '@/services/bill/types';
 
@@ -54,27 +56,55 @@ function MonthSummaryCard() {
 
 // ── 筛选栏 ──
 function FilterBar() {
-  const { flowFilter, drillCategoryName, setFlowFilter, resetFlowFilter } = useStatsStore();
+  const { flowFilter, drillCategoryName, setFlowFilter, resetFlowFilter, selectedType } =
+    useStatsStore();
+  const categories = useCategoryStore((s) => s.categories);
+  const fetchCategories = useCategoryStore((s) => s.fetchCategories);
   const [expanded, setExpanded] = useState(false);
 
   const hasFilter = !!flowFilter.type || !!flowFilter.categoryId || !!drillCategoryName;
+
+  const activeLabel =
+    flowFilter.type === 'expense' ? '支出' : flowFilter.type === 'income' ? '收入' : null;
+
+  const activeCategory = flowFilter.categoryId
+    ? categories.find((c) => c.id === flowFilter.categoryId)
+    : null;
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const filteredCategories = categories.filter((c) => {
+    if (flowFilter.type) return c.type === flowFilter.type;
+    return c.type === selectedType;
+  });
+
+  const filterLabelParts: string[] = [];
+  if (activeLabel) filterLabelParts.push(activeLabel);
+  if (activeCategory) filterLabelParts.push(activeCategory.name);
 
   return (
     <View style={s.filterWrap}>
       <View style={s.filterRow}>
         <TouchableOpacity
-          style={s.searchBox}
+          style={[s.filterBtn, hasFilter && s.filterBtnActive]}
           activeOpacity={0.7}
           onPress={() => setExpanded(!expanded)}
         >
-          <MaterialCommunityIcons name="magnify" size={18} color={colors.textTertiary} />
-          <Text style={s.searchPlaceholder}>
-            {flowFilter.type === 'expense'
-              ? '筛选：支出'
-              : flowFilter.type === 'income'
-                ? '筛选：收入'
-                : '搜索备注、分类名...'}
+          <MaterialCommunityIcons
+            name="filter-variant"
+            size={16}
+            color={hasFilter ? colors.accent : colors.textTertiary}
+          />
+          <Text style={[s.filterBtnText, hasFilter && s.filterBtnTextActive]}>
+            {filterLabelParts.length > 0 ? `筛选：${filterLabelParts.join('·')}` : '筛选'}
           </Text>
+          <MaterialCommunityIcons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color={hasFilter ? colors.accent : colors.textQuaternary}
+          />
         </TouchableOpacity>
         {hasFilter && (
           <TouchableOpacity style={s.resetBtn} onPress={resetFlowFilter} activeOpacity={0.7}>
@@ -83,7 +113,7 @@ function FilterBar() {
         )}
       </View>
 
-      {drillCategoryName && (
+      {drillCategoryName && !expanded && (
         <View style={s.drillTag}>
           <Text style={s.drillTagText}>{drillCategoryName}</Text>
           <TouchableOpacity onPress={resetFlowFilter} activeOpacity={0.6}>
@@ -94,6 +124,7 @@ function FilterBar() {
 
       {expanded && (
         <View style={s.filterExpanded}>
+          <Text style={s.filterSectionLabel}>类型</Text>
           <View style={s.filterChips}>
             <TouchableOpacity
               style={[s.chip, flowFilter.type === 'expense' && s.chipActive]}
@@ -118,6 +149,37 @@ function FilterBar() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          <Text style={s.filterSectionLabel}>分类</Text>
+          <ScrollView
+            style={s.categoryScroll}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={s.filterChips}>
+              {filteredCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[s.chip, flowFilter.categoryId === cat.id && s.chipActive]}
+                  onPress={() =>
+                    setFlowFilter({
+                      categoryId: flowFilter.categoryId === cat.id ? undefined : cat.id,
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <CategoryIcon
+                    iconKey={cat.icon}
+                    size={12}
+                    color={flowFilter.categoryId === cat.id ? colors.accent : colors.textTertiary}
+                  />
+                  <Text style={[s.chipText, flowFilter.categoryId === cat.id && s.chipTextActive]}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       )}
     </View>
@@ -469,19 +531,27 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  searchBox: {
-    flex: 1,
+  filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.fillTertiary,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
-  searchPlaceholder: {
+  filterBtnActive: {
+    backgroundColor: colors.accentSubtle,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.accent,
+  },
+  filterBtnText: {
     ...typography.footnote,
     color: colors.textTertiary,
+  },
+  filterBtnTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
   },
   resetBtn: {
     width: 32,
@@ -509,11 +579,22 @@ const s = StyleSheet.create({
     marginTop: spacing.sm,
     gap: spacing.sm,
   },
+  filterSectionLabel: {
+    ...typography.caption1,
+    color: colors.textTertiary,
+    fontWeight: '600',
+  },
+  categoryScroll: {
+    maxHeight: 120,
+  },
   filterChips: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radius.xs,

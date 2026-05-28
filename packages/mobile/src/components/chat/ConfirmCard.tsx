@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { colors, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
@@ -35,17 +28,12 @@ interface BillItemState {
 }
 
 function isBillValid(state: BillItemState): boolean {
-  const amount = state.edits.amount ?? state.parse.amount;
+  const amount = state.edits.amount ?? state.parse.amount ?? 0;
   return amount > 0;
 }
 
 function hasEdits(edits: BillEdits): boolean {
-  return !!(
-    edits.categoryId ||
-    edits.amount !== undefined ||
-    edits.note ||
-    edits.accountName
-  );
+  return !!(edits.categoryId || edits.amount !== undefined || edits.note || edits.accountName);
 }
 
 export function ConfirmCard({
@@ -71,7 +59,7 @@ export function ConfirmCard({
       parse,
       edits: {},
       confirmed: false,
-      amountText: parse.amount > 0 ? parse.amount.toString() : '',
+      amountText: (parse.amount ?? 0) > 0 ? (parse.amount ?? 0).toString() : '',
       categoryPickerVisible: false,
       accountPickerVisible: false,
     })),
@@ -80,7 +68,7 @@ export function ConfirmCard({
   const isMulti = parseResults.length > 1;
   const allConfirmed = billStates.every((s) => s.confirmed);
   const totalAmount = billStates.reduce(
-    (sum, s) => sum + (s.edits.amount ?? s.parse.amount),
+    (sum, s) => sum + (s.edits.amount ?? s.parse.amount ?? 0),
     0,
   );
   const allValid = billStates.every(isBillValid);
@@ -171,7 +159,7 @@ export function ConfirmCard({
             ]}
           />
           <Text style={s.confirmedText}>
-            {parse.categoryName} · ¥{parse.amount.toFixed(2)} · 已记录
+            {parse.categoryName} · ¥{(parse.amount ?? 0).toFixed(2)} · 已记录
           </Text>
         </View>
       </View>
@@ -204,14 +192,18 @@ export function ConfirmCard({
           const accentColor = isExpense ? colors.error : colors.success;
           const filteredCategories = categories.filter((c) => c.type === parse.type);
           const amountMissing = !isBillValid(state);
-          const accountMissing = !currentAccountName;
+          const accountMissing = isExpense && !currentAccountName;
 
           return (
             <View key={index} style={isMulti ? s.billItemContainer : undefined}>
               {isMulti && index > 0 && <View style={s.billDivider} />}
 
               <View style={s.amountRow}>
-                <Text style={[s.amountSign, { color: amountMissing ? colors.warning : accentColor }]}>¥</Text>
+                <Text
+                  style={[s.amountSign, { color: amountMissing ? colors.warning : accentColor }]}
+                >
+                  ¥
+                </Text>
                 <TextInput
                   style={[s.amountInput, { color: amountMissing ? colors.warning : accentColor }]}
                   value={state.amountText}
@@ -244,13 +236,21 @@ export function ConfirmCard({
                 <View style={s.hintRow}>
                   {amountMissing && (
                     <View style={s.hintItem}>
-                      <MaterialCommunityIcons name="alert-circle-outline" size={11} color={colors.warning} />
+                      <MaterialCommunityIcons
+                        name="alert-circle-outline"
+                        size={11}
+                        color={colors.warning}
+                      />
                       <Text style={s.hintText}>请输入金额</Text>
                     </View>
                   )}
                   {accountMissing && (
                     <View style={s.hintItem}>
-                      <MaterialCommunityIcons name="alert-circle-outline" size={11} color={colors.warning} />
+                      <MaterialCommunityIcons
+                        name="alert-circle-outline"
+                        size={11}
+                        color={colors.warning}
+                      />
                       <Text style={s.hintText}>请选择账户</Text>
                     </View>
                   )}
@@ -328,10 +328,17 @@ export function ConfirmCard({
                   }}
                   activeOpacity={0.5}
                 >
-                  <Text style={[s.fieldLabel, accountMissing && s.fieldLabelWarn]}>账户</Text>
+                  <Text style={[s.fieldLabel, accountMissing && s.fieldLabelWarn]}>
+                    {isExpense ? '账户' : '账户（选填）'}
+                  </Text>
                   <View style={s.fieldRight}>
-                    <Text style={[s.fieldValue, !currentAccountName && s.fieldPlaceholderWarn]}>
-                      {currentAccountName || '请选择'}
+                    <Text
+                      style={[
+                        s.fieldValue,
+                        !currentAccountName && isExpense && s.fieldPlaceholderWarn,
+                      ]}
+                    >
+                      {currentAccountName || (isExpense ? '请选择' : '选填')}
                     </Text>
                     <MaterialCommunityIcons
                       name={state.accountPickerVisible ? 'chevron-up' : 'chevron-right'}
@@ -373,11 +380,7 @@ export function ConfirmCard({
                 </View>
                 {parse.warning && (
                   <View style={s.metaItem}>
-                    <MaterialCommunityIcons
-                      name="alert-outline"
-                      size={11}
-                      color={colors.warning}
-                    />
+                    <MaterialCommunityIcons name="alert-outline" size={11} color={colors.warning} />
                     <Text style={s.metaHint}>{parse.warning}</Text>
                   </View>
                 )}
@@ -385,12 +388,20 @@ export function ConfirmCard({
 
               {isMulti && !state.confirmed && (
                 <TouchableOpacity
-                  style={[s.singleConfirmBtn, { borderColor: amountMissing ? colors.textQuaternary : accentColor }]}
+                  style={[
+                    s.singleConfirmBtn,
+                    { borderColor: amountMissing ? colors.textQuaternary : accentColor },
+                  ]}
                   onPress={() => handleConfirmSingle(index)}
                   disabled={amountMissing}
                   activeOpacity={0.6}
                 >
-                  <Text style={[s.singleConfirmText, { color: amountMissing ? colors.textQuaternary : accentColor }]}>
+                  <Text
+                    style={[
+                      s.singleConfirmText,
+                      { color: amountMissing ? colors.textQuaternary : accentColor },
+                    ]}
+                  >
                     确认此笔
                   </Text>
                 </TouchableOpacity>
@@ -410,12 +421,15 @@ export function ConfirmCard({
         </TouchableOpacity>
         {isMulti ? (
           <TouchableOpacity
-            style={[s.confirmBtn, { backgroundColor: allValid ? colors.accent : colors.textQuaternary }]}
+            style={[
+              s.confirmBtn,
+              { backgroundColor: allValid ? colors.accent : colors.textQuaternary },
+            ]}
             onPress={handleConfirmAll}
             disabled={!allValid}
             activeOpacity={0.6}
           >
-            <Text style={s.confirmText}>全部确认（{parseResults.length}笔）</Text>
+            <Text style={s.confirmText}>全部确认</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity

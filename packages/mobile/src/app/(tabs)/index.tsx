@@ -15,6 +15,7 @@ import { useIsFocused } from 'expo-router';
 import { useChatStore } from '@/stores/chat';
 import { useBillStore } from '@/stores/bill';
 import { useCategoryStore } from '@/stores/category';
+import { useAccountStore } from '@/stores/account';
 import { AddBillModal } from '@/components/AddBillModal';
 import { colors, spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -42,6 +43,7 @@ export default function HomeScreen() {
   const fetchBills = useBillStore((s) => s.fetchBills);
   const createBill = useBillStore((s) => s.createBill);
   const fetchCategories = useCategoryStore((s) => s.fetchCategories);
+  const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
 
   const [inputText, setInputText] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -54,6 +56,7 @@ export default function HomeScreen() {
     if (isFocused) {
       fetchHistory();
       fetchCategories();
+      fetchAccounts();
       fetchTodaySummary();
     }
   }, [isFocused]);

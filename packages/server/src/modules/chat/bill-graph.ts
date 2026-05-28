@@ -115,7 +115,7 @@ async function semanticParse(
 4. 日期格式为 YYYY-MM-DD，"今天"用${today}，"昨天"用${yesterday}
 5. 如果金额看起来异常（如午饭500），在warning中提醒
 6. confidence: high=金额+分类都明确, medium=金额明确但分类不确定, low=信息不完整
-7. 账户名必须从下面的可用账户中选择，用户未提及账户时accountName设为空字符串
+7. 账户名必须从下面的可用账户中选择，仅支出类型需要账户，收入类型accountName设为空字符串
 8. 用户可能一次输入多笔消费（如"午饭25，打车15，奶茶8"），必须将每笔消费拆分为 bills 数组中的独立项
 9. 如果用户只输入了一笔消费，bills 数组中只有一项
 
@@ -242,7 +242,7 @@ function evaluateAndReply(state: BillStateType): Partial<BillStateType> {
       !!b.warning ||
       !b.amount ||
       !b.categoryId ||
-      !b.accountName,
+      (b.type === 'expense' && !b.accountName),
   );
 
   return { needsConfirm };

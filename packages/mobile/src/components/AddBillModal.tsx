@@ -105,6 +105,7 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
   const handleTypeSwitch = (type: 'expense' | 'income') => {
     setBillType(type);
     setSelectedCategoryId('');
+    if (type === 'income') setAccount('');
   };
 
   const handleSubmit = async () => {
@@ -228,23 +229,25 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
               </View>
 
               {/* 账户 */}
-              <View style={s.fieldSection}>
-                <Text style={s.fieldLabel}>账户</Text>
-                <View style={s.accountRow}>
-                  {accounts.map((acc) => (
-                    <TouchableOpacity
-                      key={acc.id}
-                      style={[s.accountItem, account === acc.name && s.accountItemActive]}
-                      onPress={() => setAccount(acc.name === account ? '' : acc.name)}
-                      activeOpacity={0.6}
-                    >
-                      <Text style={[s.accountText, account === acc.name && s.accountTextActive]}>
-                        {acc.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+              {billType === 'expense' && (
+                <View style={s.fieldSection}>
+                  <Text style={s.fieldLabel}>账户</Text>
+                  <View style={s.accountRow}>
+                    {accounts.map((acc) => (
+                      <TouchableOpacity
+                        key={acc.id}
+                        style={[s.accountItem, account === acc.name && s.accountItemActive]}
+                        onPress={() => setAccount(acc.name === account ? '' : acc.name)}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={[s.accountText, account === acc.name && s.accountTextActive]}>
+                          {acc.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* 备注 */}
               <View style={s.fieldSection}>

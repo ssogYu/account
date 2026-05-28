@@ -137,4 +137,11 @@ export class QueryBillDto {
   @IsString()
   @IsOptional()
   month?: string;
+
+  @ApiPropertyOptional({
+    description: '成员用户ID筛选（家庭组模式下按成员筛选）',
+  })
+  @IsString()
+  @IsOptional()
+  userId?: string;
 }

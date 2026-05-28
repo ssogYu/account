@@ -6,12 +6,14 @@ import {
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useIsFocused } from 'expo-router';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useStatsStore } from '@/stores/stats';
+import { useAuthStore } from '@/stores/auth';
 import { BillFlowView } from '@/components/stats/BillFlowView';
 import { ChartView } from '@/components/stats/ChartView';
 
@@ -23,11 +25,15 @@ export default function StatsScreen() {
     isLoading,
     activeTab,
     monthSummary,
+    familyInfo,
+    selectedMemberId,
     fetchAll,
     setSelectedMonth,
     setSelectedType,
     setActiveTab,
+    setSelectedMemberId,
   } = useStatsStore();
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   const isFocused = useIsFocused();
 
@@ -69,16 +75,28 @@ export default function StatsScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.6}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.6}
+          >
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.monthSelector}>
-            <TouchableOpacity onPress={handlePrevMonth} activeOpacity={0.6} style={styles.monthArrow}>
+            <TouchableOpacity
+              onPress={handlePrevMonth}
+              activeOpacity={0.6}
+              style={styles.monthArrow}
+            >
               <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             <Text style={styles.monthLabel}>{formatMonthLabel(selectedMonth)}</Text>
-            <TouchableOpacity onPress={handleNextMonth} activeOpacity={0.6} style={styles.monthArrow}>
+            <TouchableOpacity
+              onPress={handleNextMonth}
+              activeOpacity={0.6}
+              style={styles.monthArrow}
+            >
               <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -112,6 +130,50 @@ export default function StatsScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {familyInfo && familyInfo.members.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.memberBar}
+            contentContainerStyle={styles.memberBarContent}
+          >
+            <TouchableOpacity
+              style={[styles.memberChip, !selectedMemberId && styles.memberChipActive]}
+              onPress={() => setSelectedMemberId(null)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[styles.memberChipText, !selectedMemberId && styles.memberChipTextActive]}
+              >
+                全部
+              </Text>
+            </TouchableOpacity>
+            {familyInfo.members.map((member) => {
+              const isActive = selectedMemberId === member.userId;
+              const isMe = member.userId === currentUserId;
+              return (
+                <TouchableOpacity
+                  key={member.userId}
+                  style={[styles.memberChip, isActive && styles.memberChipActive]}
+                  onPress={() => setSelectedMemberId(isActive ? null : member.userId)}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[styles.memberAvatarSmall, isActive && styles.memberAvatarSmallActive]}
+                  >
+                    <Text style={styles.memberAvatarCharSmall}>
+                      {member.user.nickname?.[0] ?? '?'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.memberChipText, isActive && styles.memberChipTextActive]}>
+                    {isMe ? '我' : member.user.nickname || '成员'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
 
       <View style={styles.tabBar}>
@@ -221,6 +283,53 @@ const styles = StyleSheet.create({
   typeBtnAmount: {
     ...typography.caption1,
     fontWeight: '700',
+  },
+
+  memberBar: {
+    marginHorizontal: -spacing.lg,
+  },
+  memberBarContent: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  memberChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.xl,
+    backgroundColor: colors.fillTertiary,
+  },
+  memberChipActive: {
+    backgroundColor: colors.accentSubtle,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.accent,
+  },
+  memberChipText: {
+    ...typography.caption1,
+    color: colors.textTertiary,
+  },
+  memberChipTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  memberAvatarSmall: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.fillSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarSmallActive: {
+    backgroundColor: colors.accent,
+  },
+  memberAvatarCharSmall: {
+    ...typography.caption2,
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.text,
   },
 
   tabBar: {

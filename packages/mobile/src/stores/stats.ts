@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { billService } from '@/services/bill';
 import type { Bill, BillListResult, BillSummary, QueryBillParams } from '@/services/bill/types';
 import type { CategoryStats, DailyStats, MonthlyComparison } from '@/services/bill/stats.types';
+import { familyService } from '@/services/family';
+import type { FamilyInfo } from '@/services/family/types';
 
 // ── 筛选状态 ──
 export interface FlowFilter {
@@ -9,6 +11,7 @@ export interface FlowFilter {
   type?: 'expense' | 'income';
   categoryId?: string;
   month?: string;
+  userId?: string;
 }
 
 // ── 按日分组的账单 ──
@@ -97,17 +100,23 @@ interface StatsState {
   drillCategoryName: string | null;
   activeTab: 'flow' | 'chart';
 
+  // ── 家庭成员 ──
+  familyInfo: FamilyInfo | null;
+  selectedMemberId: string | null;
+
   // ── Actions ──
   setSelectedMonth: (month: string) => void;
   setSelectedType: (type: 'expense' | 'income') => void;
   setActiveTab: (tab: 'flow' | 'chart') => void;
   setFlowFilter: (filter: Partial<FlowFilter>) => void;
   resetFlowFilter: () => void;
+  setSelectedMemberId: (userId: string | null) => void;
   fetchFlowList: (append?: boolean) => Promise<void>;
   fetchMonthSummary: (month?: string) => Promise<void>;
   fetchCategoryStats: (month?: string, type?: string) => Promise<void>;
   fetchDailyStats: (month?: string) => Promise<void>;
   fetchMonthlyComparison: (month?: string) => Promise<void>;
+  fetchFamilyInfo: () => Promise<void>;
   fetchAll: (month?: string) => Promise<void>;
   drillToFlow: (categoryId: string, categoryName: string) => void;
   deleteBill: (billId: string) => Promise<void>;
@@ -134,6 +143,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   drillCategoryId: null,
   drillCategoryName: null,
   activeTab: 'flow',
+
+  familyInfo: null,
+  selectedMemberId: null,
 
   setSelectedMonth(month: string) {
     const { selectedType } = get();
@@ -193,8 +205,25 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     get().fetchFlowList();
   },
 
+  setSelectedMemberId(userId: string | null) {
+    set({
+      selectedMemberId: userId,
+      flowFilter: { ...get().flowFilter, userId: userId ?? undefined },
+      flowPage: 1,
+      flowGroups: [],
+      flowHasMore: true,
+    });
+    const { selectedMonth, selectedType } = get();
+    get().fetchFlowList();
+    get().fetchMonthSummary(selectedMonth);
+    get().fetchCategoryStats(selectedMonth, selectedType);
+    get().fetchDailyStats(selectedMonth);
+    get().fetchMonthlyComparison(selectedMonth);
+  },
+
   async fetchFlowList(append = false) {
-    const { selectedMonth, flowFilter, flowPage, flowGroups, drillCategoryId } = get();
+    const { selectedMonth, flowFilter, flowPage, flowGroups, drillCategoryId, selectedMemberId } =
+      get();
     const params: QueryBillParams = {
       page: flowPage,
       pageSize: PAGE_SIZE,
@@ -204,6 +233,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     if (flowFilter.categoryId || drillCategoryId) {
       params.categoryId = flowFilter.categoryId ?? drillCategoryId ?? undefined;
     }
+    if (selectedMemberId) params.userId = selectedMemberId;
 
     try {
       const result: BillListResult = await billService.findMany(params);
@@ -242,8 +272,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchMonthSummary(month?: string) {
+    const { selectedMemberId } = get();
     try {
-      const monthSummary = await billService.getSummary(month);
+      const monthSummary = await billService.getSummary(month, selectedMemberId ?? undefined);
       set({ monthSummary });
     } catch {
       // 静默
@@ -251,8 +282,13 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchCategoryStats(month?: string, type?: string) {
+    const { selectedMemberId } = get();
     try {
-      const categoryStats = await billService.getCategoryStats(month, type);
+      const categoryStats = await billService.getCategoryStats(
+        month,
+        type,
+        selectedMemberId ?? undefined,
+      );
       set({ categoryStats });
     } catch {
       // 静默
@@ -260,8 +296,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchDailyStats(month?: string) {
+    const { selectedMemberId } = get();
     try {
-      const dailyStats = await billService.getDailyStats(month);
+      const dailyStats = await billService.getDailyStats(month, selectedMemberId ?? undefined);
       set({ dailyStats });
     } catch {
       // 静默
@@ -269,9 +306,22 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchMonthlyComparison(month?: string) {
+    const { selectedMemberId } = get();
     try {
-      const monthlyComparison = await billService.getMonthlyComparison(month);
+      const monthlyComparison = await billService.getMonthlyComparison(
+        month,
+        selectedMemberId ?? undefined,
+      );
       set({ monthlyComparison });
+    } catch {
+      // 静默
+    }
+  },
+
+  async fetchFamilyInfo() {
+    try {
+      const { data: res } = await familyService.getMyFamily();
+      set({ familyInfo: res.data });
     } catch {
       // 静默
     }
@@ -280,19 +330,21 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   async fetchAll(month?: string) {
     const m = month ?? get().selectedMonth;
     const type = get().selectedType;
+    const memberFilter = get().selectedMemberId ?? undefined;
     set({ isLoading: true });
     try {
       const [monthSummary, categoryStats, dailyStats, monthlyComparison] = await Promise.all([
-        billService.getSummary(m),
-        billService.getCategoryStats(m, type),
-        billService.getDailyStats(m),
-        billService.getMonthlyComparison(m),
+        billService.getSummary(m, memberFilter),
+        billService.getCategoryStats(m, type, memberFilter),
+        billService.getDailyStats(m, memberFilter),
+        billService.getMonthlyComparison(m, memberFilter),
       ]);
       set({ monthSummary, categoryStats, dailyStats, monthlyComparison, isLoading: false });
     } catch {
       set({ isLoading: false });
     }
     get().fetchFlowList();
+    get().fetchFamilyInfo();
   },
 
   /** 图表下钻：点击饼图分类 → 切换流水视图 + 自动筛选该分类 */

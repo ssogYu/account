@@ -1,5 +1,11 @@
 import type { Category } from '../category/types';
 
+export interface BillUser {
+  id: string;
+  nickname: string | null;
+  avatar: string | null;
+}
+
 export interface Bill {
   id: string;
   userId: string;
@@ -14,6 +20,7 @@ export interface Bill {
   createdAt: string;
   updatedAt: string;
   category?: Category;
+  user?: BillUser;
 }
 
 export interface BillListResult {
@@ -64,4 +71,5 @@ export interface QueryBillParams {
   startDate?: string;
   endDate?: string;
   month?: string;
+  userId?: string;
 }

@@ -43,8 +43,9 @@ export class BillController {
   getSummary(
     @CurrentUser() user: { id: string },
     @Query('month') month?: string,
+    @Query('userId') filterUserId?: string,
   ) {
-    return this.billService.getSummary(user.id, month);
+    return this.billService.getSummary(user.id, month, filterUserId);
   }
 
   @Get('today')
@@ -61,8 +62,14 @@ export class BillController {
     @CurrentUser() user: { id: string },
     @Query('month') month?: string,
     @Query('type') type?: string,
+    @Query('userId') filterUserId?: string,
   ) {
-    return this.billService.getCategoryStats(user.id, month, type);
+    return this.billService.getCategoryStats(
+      user.id,
+      month,
+      type,
+      filterUserId,
+    );
   }
 
   @Get('stats/daily')
@@ -71,8 +78,9 @@ export class BillController {
   getDailyStats(
     @CurrentUser() user: { id: string },
     @Query('month') month?: string,
+    @Query('userId') filterUserId?: string,
   ) {
-    return this.billService.getDailyStats(user.id, month);
+    return this.billService.getDailyStats(user.id, month, filterUserId);
   }
 
   @Get('stats/comparison')
@@ -81,8 +89,9 @@ export class BillController {
   getMonthlyComparison(
     @CurrentUser() user: { id: string },
     @Query('month') month?: string,
+    @Query('userId') filterUserId?: string,
   ) {
-    return this.billService.getMonthlyComparison(user.id, month);
+    return this.billService.getMonthlyComparison(user.id, month, filterUserId);
   }
 
   @Get(':id')

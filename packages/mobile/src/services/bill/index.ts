@@ -36,9 +36,9 @@ export const billService = {
     await api.delete(`/bill/${id}`);
   },
 
-  async getSummary(month?: string): Promise<BillSummary> {
+  async getSummary(month?: string, userId?: string): Promise<BillSummary> {
     const { data } = await api.get<ApiResponse<BillSummary>>('/bill/summary', {
-      params: month ? { month } : undefined,
+      params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
     });
     return data.data;
   },
@@ -48,23 +48,27 @@ export const billService = {
     return data.data;
   },
 
-  async getCategoryStats(month?: string, type?: string): Promise<CategoryStats> {
+  async getCategoryStats(month?: string, type?: string, userId?: string): Promise<CategoryStats> {
     const { data } = await api.get<ApiResponse<CategoryStats>>('/bill/stats/category', {
-      params: { ...(month ? { month } : {}), ...(type ? { type } : {}) },
+      params: {
+        ...(month ? { month } : {}),
+        ...(type ? { type } : {}),
+        ...(userId ? { userId } : {}),
+      },
     });
     return data.data;
   },
 
-  async getDailyStats(month?: string): Promise<DailyStats> {
+  async getDailyStats(month?: string, userId?: string): Promise<DailyStats> {
     const { data } = await api.get<ApiResponse<DailyStats>>('/bill/stats/daily', {
-      params: month ? { month } : undefined,
+      params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
     });
     return data.data;
   },
 
-  async getMonthlyComparison(month?: string): Promise<MonthlyComparison> {
+  async getMonthlyComparison(month?: string, userId?: string): Promise<MonthlyComparison> {
     const { data } = await api.get<ApiResponse<MonthlyComparison>>('/bill/stats/comparison', {
-      params: month ? { month } : undefined,
+      params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
     });
     return data.data;
   },

@@ -16,6 +16,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { AddBillModal } from '@/components/AddBillModal';
 import { useStatsStore, type DayGroup } from '@/stores/stats';
+import { useAuthStore } from '@/stores/auth';
 import { billService } from '@/services/bill';
 import type { Bill } from '@/services/bill/types';
 
@@ -135,11 +136,14 @@ function BillItem({
   bill,
   onDelete,
   onEdit,
+  showMemberTag,
 }: {
   bill: Bill;
   onDelete: (id: string) => void;
   onEdit: (bill: Bill) => void;
+  showMemberTag: boolean;
 }) {
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const translateX = useRef(new Animated.Value(0)).current;
   const isSwipedOpen = useRef(false);
   const isExpense = bill.type === 'expense';
@@ -251,6 +255,11 @@ function BillItem({
               <Text style={s.billNote} numberOfLines={1}>
                 {bill.note || bill.category?.name || '未分类'}
               </Text>
+              {showMemberTag && bill.user && bill.userId !== currentUserId && (
+                <View style={s.memberTag}>
+                  <Text style={s.memberTagText}>{bill.user.nickname?.[0] ?? '?'}</Text>
+                </View>
+              )}
               {bill.account ? (
                 <View style={s.accountTag}>
                   <Text style={s.accountTagText}>{bill.account}</Text>
@@ -292,9 +301,11 @@ function DateHeader({ group }: { group: DayGroup }) {
 
 // ── 流水视图主体 ──
 export function BillFlowView() {
-  const { flowGroups, flowHasMore, deleteBill, fetchFlowList, flowPage } = useStatsStore();
+  const { flowGroups, flowHasMore, deleteBill, fetchFlowList, flowPage, familyInfo } =
+    useStatsStore();
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
+  const showMemberTag = !!familyInfo && familyInfo.members.length > 1;
 
   const handleEdit = useCallback((bill: Bill) => {
     setBillToEdit(bill);
@@ -343,11 +354,17 @@ export function BillFlowView() {
       <View style={s.daySection}>
         <DateHeader group={item} />
         {item.bills.map((bill) => (
-          <BillItem key={bill.id} bill={bill} onDelete={deleteBill} onEdit={handleEdit} />
+          <BillItem
+            key={bill.id}
+            bill={bill}
+            onDelete={deleteBill}
+            onEdit={handleEdit}
+            showMemberTag={showMemberTag}
+          />
         ))}
       </View>
     ),
-    [deleteBill, handleEdit],
+    [deleteBill, handleEdit, showMemberTag],
   );
 
   const listHeader = useCallback(() => <FlowHeader />, []);
@@ -629,6 +646,18 @@ const s = StyleSheet.create({
     ...typography.caption2,
     fontSize: 10,
     color: colors.accent,
+    fontWeight: '600',
+  },
+  memberTag: {
+    backgroundColor: colors.fillSecondary,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  memberTagText: {
+    ...typography.caption2,
+    fontSize: 10,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   billNote: {

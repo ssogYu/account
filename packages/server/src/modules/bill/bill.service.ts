@@ -42,6 +42,7 @@ export class BillService {
       startDate,
       endDate,
       month,
+      userId: filterUserId,
     } = query;
 
     const where = await this.buildListWhere(userId, {
@@ -50,13 +51,17 @@ export class BillService {
       startDate,
       endDate,
       month,
+      filterUserId,
     });
 
     const [total, items] = await Promise.all([
       this.prisma.bill.count({ where }),
       this.prisma.bill.findMany({
         where,
-        include: { category: true },
+        include: {
+          category: true,
+          user: { select: { id: true, nickname: true, avatar: true } },
+        },
         orderBy: { date: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -121,7 +126,7 @@ export class BillService {
   }
 
   /** 获取月度收支汇总 */
-  async getSummary(userId: string, month?: string) {
+  async getSummary(userId: string, month?: string, filterUserId?: string) {
     const targetMonth = month ?? this.getCurrentMonth();
     const [year, m] = targetMonth.split('-').map(Number);
     const start = new Date(year, m - 1, 1);
@@ -131,6 +136,7 @@ export class BillService {
       userId,
       start,
       end,
+      filterUserId,
     );
 
     return { month: targetMonth, totalExpense, totalIncome, balance };
@@ -151,7 +157,12 @@ export class BillService {
   }
 
   /** 获取分类汇总统计 */
-  async getCategoryStats(userId: string, month?: string, type?: string) {
+  async getCategoryStats(
+    userId: string,
+    month?: string,
+    type?: string,
+    filterUserId?: string,
+  ) {
     const targetMonth = month ?? this.getCurrentMonth();
     const [year, m] = targetMonth.split('-').map(Number);
     const start = new Date(year, m - 1, 1);
@@ -170,6 +181,7 @@ export class BillService {
     const where: Prisma.BillWhereInput = {
       ...baseWhere,
       ...(type ? { type } : {}),
+      ...(filterUserId ? { userId: filterUserId } : {}),
     };
 
     const bills = await this.prisma.bill.findMany({
@@ -225,7 +237,7 @@ export class BillService {
   }
 
   /** 获取每日趋势统计 */
-  async getDailyStats(userId: string, month?: string) {
+  async getDailyStats(userId: string, month?: string, filterUserId?: string) {
     const targetMonth = month ?? this.getCurrentMonth();
     const [year, m] = targetMonth.split('-').map(Number);
     const start = new Date(year, m - 1, 1);
@@ -241,13 +253,15 @@ export class BillService {
       ? { familyId: membership.familyId, date: dateFilter }
       : { userId, date: dateFilter };
 
+    const memberFilter = filterUserId ? { userId: filterUserId } : {};
+
     const [expenseBills, incomeBills] = await Promise.all([
       this.prisma.bill.findMany({
-        where: { ...baseWhere, type: 'expense' },
+        where: { ...baseWhere, ...memberFilter, type: 'expense' },
         select: { date: true, amount: true },
       }),
       this.prisma.bill.findMany({
-        where: { ...baseWhere, type: 'income' },
+        where: { ...baseWhere, ...memberFilter, type: 'income' },
         select: { date: true, amount: true },
       }),
     ]);
@@ -285,15 +299,19 @@ export class BillService {
   }
 
   /** 获取月度对比统计 */
-  async getMonthlyComparison(userId: string, month?: string) {
+  async getMonthlyComparison(
+    userId: string,
+    month?: string,
+    filterUserId?: string,
+  ) {
     const currentMonth = month ?? this.getCurrentMonth();
     const [year, m] = currentMonth.split('-').map(Number);
     const prevMonthDate = new Date(year, m - 2, 1);
     const prevMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
     const [current, previous] = await Promise.all([
-      this.getSummary(userId, currentMonth),
-      this.getSummary(userId, prevMonth),
+      this.getSummary(userId, currentMonth, filterUserId),
+      this.getSummary(userId, prevMonth, filterUserId),
     ]);
 
     const expenseChange = previous.totalExpense
@@ -334,6 +352,7 @@ export class BillService {
       startDate?: string;
       endDate?: string;
       month?: string;
+      filterUserId?: string;
     },
   ): Promise<Prisma.BillWhereInput> {
     const membership = await this.prisma.familyMember.findFirst({
@@ -345,6 +364,9 @@ export class BillService {
       ? { familyId: membership.familyId }
       : { userId };
 
+    if (filters.filterUserId) {
+      where.userId = filters.filterUserId;
+    }
     if (filters.type) {
       where.type = filters.type;
     }
@@ -365,7 +387,12 @@ export class BillService {
     return where;
   }
 
-  private async aggregateSummary(userId: string, start: Date, end: Date) {
+  private async aggregateSummary(
+    userId: string,
+    start: Date,
+    end: Date,
+    filterUserId?: string,
+  ) {
     const membership = await this.prisma.familyMember.findFirst({
       where: { userId },
       select: { familyId: true },
@@ -376,13 +403,15 @@ export class BillService {
       ? { familyId: membership.familyId, date: dateFilter }
       : { userId, date: dateFilter };
 
+    const memberFilter = filterUserId ? { userId: filterUserId } : {};
+
     const [expenseResult, incomeResult] = await Promise.all([
       this.prisma.bill.aggregate({
-        where: { ...baseWhere, type: 'expense' },
+        where: { ...baseWhere, ...memberFilter, type: 'expense' },
         _sum: { amount: true },
       }),
       this.prisma.bill.aggregate({
-        where: { ...baseWhere, type: 'income' },
+        where: { ...baseWhere, ...memberFilter, type: 'income' },
         _sum: { amount: true },
       }),
     ]);

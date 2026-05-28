@@ -35,20 +35,13 @@ function FlowHeader() {
   const [expanded, setExpanded] = useState(false);
 
   const balance = monthSummary?.balance ?? 0;
-  const hasFilter = !!flowFilter.type || !!flowFilter.categoryId || !!drillCategoryName;
-
-  const activeLabel =
-    flowFilter.type === 'expense' ? '支出' : flowFilter.type === 'income' ? '收入' : null;
+  const hasFilter = !!flowFilter.categoryId || !!drillCategoryName;
 
   const activeCategory = flowFilter.categoryId
     ? categoryStats?.items.find((c) => c.categoryId === flowFilter.categoryId)
     : null;
 
   const billCategories = categoryStats?.items ?? [];
-
-  const filterLabelParts: string[] = [];
-  if (activeLabel) filterLabelParts.push(activeLabel);
-  if (activeCategory) filterLabelParts.push(activeCategory.categoryName);
 
   return (
     <View style={s.flowHeader}>
@@ -71,7 +64,7 @@ function FlowHeader() {
               color={hasFilter ? colors.accent : colors.textTertiary}
             />
             <Text style={[s.filterBtnText, hasFilter && s.filterBtnTextActive]}>
-              {filterLabelParts.length > 0 ? filterLabelParts.join('·') : '筛选'}
+              {activeCategory ? activeCategory.categoryName : '筛选'}
             </Text>
           </TouchableOpacity>
           {hasFilter && (
@@ -93,32 +86,6 @@ function FlowHeader() {
 
       {expanded && (
         <View style={s.filterExpanded}>
-          <Text style={s.filterSectionLabel}>类型</Text>
-          <View style={s.filterChips}>
-            <TouchableOpacity
-              style={[s.chip, flowFilter.type === 'expense' && s.chipActive]}
-              onPress={() =>
-                setFlowFilter({ type: flowFilter.type === 'expense' ? undefined : 'expense' })
-              }
-              activeOpacity={0.7}
-            >
-              <Text style={[s.chipText, flowFilter.type === 'expense' && s.chipTextActive]}>
-                支出
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.chip, flowFilter.type === 'income' && s.chipActive]}
-              onPress={() =>
-                setFlowFilter({ type: flowFilter.type === 'income' ? undefined : 'income' })
-              }
-              activeOpacity={0.7}
-            >
-              <Text style={[s.chipText, flowFilter.type === 'income' && s.chipTextActive]}>
-                收入
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <Text style={s.filterSectionLabel}>分类</Text>
           <ScrollView
             style={s.categoryScroll}

@@ -14,14 +14,22 @@ interface DailyBarChartProps {
 export function DailyBarChart({ items, displayType }: DailyBarChartProps) {
   const accentColor = displayType === 'expense' ? colors.error : colors.success;
 
-  // 计算最大值用于缩放
-  const maxValue = Math.max(
-    ...items.map((d) => (displayType === 'expense' ? d.expense : d.income)),
-    1,
-  );
-
-  // 只显示有数据的日期范围，最多显示 31 天
   const displayItems = items.slice(-31);
+
+  const maxValue =
+    displayItems.length > 0
+      ? Math.max(...displayItems.map((d) => (displayType === 'expense' ? d.expense : d.income)), 1)
+      : 0;
+
+  if (displayItems.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.emptyChart}>
+          <Text style={styles.emptyText}>暂无趋势数据</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -31,7 +39,8 @@ export function DailyBarChart({ items, displayType }: DailyBarChartProps) {
           const value = displayType === 'expense' ? item.expense : item.income;
           const height = maxValue > 0 ? (value / maxValue) * 100 : 0;
           const day = item.date.split('-')[2];
-          const isToday = item.date ===
+          const isToday =
+            item.date ===
             `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
 
           return (
@@ -128,5 +137,14 @@ const styles = StyleSheet.create({
     ...typography.caption1,
     color: colors.textTertiary,
     marginLeft: 'auto',
+  },
+  emptyChart: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 140,
+  },
+  emptyText: {
+    ...typography.footnote,
+    color: colors.textTertiary,
   },
 });

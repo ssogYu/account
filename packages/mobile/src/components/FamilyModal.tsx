@@ -93,14 +93,14 @@ export function FamilyModal({ visible, onClose }: FamilyModalProps) {
   const handleLeave = () => {
     const isOwner = family?.myRole === 'owner';
     Alert.alert(
-      isOwner ? '解散家庭组' : '退出家庭组',
+      isOwner ? '删除家庭组' : '退出家庭组',
       isOwner
-        ? '解散后所有成员将被移出，确定要解散吗？'
+        ? '删除后所有成员将被移出，确定要删除吗？'
         : '退出后将无法查看家庭账单，确定要退出吗？',
       [
         { text: '取消', style: 'cancel' },
         {
-          text: isOwner ? '解散' : '退出',
+          text: isOwner ? '删除' : '退出',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -238,7 +238,7 @@ export function FamilyModal({ visible, onClose }: FamilyModalProps) {
 
         {/* 底部操作 */}
         <TouchableOpacity style={s.leaveBtn} onPress={handleLeave} activeOpacity={0.6}>
-          <Text style={s.leaveText}>{isOwner ? '解散家庭组' : '退出家庭组'}</Text>
+          <Text style={s.leaveText}>{isOwner ? '删除家庭组' : '退出家庭组'}</Text>
         </TouchableOpacity>
       </View>
     );

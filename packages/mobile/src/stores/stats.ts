@@ -120,7 +120,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   selectedType: 'expense',
   isLoading: false,
 
-  flowFilter: {},
+  flowFilter: { type: 'expense' },
   flowGroups: [],
   flowTotal: 0,
   flowPage: 1,
@@ -136,14 +136,32 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   activeTab: 'flow',
 
   setSelectedMonth(month: string) {
-    set({ selectedMonth: month, flowPage: 1, flowGroups: [], flowHasMore: true });
+    const { selectedType } = get();
+    set({
+      selectedMonth: month,
+      flowFilter: { type: selectedType },
+      flowPage: 1,
+      flowGroups: [],
+      flowHasMore: true,
+      drillCategoryId: null,
+      drillCategoryName: null,
+    });
     get().fetchAll(month);
   },
 
   setSelectedType(type: 'expense' | 'income') {
-    set({ selectedType: type });
+    set({
+      selectedType: type,
+      flowFilter: { ...get().flowFilter, type },
+      flowPage: 1,
+      flowGroups: [],
+      flowHasMore: true,
+      drillCategoryId: null,
+      drillCategoryName: null,
+    });
     const { selectedMonth } = get();
     get().fetchCategoryStats(selectedMonth, type);
+    get().fetchFlowList();
   },
 
   setActiveTab(tab: 'flow' | 'chart') {
@@ -163,8 +181,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   resetFlowFilter() {
+    const { selectedType } = get();
     set({
-      flowFilter: {},
+      flowFilter: { type: selectedType },
       flowPage: 1,
       flowGroups: [],
       flowHasMore: true,
@@ -263,18 +282,17 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     const type = get().selectedType;
     set({ isLoading: true });
     try {
-      const [monthSummary, categoryStats, dailyStats] = await Promise.all([
+      const [monthSummary, categoryStats, dailyStats, monthlyComparison] = await Promise.all([
         billService.getSummary(m),
         billService.getCategoryStats(m, type),
         billService.getDailyStats(m),
+        billService.getMonthlyComparison(m),
       ]);
-      set({ monthSummary, categoryStats, dailyStats, isLoading: false });
+      set({ monthSummary, categoryStats, dailyStats, monthlyComparison, isLoading: false });
     } catch {
       set({ isLoading: false });
     }
-    // 流水列表单独请求
     get().fetchFlowList();
-    get().fetchMonthlyComparison(m);
   },
 
   /** 图表下钻：点击饼图分类 → 切换流水视图 + 自动筛选该分类 */

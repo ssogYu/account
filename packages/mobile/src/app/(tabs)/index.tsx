@@ -97,8 +97,20 @@ export default function HomeScreen() {
   );
 
   const handleConfirmAll = useCallback(
-    async (messageId: string) => {
-      const ok = await confirmAllBills({ messageId });
+    async (messageId: string, edits: Record<number, ConfirmBillEdits>) => {
+      const editsForApi: Record<
+        number,
+        { categoryId?: string; amount?: number; note?: string; accountName?: string }
+      > = {};
+      for (const [key, val] of Object.entries(edits)) {
+        editsForApi[Number(key)] = {
+          categoryId: val.categoryId,
+          amount: val.amount,
+          note: val.note,
+          accountName: val.accountName,
+        };
+      }
+      const ok = await confirmAllBills({ messageId, edits: editsForApi });
       if (ok) {
         await Promise.all([fetchBills({ page: 1, pageSize: 20 }), fetchTodaySummary()]);
       }

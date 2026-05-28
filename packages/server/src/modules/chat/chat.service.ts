@@ -96,7 +96,14 @@ export class ChatService {
       let billIds: string[] = [];
 
       if (parseResults && parseResults.length > 0) {
-        const needsConfirm = parseResults.some((r) => r.needsConfirm);
+        const needsConfirm = parseResults.some(
+          (r) =>
+            r.confidence !== 'high' ||
+            !!r.warning ||
+            !r.amount ||
+            !r.categoryId ||
+            !r.accountName,
+        );
 
         if (needsConfirm) {
           assistantContent = this.buildConfirmMessage(parseResults);
@@ -156,22 +163,20 @@ export class ChatService {
         return null;
       }
 
-      const parseResults: ParseResult[] = result.bills
-        .filter((b: BillItem) => b.amount && b.categoryId)
-        .map((b: BillItem) => ({
-          type: b.type ?? 'expense',
-          amount: b.amount!,
-          categoryName: b.categoryName,
-          categoryIcon: b.categoryIcon,
-          categoryId: b.categoryId,
-          note: b.note || input,
-          date: b.date || today,
-          accountName: b.accountName || '',
-          accountId: b.accountId || '',
-          confidence: b.confidence,
-          warning: b.warning || undefined,
-          needsConfirm: b.confidence !== 'high' || !!b.warning,
-        }));
+      const parseResults: ParseResult[] = result.bills.map((b: BillItem) => ({
+        type: b.type ?? 'expense',
+        amount: b.amount ?? 0,
+        categoryName: b.categoryName || '其他',
+        categoryIcon: b.categoryIcon || '',
+        categoryId: b.categoryId || '',
+        note: b.note || input,
+        date: b.date || today,
+        accountName: b.accountName || '',
+        accountId: b.accountId || '',
+        confidence: b.confidence,
+        warning: b.warning || undefined,
+        needsConfirm: result.needsConfirm,
+      }));
 
       if (parseResults.length === 0) {
         this.logger.warn('LangGraph: 所有账单均缺少必要字段');
@@ -185,34 +190,6 @@ export class ChatService {
       );
       return this.localParse(userId, input);
     }
-  }
-
-  async getHistory(userId: string, query: QueryChatDto) {
-    const { limit = 50, cursor } = query;
-
-    const where: Record<string, unknown> = { userId };
-    if (cursor) {
-      const cursorMsg = await this.prisma.chatMessage.findUnique({
-        where: { id: cursor },
-      });
-      if (cursorMsg) {
-        where.createdAt = { lt: cursorMsg.createdAt };
-      }
-    }
-
-    const messages = await this.prisma.chatMessage.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-    });
-
-    let nextCursor: string | null = null;
-    if (messages.length > limit) {
-      const nextItem = messages.pop()!;
-      nextCursor = nextItem.id;
-    }
-
-    return { items: messages.reverse(), nextCursor };
   }
 
   private async createBillsFromParse(
@@ -244,6 +221,34 @@ export class ChatService {
     );
 
     return bills;
+  }
+
+  async getHistory(userId: string, query: QueryChatDto) {
+    const { limit = 50, cursor } = query;
+
+    const where: Record<string, unknown> = { userId };
+    if (cursor) {
+      const cursorMsg = await this.prisma.chatMessage.findUnique({
+        where: { id: cursor },
+      });
+      if (cursorMsg) {
+        where.createdAt = { lt: cursorMsg.createdAt };
+      }
+    }
+
+    const messages = await this.prisma.chatMessage.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+    });
+
+    let nextCursor: string | null = null;
+    if (messages.length > limit) {
+      const nextItem = messages.pop()!;
+      nextCursor = nextItem.id;
+    }
+
+    return { items: messages.reverse(), nextCursor };
   }
 
   async confirmBill(
@@ -293,7 +298,10 @@ export class ChatService {
 
       if (edits?.accountName && edits.accountName !== parse.accountName) {
         const updatedAccount = await tx.account.findFirst({
-          where: { name: edits.accountName, userId },
+          where: {
+            name: edits.accountName,
+            OR: [{ isSystem: true }, { userId }],
+          },
           select: { id: true, name: true },
         });
         if (updatedAccount) {
@@ -355,7 +363,16 @@ export class ChatService {
     });
   }
 
-  async confirmAllBills(userId: string, messageId: string) {
+  async confirmAllBills(
+    userId: string,
+    messageId: string,
+    edits?: Record<
+      number,
+      Partial<
+        Pick<ParseResult, 'categoryId' | 'amount' | 'note' | 'accountName'>
+      >
+    >,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const aiMessage = await tx.chatMessage.findFirst({
         where: { id: messageId, userId, role: 'assistant' },
@@ -370,13 +387,80 @@ export class ChatService {
         return { confirmed: false, message: '该消息不是确认卡片' };
       }
 
+      const parseResults = meta.parseResults.map((pr, i) => {
+        const billEdits = edits?.[i];
+        if (!billEdits) return { ...pr };
+        return {
+          ...pr,
+          ...(billEdits.amount !== undefined
+            ? { amount: billEdits.amount }
+            : {}),
+          ...(billEdits.note !== undefined ? { note: billEdits.note } : {}),
+          ...(billEdits.categoryId !== undefined
+            ? { categoryId: billEdits.categoryId }
+            : {}),
+          ...(billEdits.accountName !== undefined
+            ? { accountName: billEdits.accountName }
+            : {}),
+        };
+      });
+
+      for (let i = 0; i < parseResults.length; i++) {
+        const billEdits = edits?.[i];
+        if (!billEdits) continue;
+        const parse = parseResults[i];
+
+        if (
+          billEdits.categoryId &&
+          billEdits.categoryId !== meta.parseResults[i].categoryId
+        ) {
+          const updatedCategory = await tx.category.findUnique({
+            where: { id: billEdits.categoryId },
+            select: { name: true, icon: true },
+          });
+          if (updatedCategory) {
+            parse.categoryName = updatedCategory.name;
+            parse.categoryIcon = updatedCategory.icon;
+            parse.categoryId = billEdits.categoryId;
+          }
+        }
+
+        if (
+          billEdits.accountName &&
+          billEdits.accountName !== meta.parseResults[i].accountName
+        ) {
+          const updatedAccount = await tx.account.findFirst({
+            where: {
+              name: billEdits.accountName,
+              OR: [{ isSystem: true }, { userId }],
+            },
+            select: { id: true, name: true },
+          });
+          if (updatedAccount) {
+            parse.accountName = updatedAccount.name;
+            parse.accountId = updatedAccount.id;
+          } else {
+            parse.accountName = billEdits.accountName;
+            parse.accountId = '';
+          }
+        }
+      }
+
+      const unconfirmedResults = parseResults.filter(
+        (pr) => pr.needsConfirm !== false,
+      );
+
+      if (unconfirmedResults.length === 0) {
+        return { confirmed: false, message: '没有待确认的账单' };
+      }
+
       const membership = await tx.familyMember.findFirst({
         where: { userId },
         select: { familyId: true },
       });
 
       const bills = await Promise.all(
-        meta.parseResults.map((parse) =>
+        unconfirmedResults.map((parse) =>
           tx.bill.create({
             data: {
               userId,
@@ -394,13 +478,18 @@ export class ChatService {
         ),
       );
 
+      const updatedParseResults = parseResults.map((pr) => ({
+        ...pr,
+        needsConfirm: false,
+      }));
+
       await tx.chatMessage.update({
         where: { id: messageId },
         data: {
           billId: bills[0]?.id ?? null,
           metadata: {
             type: 'confirmed',
-            parseResults: meta.parseResults,
+            parseResults: updatedParseResults,
           } as any,
         },
       });

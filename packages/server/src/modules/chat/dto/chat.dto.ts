@@ -5,6 +5,8 @@ import {
   IsNumber,
   Min,
   IsInt,
+  ValidateNested,
+  IsObject,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -66,4 +68,38 @@ export class ConfirmBillDto {
     if (this.accountName !== undefined) result.accountName = this.accountName;
     return Object.keys(result).length > 0 ? result : undefined;
   }
+}
+
+export class BillEditDto {
+  @ApiPropertyOptional({ description: '修改后的分类ID' })
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
+
+  @ApiPropertyOptional({ description: '修改后的金额' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  @IsOptional()
+  amount?: number;
+
+  @ApiPropertyOptional({ description: '修改后的备注' })
+  @IsString()
+  @IsOptional()
+  note?: string;
+
+  @ApiPropertyOptional({ description: '修改后的账户名称' })
+  @IsString()
+  @IsOptional()
+  accountName?: string;
+}
+
+export class ConfirmAllBillsDto {
+  @ApiPropertyOptional({
+    description: '每笔账单的编辑内容，key为账单索引（从0开始）',
+    example: { '0': { accountName: '微信' }, '1': { amount: 20 } },
+  })
+  @IsObject()
+  @IsOptional()
+  edits?: Record<string, BillEditDto>;
 }

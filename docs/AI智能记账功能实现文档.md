@@ -24,11 +24,10 @@
                               │ OpenAI │ Gemini │ Ollama      │
                               └─────────────────────────────┘
                                     ↓
-                        ┌── needsConfirm=false ──→ 直接创建账单入库
-                        │                        → 返回 confirmed + billId
-                        │
-                        └── needsConfirm=true ──→ 确认卡片 → 用户确认 → 创建账单入库
+                        ──→ 确认卡片 → 用户确认/编辑 → 创建账单入库
 ```
+
+> **确认策略**: 当所有账单都满足高置信度 + 有金额 + 有分类 + 有账户时，自动确认直接入库（`needsConfirm=false`）；否则展示确认卡片让用户审核和补充信息。
 
 ---
 
@@ -205,12 +204,19 @@ START → semanticParse → [条件边]
 - 匹配成功时用数据库标准名称替换，并填充 categoryId/categoryIcon/accountId
 - 匹配失败或为空时回退到"其他"分类或清空账户，并降低置信度为 medium
 
-**节点3: evaluateAndReply (置信度评估)**
+**节点3: evaluateAndReply (确认评估)**
 
-- 根据 confidence 和 warning 决定是否需要用户确认
-- high + 无 warning → 自动确认（needsConfirm=false）
-- medium/low/有 warning → 需要用户确认（needsConfirm=true）
+- 根据每笔账单的完整度决定是否需要用户确认
+- 仅当**所有**账单都满足以下条件时才自动确认（`needsConfirm=false`）：
+  - `confidence === 'high'`（高置信度）
+  - `warning` 为空（无异常提示）
+  - `amount > 0`（有金额）
+  - `categoryId` 不为空（有分类）
+  - `accountName` 不为空（有账户）
+- 任一账单不满足以上条件 → 需要用户确认（`needsConfirm=true`）
 - 回复文本由 `ChatService.buildConfirmMessage()` 在图外生成，图内只输出 `needsConfirm`
+
+> **设计说明**: 相比仅基于 confidence 的判断，增加了金额/分类/账户的完整性检查。这确保了用户未指定账户或金额时，确认卡片能提供编辑入口让用户补充信息。
 
 #### LLM 结构化输出 Schema
 
@@ -247,24 +253,32 @@ sendMessage(userId, dto):
   1. 保存用户消息
   2. 获取用户可用分类和账户
   3. 调用 LangGraph 编排图 (runBillGraph)
-     ├── 成功: 返回 ParseResult[] (含 needsConfirm)
+     ├── 成功: 返回 ParseResult[] (允许空金额/空分类，前端编辑补充)
      └── 失败: 降级到本地关键词解析 (localParse, needsConfirm=true)
   4. 根据 needsConfirm 分流:
-     ├── needsConfirm=true  → 返回 confirm_card，等用户确认
-     └── needsConfirm=false → 调用 createBillFromParse 直接入库，返回 confirmed + billId
+     ├── needsConfirm=true  → 返回 confirm_card，等用户确认/编辑
+     └── needsConfirm=false → 调用 createBillsFromParse 直接入库，返回 confirmed + billId
   5. 保存 AI 消息 (含 metadata 和 billId)
   6. 返回结果
 ```
 
 #### 高置信度免确认
 
-当 LLM 解析结果为高置信度（`confidence=high`）且无异常提示（`warning` 为空）时，`evaluateAndReply` 节点设置 `needsConfirm=false`。此时 `ChatService.sendMessage` 会：
+当所有解析结果都满足以下条件时，自动确认直接入库（`needsConfirm=false`）：
 
-1. 调用 `createBillFromParse()` 直接创建账单入库
-2. 返回 `metadata: { type: 'confirmed', parseResult }` + `billId`
+1. `confidence === 'high'`（高置信度）
+2. `warning` 为空（无异常提示）
+3. `amount > 0`（有金额）
+4. `categoryId` 不为空（有分类）
+5. `accountName` 不为空（有账户）
+
+此时 `ChatService.sendMessage` 会：
+
+1. 调用 `createBillsFromParse()` 直接创建账单入库
+2. 返回 `metadata: { type: 'confirmed', parseResults }` + `billId`
 3. 前端渲染"已记录 ✓"的 ConfirmCard（无操作按钮）
 
-这避免了高置信度场景下用户每次都需要手动确认的繁琐操作。
+> **与旧版区别**: 旧版仅检查 `confidence` 和 `warning`，新版额外检查金额、分类、账户是否完整。这确保了用户未指定账户或金额时，确认卡片能提供编辑入口。
 
 #### 降级策略
 
@@ -291,14 +305,15 @@ confirmBill(userId, messageId, billIndex, edits?):
      └── allConfirmed=false → 保持 metadata.type = 'confirm_card'
   7. 更新消息 metadata
   8. 创建用户"确认"消息
-  （不再额外创建"已记录"助手消息，原确认卡片已变为已确认状态）
 
-confirmAllBills(userId, messageId):
+confirmAllBills(userId, messageId, edits?):
   1. 查找 AI 消息，验证 metadata.type === 'confirm_card'
-  2. 遍历 parseResults，为每笔创建账单 (source: 'ai')
-  3. 更新 metadata → type: 'confirmed'，所有 parseResults.needsConfirm = false
-  4. 创建用户"全部确认"消息
-  5. 返回 { confirmed: true, billIds, bills }
+  2. 合并用户编辑 (edits: Record<number, Partial<ParseResult>>) 到对应 parseResults
+  3. 处理分类和账户变更的关联更新（categoryName/categoryIcon/accountId）
+  4. 过滤出未确认的账单，为每笔创建账单 (source: 'ai')
+  5. 更新 metadata → type: 'confirmed'，所有 parseResults.needsConfirm = false
+  6. 创建用户"全部确认"消息
+  7. 返回 { confirmed: true, billIds, bills }
 
 rejectBill(userId, messageId):
   1. 验证消息类型
@@ -306,24 +321,7 @@ rejectBill(userId, messageId):
   3. 创建取消消息 + AI 回复消息
 ```
 
-#### createBillFromParse（高置信度直接入库）
-
-```typescript
-private async createBillFromParse(userId: string, parse: ParseResult) {
-  // 查询用户家庭组
-  const membership = await this.prisma.familyMember.findFirst({ ... });
-  // 创建账单
-  return this.prisma.bill.create({
-    data: {
-      userId, familyId, categoryId, type, amount, note, date,
-      source: 'ai',
-    },
-    include: { category: true },
-  });
-}
-```
-
-> **设计说明**: `createBillFromParse` 与 `confirmBill` 中的账单创建逻辑一致（都查询家庭组、创建 Bill 记录、设置 source='ai'），抽为独立方法避免重复。
+> **confirmAllBills edits 参数**: 支持批量确认时同时编辑每笔账单的字段。`edits` 为 `Record<number, Partial<ParseResult>>` 类型，key 为账单索引，value 为该笔的修改内容。这允许用户在确认卡片中修改金额、选择账户后，一次性提交所有修改。
 
 ---
 
@@ -348,9 +346,14 @@ private async createBillFromParse(userId: string, parse: ParseResult) {
 ```
 ┌──────────────────────────────────┐
 │  [图标] 餐饮        支出  ¥25.00 │
-│         支出                      │
+│         支出  (金额可编辑输入框)  │
 │ ─────────────────────────────── │
-│  📅 今天        ⚠️ 分类待确认    │
+│  ⚠️ 请选择账户                   │
+│ ─────────────────────────────── │
+│  分类  [图标] 餐饮          >   │
+│  账户  请选择 (橙色高亮)     >   │
+│ ─────────────────────────────── │
+│  📅 今天                         │
 │                                  │
 │  [  取消  ]  [ ✓ 确认记账  ]     │
 └──────────────────────────────────┘
@@ -363,18 +366,21 @@ private async createBillFromParse(userId: string, parse: ParseResult) {
 │  识别到 3 笔消费     合计 ¥48.00 │
 │ ─────────────────────────────── │
 │  ¥25.00  支出  餐饮              │
-│  📅 今天                         │
+│  ⚠️ 请选择账户                   │
+│  分类  餐饮  账户  请选择 (高亮)  │
 │  [确认此笔]                      │
 │ ─────────────────────────────── │
 │  ¥15.00  支出  交通              │
-│  📅 今天                         │
+│  分类  交通  账户  微信          │
 │  [确认此笔]                      │
 │ ─────────────────────────────── │
-│  ¥8.00   支出  餐饮              │
-│  📅 今天                         │
-│  [确认此笔]                      │
+│  ¥___  支出  餐饮 (金额为空)     │
+│  ⚠️ 请输入金额  ⚠️ 请选择账户    │
+│  分类  餐饮  账户  请选择 (高亮)  │
+│  [确认此笔] (禁用，金额为空)     │
 │ ─────────────────────────────── │
 │  [  取消  ]  [ ✓ 全部确认（3笔）]│
+│            (禁用，有未填金额)     │
 └──────────────────────────────────┘
 ```
 
@@ -386,13 +392,16 @@ private async createBillFromParse(userId: string, parse: ParseResult) {
 **关键设计点**:
 
 - 支出用红色系 (error)，收入用绿色系 (success)
+- **金额可编辑**: 使用 TextInput 替代 Text，支持直接修改金额
+- **缺失字段高亮**: 金额为空时显示橙色警告"请输入金额"；账户未选择时显示橙色"请选择"
+- **确认前校验**: 金额必须 > 0 才能确认，否则按钮禁用
+- **全部确认校验**: 所有账单金额都 > 0 时"全部确认"按钮才可用
 - 分类图标带彩色背景圆
-- 金额使用大号加粗字体
 - 分隔线区分信息区和操作区
 - 确认按钮带 check 图标
 - 已确认状态显示 ✓ 徽章
 - 多笔消费时自动识别，展示"识别到N笔消费"头部和合计金额
-- 多笔消费支持"确认此笔"（单笔确认）和"全部确认"（批量确认）
+- 多笔消费支持"确认此笔"（单笔确认）和"全部确认"（批量确认+编辑）
 - 单笔确认后该笔显示 ✓ 徽章，全部确认后卡片整体变为已确认状态
 
 #### 打字指示器
@@ -439,31 +448,31 @@ function usePulse(delay: number) {
 
 ### 4.1 完整对话记账流程
 
-#### 高置信度（免确认）
+#### 高置信度 + 信息完整（免确认）
 
 ```
-1. 用户输入 "午饭花了25"
-2. → POST /api/v1/chat/send { content: "午饭花了25" }
+1. 用户输入 "午饭花了25，微信支付"
+2. → POST /api/v1/chat/send { content: "午饭花了25，微信支付" }
 3. → ChatService.sendMessage()
 4. → LangGraph: semanticParse → matchCategoryAndAccount → evaluateAndReply
-5. → evaluateAndReply: confidence=high, warning=空 → needsConfirm=false
-6. → ChatService: needsConfirm=false → createBillFromParse() 直接入库
+5. → evaluateAndReply: confidence=high, warning=空, amount>0, categoryId有, accountName有 → needsConfirm=false
+6. → ChatService: needsConfirm=false → createBillsFromParse() 直接入库
 7. → 返回 { assistantMessage: { metadata: { type: 'confirmed', parseResults: [...] }, billId } }
 8. → 前端渲染"已记录 ✓"的 ConfirmCard（无操作按钮）
 ```
 
-#### 中/低置信度（需确认）
+#### 信息不完整（需确认）
 
 ```
-1. 用户输入 "午饭花了25"
+1. 用户输入 "午饭花了25"（未指定账户）
 2. → POST /api/v1/chat/send { content: "午饭花了25" }
 3. → ChatService.sendMessage()
 4. → LangGraph: semanticParse → matchCategoryAndAccount → evaluateAndReply
-5. → evaluateAndReply: confidence≠high 或 warning≠空 → needsConfirm=true
+5. → evaluateAndReply: accountName为空 → needsConfirm=true
 6. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResults: [...] } } }
-7. → 前端渲染确认卡片（带"确认记账"和"取消"按钮）
-8. 用户点击"确认记账"
-9. → POST /api/v1/chat/confirm/:messageId { billIndex: 0 }
+7. → 前端渲染确认卡片（带金额输入、分类/账户选择、确认/取消按钮）
+8. 用户编辑/确认
+9. → POST /api/v1/chat/confirm/:messageId { billIndex: 0, ...edits }
 10. → ChatService.confirmBill()
 11. → 创建 Bill 记录 (source: 'ai')
 12. → 更新消息 metadata → type: 'confirmed', billId
@@ -471,7 +480,7 @@ function usePulse(delay: number) {
 14. → 前端刷新账单列表和今日汇总
 ```
 
-#### 多笔消费（批量确认）
+#### 多笔消费（批量确认+编辑）
 
 ```
 1. 用户输入 "午饭25，打车15，奶茶8"
@@ -481,12 +490,23 @@ function usePulse(delay: number) {
 5. → matchCategoryAndAccount: 每笔独立匹配分类和账户
 6. → evaluateAndReply: needsConfirm=true
 7. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResults: [3项] } } }
-8. → 前端渲染多笔确认卡片（"识别到3笔消费"，每笔可独立确认，底部"全部确认"按钮）
+8. → 前端渲染多笔确认卡片（"识别到3笔消费"，每笔可独立编辑/确认，底部"全部确认"按钮）
 9a. 用户点击"确认此笔" → POST /chat/confirm/:messageId { billIndex: 1 }
     → 仅创建该笔账单，卡片保持 confirm_card 状态（其他笔未确认）
-9b. 用户点击"全部确认" → POST /chat/confirm-all/:messageId
-    → 创建所有账单，卡片变为 confirmed 状态
+9b. 用户点击"全部确认" → POST /chat/confirm-all/:messageId { edits: { 0: {...}, 1: {...} } }
+    → 合并编辑，创建所有账单，卡片变为 confirmed 状态
 10. → 前端刷新账单列表和今日汇总
+```
+
+#### 缺失信息场景
+
+```
+1. 用户输入 "午饭"（无金额、无账户）
+2. → LangGraph 解析: bills: [{ amount: 0, categoryName: "餐饮", accountName: "" }]
+3. → 确认卡片: 金额输入框为空（橙色提示"请输入金额"），账户显示"请选择"（橙色高亮）
+4. → 用户输入金额25，选择账户"微信"
+5. → 点击确认 → POST /chat/confirm/:messageId { billIndex: 0, amount: 25, accountName: "微信" }
+6. → 创建账单入库
 ```
 
 ### 4.2 降级流程

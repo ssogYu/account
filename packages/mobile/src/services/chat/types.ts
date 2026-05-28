@@ -76,4 +76,13 @@ export interface ConfirmBillParams {
 
 export interface ConfirmAllBillsParams {
   messageId: string;
+  edits?: Record<
+    number,
+    {
+      categoryId?: string;
+      amount?: number;
+      note?: string;
+      accountName?: string;
+    }
+  >;
 }

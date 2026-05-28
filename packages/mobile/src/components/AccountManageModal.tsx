@@ -218,7 +218,6 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
                       placeholder="输入账户名称"
                       placeholderTextColor={colors.textTertiary}
                       maxLength={8}
-                      autoFocus
                     />
 
                     <View style={s.formActions}>

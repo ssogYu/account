@@ -15,7 +15,7 @@ export function ChatBubble({
 }: {
   message: ChatMessage;
   onConfirm: (messageId: string, billIndex: number, edits?: ConfirmBillEdits) => void;
-  onConfirmAll: (messageId: string) => void;
+  onConfirmAll: (messageId: string, edits: Record<number, ConfirmBillEdits>) => void;
   onReject: (messageId: string) => void;
 }) {
   const isUser = message.role === 'user';

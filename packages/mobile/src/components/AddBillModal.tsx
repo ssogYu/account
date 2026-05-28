@@ -191,7 +191,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
                   placeholder="0.00"
                   placeholderTextColor={colors.textTertiary}
                   keyboardType="decimal-pad"
-                  autoFocus
                   maxLength={12}
                 />
               </View>

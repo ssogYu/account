@@ -1,1 +1,6 @@
-export { SendMessageDto, QueryChatDto, ConfirmBillDto } from './chat.dto';
+export {
+  SendMessageDto,
+  QueryChatDto,
+  ConfirmBillDto,
+  ConfirmAllBillsDto,
+} from './chat.dto';

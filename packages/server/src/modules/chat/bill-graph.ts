@@ -237,7 +237,12 @@ function evaluateAndReply(state: BillStateType): Partial<BillStateType> {
   }
 
   const needsConfirm = state.bills.some(
-    (b) => b.confidence !== 'high' || !!b.warning,
+    (b) =>
+      b.confidence !== 'high' ||
+      !!b.warning ||
+      !b.amount ||
+      !b.categoryId ||
+      !b.accountName,
   );
 
   return { needsConfirm };

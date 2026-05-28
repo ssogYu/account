@@ -284,7 +284,6 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
                       placeholder="输入分类名称"
                       placeholderTextColor={colors.textTertiary}
                       maxLength={10}
-                      autoFocus
                     />
 
                     {/* 操作按钮 */}

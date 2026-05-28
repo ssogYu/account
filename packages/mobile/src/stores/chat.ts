@@ -86,11 +86,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   billId: result.billId ?? null,
                   metadata: {
                     ...msg.metadata!,
-                    type: 'confirmed' as const,
+                    type: msg.metadata!.parseResults!.every(
+                      (pr, i) => i === params.billIndex || pr.needsConfirm === false,
+                    )
+                      ? ('confirmed' as const)
+                      : ('confirm_card' as const),
                     parseResults: msg.metadata!.parseResults!.map((pr, i) =>
-                      i === params.billIndex
-                        ? { ...pr, ...params.edits, needsConfirm: false }
-                        : pr,
+                      i === params.billIndex ? { ...pr, ...params.edits, needsConfirm: false } : pr,
                     ),
                   },
                 }
@@ -120,10 +122,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   metadata: {
                     ...msg.metadata!,
                     type: 'confirmed' as const,
-                    parseResults: msg.metadata!.parseResults!.map((pr) => ({
-                      ...pr,
-                      needsConfirm: false,
-                    })),
+                    parseResults: msg.metadata!.parseResults!.map((pr, i) => {
+                      const billEdits = params.edits?.[i];
+                      return {
+                        ...pr,
+                        ...(billEdits || {}),
+                        needsConfirm: false,
+                      };
+                    }),
                   },
                 }
               : msg,

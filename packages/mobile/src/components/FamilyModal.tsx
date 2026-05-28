@@ -260,7 +260,6 @@ export function FamilyModal({ visible, onClose }: FamilyModalProps) {
           value={familyName}
           onChangeText={setFamilyName}
           maxLength={20}
-          autoFocus
         />
         <Text style={s.inputCount}>{familyName.length}/20</Text>
       </View>
@@ -291,7 +290,6 @@ export function FamilyModal({ visible, onClose }: FamilyModalProps) {
           onChangeText={(v) => setInviteCode(v.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
           maxLength={6}
           autoCapitalize="characters"
-          autoFocus
         />
       </View>
       <Button

@@ -152,7 +152,6 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
                     maxLength={20}
                     placeholder="输入昵称"
                     placeholderTextColor={colors.textTertiary}
-                    autoFocus
                   />
                   <Text style={s.inputCount}>{editNickname.length}/20</Text>
                 </View>

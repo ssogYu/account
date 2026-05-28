@@ -1,6 +1,11 @@
 import { Controller, Get, Post, Body, Query, Param, Req } from '@nestjs/common';
 import { ChatService } from './chat.service';
-import { SendMessageDto, QueryChatDto, ConfirmBillDto } from './dto';
+import {
+  SendMessageDto,
+  QueryChatDto,
+  ConfirmBillDto,
+  ConfirmAllBillsDto,
+} from './dto';
 import { CurrentUser } from '../auth/decorators';
 import { ResponseMessage } from '../../common/decorators';
 import {
@@ -60,8 +65,14 @@ export class ChatController {
   confirmAllBills(
     @CurrentUser() user: { id: string },
     @Param('messageId') messageId: string,
+    @Body() dto: ConfirmAllBillsDto,
   ) {
-    return this.chatService.confirmAllBills(user.id, messageId);
+    const edits = dto.edits
+      ? Object.fromEntries(
+          Object.entries(dto.edits).map(([key, val]) => [Number(key), val]),
+        )
+      : undefined;
+    return this.chatService.confirmAllBills(user.id, messageId, edits);
   }
 
   @Post('reject/:messageId')

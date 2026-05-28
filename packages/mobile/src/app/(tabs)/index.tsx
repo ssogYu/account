@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from 'expo-router';
 import { useChatStore } from '@/stores/chat';
 import { useBillStore } from '@/stores/bill';
 import { useCategoryStore } from '@/stores/category';
@@ -46,11 +47,15 @@ export default function HomeScreen() {
   const [navVisible, setNavVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  const isFocused = useIsFocused();
+
   useEffect(() => {
-    fetchHistory();
-    fetchCategories();
-    fetchTodaySummary();
-  }, [fetchHistory, fetchCategories, fetchTodaySummary]);
+    if (isFocused) {
+      fetchHistory();
+      fetchCategories();
+      fetchTodaySummary();
+    }
+  }, [isFocused]);
 
   const displayMessages = messages.length > 0 ? messages : WELCOME_MESSAGES;
 

@@ -75,7 +75,6 @@ model Account {
   id       String  @id @default(cuid())
   userId   String? @map("user_id")
   name     String
-  icon     String
   isSystem Boolean @default(false) @map("is_system")
 
   user  User?   @relation(fields: [userId], references: [id])

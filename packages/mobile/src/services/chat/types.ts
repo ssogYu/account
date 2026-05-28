@@ -8,6 +8,7 @@ export interface ParseResult {
   note: string;
   date: string;
   accountName: string;
+  accountId: string;
   confidence: 'high' | 'medium' | 'low';
   needsConfirm?: boolean;
 }
@@ -62,5 +63,6 @@ export interface ConfirmBillParams {
     amount?: number;
     note?: string;
     accountName?: string;
+    accountId?: string;
   };
 }

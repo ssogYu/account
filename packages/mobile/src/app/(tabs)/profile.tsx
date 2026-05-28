@@ -22,7 +22,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 const MENU_ITEMS = [
   { key: 'category', title: '分类管理', subtitle: '自定义支出与收入分类' },
-  { key: 'account', title: '账户管理', subtitle: '微信、支付宝、银行卡等' },
+  { key: 'account', title: '账户管理', subtitle: '微信、支付宝、现金等' },
 ];
 
 export default function ProfileScreen() {

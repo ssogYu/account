@@ -15,6 +15,7 @@ interface ConfirmCardEdits {
   amount?: number;
   note?: string;
   accountName?: string;
+  accountId?: string;
 }
 
 export function ConfirmCard({
@@ -41,6 +42,7 @@ export function ConfirmCard({
   const currentCategoryIcon = edits.categoryIcon ?? parseResult.categoryIcon;
   const currentAmount = edits.amount ?? parseResult.amount;
   const currentAccountName = edits.accountName ?? parseResult.accountName ?? '';
+  const currentAccountId = edits.accountId ?? parseResult.accountId ?? '';
 
   const isExpense = parseResult.type === 'expense';
   const accentColor = isExpense ? colors.error : colors.success;
@@ -57,10 +59,11 @@ export function ConfirmCard({
     setCategoryPickerVisible(false);
   };
 
-  const handleAccountSelect = (accName: string) => {
+  const handleAccountSelect = (acc: { id: string; name: string }) => {
     setEdits((prev) => ({
       ...prev,
-      accountName: accName,
+      accountName: acc.name,
+      accountId: acc.id,
     }));
     setAccountPickerVisible(false);
   };
@@ -177,12 +180,12 @@ export function ConfirmCard({
         {accountPickerVisible && (
           <View style={s.pickerWrap}>
             {accounts.map((acc) => {
-              const active = acc.name === currentAccountName;
+              const active = acc.id === currentAccountId;
               return (
                 <TouchableOpacity
                   key={acc.id}
                   style={[s.pickerChip, active && s.pickerChipActive]}
-                  onPress={() => handleAccountSelect(acc.name)}
+                  onPress={() => handleAccountSelect(acc)}
                   activeOpacity={0.6}
                 >
                   <Text style={[s.pickerChipText, active && s.pickerChipTextActive]}>

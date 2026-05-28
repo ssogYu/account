@@ -21,48 +21,9 @@ import type { Account } from '@/services/account/types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const ACCOUNT_ICON_OPTIONS = [
-  'wechat',
-  'alipay',
-  'cash',
-  'bank-card',
-  'credit-card',
-  'wallet',
-  'apple',
-  'google',
-] as const;
-
 interface AccountManageModalProps {
   visible: boolean;
   onClose: () => void;
-}
-
-function AccountIcon({
-  iconKey,
-  size = 22,
-  color,
-}: {
-  iconKey: string;
-  size?: number;
-  color: string;
-}) {
-  const iconMap: Record<string, string> = {
-    wechat: 'wechat',
-    alipay: 'alipay',
-    cash: 'cash',
-    bank_card: 'bank-card-outline',
-    credit_card: 'credit-card-outline',
-    wallet: 'wallet-outline',
-    apple: 'apple',
-    google: 'google',
-  };
-  return (
-    <MaterialCommunityIcons
-      name={(iconMap[iconKey] as keyof typeof MaterialCommunityIcons.glyphMap) || 'wallet-outline'}
-      size={size}
-      color={color}
-    />
-  );
 }
 
 export function AccountManageModal({ visible, onClose }: AccountManageModalProps) {
@@ -78,7 +39,6 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
-  const [formIcon, setFormIcon] = useState('wallet');
 
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(SCREEN_HEIGHT * 0.6)).current;
@@ -115,7 +75,6 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
 
   const resetForm = () => {
     setFormName('');
-    setFormIcon('wallet');
     setEditingId(null);
     setShowAddForm(false);
     clearError();
@@ -124,14 +83,12 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
   const handleAdd = () => {
     setEditingId(null);
     setFormName('');
-    setFormIcon('wallet');
     setShowAddForm(true);
   };
 
   const handleEdit = (acc: Account) => {
     setEditingId(acc.id);
     setFormName(acc.name);
-    setFormIcon(acc.icon);
     setShowAddForm(true);
   };
 
@@ -158,9 +115,9 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
 
     try {
       if (editingId) {
-        await updateAccount(editingId, { name, icon: formIcon });
+        await updateAccount(editingId, { name });
       } else {
-        await createAccount({ name, icon: formIcon });
+        await createAccount({ name });
       }
       resetForm();
     } catch {
@@ -198,25 +155,17 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* 系统默认 */}
               <View style={s.section}>
                 <Text style={s.sectionTitle}>系统默认</Text>
-                <View style={s.accountList}>
+                <View style={s.tagList}>
                   {systemAccounts.map((acc) => (
-                    <View key={acc.id} style={s.accountItem}>
-                      <View style={s.accountIconWrap}>
-                        <AccountIcon iconKey={acc.icon} size={20} color={colors.textSecondary} />
-                      </View>
-                      <Text style={s.accountName}>{acc.name}</Text>
-                      <View style={s.systemBadge}>
-                        <Text style={s.systemBadgeText}>默认</Text>
-                      </View>
+                    <View key={acc.id} style={s.tag}>
+                      <Text style={s.tagText}>{acc.name}</Text>
                     </View>
                   ))}
                 </View>
               </View>
 
-              {/* 自定义 */}
               <View style={s.section}>
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>自定义账户</Text>
@@ -228,27 +177,30 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
                 {customAccounts.length === 0 && !showAddForm ? (
                   <Text style={s.emptyText}>暂无自定义账户，点击上方添加</Text>
                 ) : (
-                  <View style={s.accountList}>
+                  <View style={s.tagList}>
                     {customAccounts.map((acc) => (
-                      <View key={acc.id} style={s.accountItem}>
-                        <View style={s.accountIconWrap}>
-                          <AccountIcon iconKey={acc.icon} size={20} color={colors.textSecondary} />
-                        </View>
-                        <Text style={s.accountName}>{acc.name}</Text>
-                        <View style={s.itemActions}>
-                          <TouchableOpacity
-                            onPress={() => handleEdit(acc)}
-                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 3 }}
-                          >
-                            <Text style={s.editText}>编辑</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => handleDelete(acc)}
-                            hitSlop={{ top: 6, bottom: 6, left: 3, right: 6 }}
-                          >
-                            <Text style={s.deleteText}>删除</Text>
-                          </TouchableOpacity>
-                        </View>
+                      <View key={acc.id} style={s.tagEditable}>
+                        <Text style={s.tagText}>{acc.name}</Text>
+                        <TouchableOpacity
+                          onPress={() => handleEdit(acc)}
+                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 2 }}
+                        >
+                          <MaterialCommunityIcons
+                            name="pencil-outline"
+                            size={12}
+                            color={colors.accent}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDelete(acc)}
+                          hitSlop={{ top: 4, bottom: 4, left: 2, right: 4 }}
+                        >
+                          <MaterialCommunityIcons
+                            name="close"
+                            size={12}
+                            color={colors.textTertiary}
+                          />
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </View>
@@ -257,24 +209,6 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
                 {showAddForm && (
                   <View style={s.form}>
                     <Text style={s.formTitle}>{editingId ? '编辑账户' : '新建账户'}</Text>
-
-                    <Text style={s.formLabel}>图标</Text>
-                    <View style={s.iconGrid}>
-                      {ACCOUNT_ICON_OPTIONS.map((iconKey) => (
-                        <TouchableOpacity
-                          key={iconKey}
-                          style={[s.iconOption, formIcon === iconKey && s.iconOptionActive]}
-                          onPress={() => setFormIcon(iconKey)}
-                          activeOpacity={0.6}
-                        >
-                          <AccountIcon
-                            iconKey={iconKey}
-                            size={18}
-                            color={formIcon === iconKey ? colors.accent : colors.textSecondary}
-                          />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
 
                     <Text style={s.formLabel}>名称</Text>
                     <TextInput
@@ -397,49 +331,32 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
 
-  accountList: {
-    gap: spacing.xs,
-  },
-  accountItem: {
+  tagList: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-  },
-  accountIconWrap: {
-    marginRight: spacing.sm,
-  },
-  accountName: {
-    ...typography.body,
-    color: colors.text,
-    flex: 1,
-  },
-  systemBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    backgroundColor: colors.fillTertiary,
-    borderRadius: 3,
-  },
-  systemBadgeText: {
-    fontSize: 9,
-    color: colors.textTertiary,
-    fontWeight: '600',
-  },
-  itemActions: {
-    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  editText: {
-    ...typography.caption2,
-    color: colors.accent,
-    fontWeight: '600',
+  tag: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.fillTertiary,
   },
-  deleteText: {
-    ...typography.caption2,
-    color: colors.error,
-    fontWeight: '600',
+  tagEditable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.separator,
+  },
+  tagText: {
+    ...typography.footnote,
+    color: colors.text,
+    fontWeight: '500',
   },
   emptyText: {
     ...typography.footnote,
@@ -452,7 +369,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgElevated,
     borderRadius: radius.lg,
     padding: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
   formTitle: {
     ...typography.headline,
@@ -464,25 +381,6 @@ const s = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '600',
     marginBottom: spacing.sm,
-  },
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  iconOption: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.fillTertiary,
-  },
-  iconOptionActive: {
-    backgroundColor: colors.accentSubtle,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
   },
   nameInput: {
     ...typography.body,

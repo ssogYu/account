@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, Req } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { SendMessageDto, QueryChatDto, ConfirmBillDto } from './dto';
 import { CurrentUser } from '../auth/decorators';
@@ -7,6 +7,7 @@ import {
   ApiOperation,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 
 @Controller('chat')
 export class ChatController {
@@ -19,8 +20,9 @@ export class ChatController {
   sendMessage(
     @CurrentUser() user: { id: string },
     @Body() dto: SendMessageDto,
+    @Req() req: Request,
   ) {
-    return this.chatService.sendMessage(user.id, dto);
+    return this.chatService.sendMessage(user.id, dto, req);
   }
 
   @Get('history')

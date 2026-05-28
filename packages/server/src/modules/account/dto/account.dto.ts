@@ -6,11 +6,6 @@ export class CreateAccountDto {
   @IsString()
   @IsNotEmpty()
   name!: string;
-
-  @ApiProperty({ description: '图标标识', example: 'wechat' })
-  @IsString()
-  @IsNotEmpty()
-  icon!: string;
 }
 
 export class UpdateAccountDto {
@@ -19,10 +14,4 @@ export class UpdateAccountDto {
   @IsNotEmpty()
   @IsOptional()
   name?: string;
-
-  @ApiPropertyOptional({ description: '图标标识' })
-  @IsString()
-  @IsNotEmpty()
-  @IsOptional()
-  icon?: string;
 }

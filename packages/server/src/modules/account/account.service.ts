@@ -5,10 +5,9 @@ import { ErrorCode } from '@ai-account/shared';
 import { CreateAccountDto, UpdateAccountDto } from './dto';
 
 const SYSTEM_ACCOUNTS = [
-  { name: '微信', icon: 'wechat' },
-  { name: '支付宝', icon: 'alipay' },
-  { name: '现金', icon: 'cash' },
-  { name: '银行卡', icon: 'bank_card' },
+  { name: '微信' },
+  { name: '支付宝' },
+  { name: '现金' },
 ];
 
 @Injectable()
@@ -54,7 +53,6 @@ export class AccountService implements OnModuleInit {
       data: {
         userId,
         name: dto.name,
-        icon: dto.icon,
         isSystem: false,
       },
     });
@@ -85,7 +83,6 @@ export class AccountService implements OnModuleInit {
       where: { id },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.icon !== undefined && { icon: dto.icon }),
       },
     });
   }

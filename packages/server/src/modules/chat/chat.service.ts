@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma';
 import { LlmService } from '../llm';
 import { SendMessageDto, QueryChatDto } from './dto';
 import { createBillGraph } from './bill-graph';
+import type { Request } from 'express';
 
 /**
  * 对话记账服务
@@ -20,6 +21,7 @@ export interface ParseResult {
   note: string;
   date: string;
   accountName: string;
+  accountId: string;
   confidence: 'high' | 'medium' | 'low';
   warning?: string;
   needsConfirm?: boolean;
@@ -41,86 +43,101 @@ export class ChatService {
   ) {}
 
   /** 发送消息并返回AI回复 */
-  async sendMessage(userId: string, dto: SendMessageDto) {
-    // 1. 保存用户消息
-    const userMessage = await this.prisma.chatMessage.create({
-      data: { userId, role: 'user', content: dto.content },
-    });
+  async sendMessage(userId: string, dto: SendMessageDto, req?: Request) {
+    const aborted = { value: false };
+    const onAbort = () => {
+      aborted.value = true;
+    };
+    req?.on('close', onAbort);
 
-    // 2. 获取用户可用分类
-    const categories = await this.prisma.category.findMany({
-      where: {
-        OR: [{ isSystem: true }, { userId }],
-      },
-      select: { id: true, name: true, icon: true, type: true },
-      orderBy: [{ isSystem: 'desc' }, { type: 'asc' }, { name: 'asc' }],
-    });
+    try {
+      // 1. 保存用户消息
+      const userMessage = await this.prisma.chatMessage.create({
+        data: { userId, role: 'user', content: dto.content },
+      });
 
-    const categoriesJson = JSON.stringify(
-      categories.map((c) => ({
-        name: c.name,
-        type: c.type,
-        icon: c.icon,
-        id: c.id,
-      })),
-    );
+      // 2. 获取用户可用分类
+      const categories = await this.prisma.category.findMany({
+        where: {
+          OR: [{ isSystem: true }, { userId }],
+        },
+        select: { id: true, name: true, icon: true, type: true },
+        orderBy: [{ isSystem: 'desc' }, { type: 'asc' }, { name: 'asc' }],
+      });
 
-    const accounts = await this.prisma.account.findMany({
-      where: {
-        OR: [{ isSystem: true }, { userId }],
-      },
-      select: { id: true, name: true, icon: true },
-      orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
-    });
+      const categoriesJson = JSON.stringify(
+        categories.map((c) => ({
+          name: c.name,
+          type: c.type,
+          icon: c.icon,
+          id: c.id,
+        })),
+      );
 
-    const accountsJson = JSON.stringify(
-      accounts.map((a) => ({ name: a.name, icon: a.icon, id: a.id })),
-    );
+      const accounts = await this.prisma.account.findMany({
+        where: {
+          OR: [{ isSystem: true }, { userId }],
+        },
+        select: { id: true, name: true },
+        orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
+      });
 
-    // 3. 使用 LangGraph 编排处理
-    const parseResult = await this.runBillGraph(
-      userId,
-      dto.content,
-      categoriesJson,
-      accountsJson,
-    );
+      const accountsJson = JSON.stringify(
+        accounts.map((a) => ({ name: a.name, id: a.id })),
+      );
 
-    // 4. 生成AI回复
-    //    - needsConfirm=true  → 弹出确认卡片，等用户确认后再入库
-    //    - needsConfirm=false → 高置信度且无异常，直接创建账单入库
-    let assistantContent: string;
-    let metadata: AssistantMetadata;
-    let billId: string | null = null;
-
-    if (parseResult) {
-      if (parseResult.needsConfirm) {
-        assistantContent = this.buildConfirmMessage(parseResult);
-        metadata = { type: 'confirm_card', parseResult };
-      } else {
-        // 高置信度：直接创建账单，无需用户确认
-        const bill = await this.createBillFromParse(userId, parseResult);
-        billId = bill.id;
-        const typeLabel = parseResult.type === 'expense' ? '支出' : '收入';
-        assistantContent = `已记录 ✓ ${parseResult.categoryName} ${typeLabel} ¥${parseResult.amount.toFixed(2)}`;
-        metadata = { type: 'confirmed', parseResult };
+      if (aborted.value) {
+        return { userMessage, assistantMessage: null, parseResult: null };
       }
-    } else {
-      assistantContent = this.buildGuideMessage(dto.content);
-      metadata = { type: 'guide' };
-    }
 
-    // 5. 保存AI消息
-    const assistantMessage = await this.prisma.chatMessage.create({
-      data: {
+      // 3. 使用 LangGraph 编排处理
+      const parseResult = await this.runBillGraph(
         userId,
-        role: 'assistant',
-        content: assistantContent,
-        metadata: metadata as any,
-        ...(billId ? { billId } : {}),
-      },
-    });
+        dto.content,
+        categoriesJson,
+        accountsJson,
+      );
 
-    return { userMessage, assistantMessage, parseResult };
+      if (aborted.value) {
+        return { userMessage, assistantMessage: null, parseResult: null };
+      }
+
+      // 4. 生成AI回复
+      let assistantContent: string;
+      let metadata: AssistantMetadata;
+      let billId: string | null = null;
+
+      if (parseResult) {
+        if (parseResult.needsConfirm) {
+          assistantContent = this.buildConfirmMessage(parseResult);
+          metadata = { type: 'confirm_card', parseResult };
+        } else {
+          const bill = await this.createBillFromParse(userId, parseResult);
+          billId = bill.id;
+          const typeLabel = parseResult.type === 'expense' ? '支出' : '收入';
+          assistantContent = `已记录 ✓ ${parseResult.categoryName} ${typeLabel} ¥${parseResult.amount.toFixed(2)}`;
+          metadata = { type: 'confirmed', parseResult };
+        }
+      } else {
+        assistantContent = this.buildGuideMessage(dto.content);
+        metadata = { type: 'guide' };
+      }
+
+      // 5. 保存AI消息
+      const assistantMessage = await this.prisma.chatMessage.create({
+        data: {
+          userId,
+          role: 'assistant',
+          content: assistantContent,
+          metadata: metadata as any,
+          ...(billId ? { billId } : {}),
+        },
+      });
+
+      return { userMessage, assistantMessage, parseResult };
+    } finally {
+      req?.off('close', onAbort);
+    }
   }
 
   /** 运行 LangGraph 记账编排图 */
@@ -147,7 +164,10 @@ export class ChatService {
         note: '',
         date: today,
         categoryName: '',
+        categoryId: '',
+        categoryIcon: '',
         accountName: '',
+        accountId: '',
         confidence: 'low',
         warning: '',
         needsConfirm: true,
@@ -159,48 +179,23 @@ export class ChatService {
         return null;
       }
 
-      // 从数据库匹配分类ID和图标
-      const category = await this.prisma.category.findFirst({
-        where: {
-          name: result.categoryName,
-          type: result.type ?? 'expense',
-          OR: [{ isSystem: true }, { userId }],
-        },
-      });
-
-      let categoryId: string;
-      let categoryName: string;
-      let categoryIcon: string;
-
-      if (category) {
-        categoryId = category.id;
-        categoryName = category.name;
-        categoryIcon = category.icon;
-      } else {
-        // 回退到"其他"分类
-        const fallback = await this.prisma.category.findFirst({
-          where: {
-            name: '其他',
-            type: result.type ?? 'expense',
-            isSystem: true,
-          },
-        });
-        if (!fallback) return null;
-        categoryId = fallback.id;
-        categoryName = '其他';
-        categoryIcon = fallback.icon;
-        result.confidence = 'medium';
+      if (!result.categoryId) {
+        this.logger.warn(
+          `LangGraph: 分类ID缺失 - categoryName="${result.categoryName}"`,
+        );
+        return null;
       }
 
       return {
         type: result.type ?? 'expense',
         amount: result.amount,
-        categoryName,
-        categoryIcon,
-        categoryId,
+        categoryName: result.categoryName,
+        categoryIcon: result.categoryIcon,
+        categoryId: result.categoryId,
         note: result.note || input,
         date: result.date || today,
         accountName: result.accountName || '',
+        accountId: result.accountId || '',
         confidence: result.confidence,
         warning: result.warning || undefined,
         needsConfirm: result.needsConfirm,
@@ -274,89 +269,133 @@ export class ChatService {
       Pick<ParseResult, 'categoryId' | 'amount' | 'note' | 'accountName'>
     >,
   ) {
-    const aiMessage = await this.prisma.chatMessage.findFirst({
-      where: { id: messageId, userId, role: 'assistant' },
+    return this.prisma.$transaction(async (tx) => {
+      const aiMessage = await tx.chatMessage.findFirst({
+        where: { id: messageId, userId, role: 'assistant' },
+      });
+
+      if (!aiMessage || !aiMessage.metadata) {
+        return { confirmed: false, message: '消息不存在或无解析结果' };
+      }
+
+      const meta = aiMessage.metadata as unknown as AssistantMetadata;
+      if (meta.type !== 'confirm_card' || !meta.parseResult) {
+        return { confirmed: false, message: '该消息不是确认卡片' };
+      }
+
+      const parse = { ...meta.parseResult, ...edits };
+
+      if (
+        edits?.categoryId &&
+        edits.categoryId !== meta.parseResult.categoryId
+      ) {
+        const updatedCategory = await tx.category.findUnique({
+          where: { id: edits.categoryId },
+          select: { name: true, icon: true },
+        });
+        if (updatedCategory) {
+          parse.categoryName = updatedCategory.name;
+          parse.categoryIcon = updatedCategory.icon;
+        }
+      }
+
+      if (
+        edits?.accountName &&
+        edits.accountName !== meta.parseResult.accountName
+      ) {
+        const updatedAccount = await tx.account.findFirst({
+          where: { name: edits.accountName, userId },
+          select: { id: true, name: true },
+        });
+        if (updatedAccount) {
+          parse.accountName = updatedAccount.name;
+          parse.accountId = updatedAccount.id;
+        } else {
+          parse.accountName = edits.accountName;
+          parse.accountId = '';
+        }
+      }
+
+      const membership = await tx.familyMember.findFirst({
+        where: { userId },
+        select: { familyId: true },
+      });
+
+      const bill = await tx.bill.create({
+        data: {
+          userId,
+          familyId: membership?.familyId ?? null,
+          categoryId: parse.categoryId,
+          type: parse.type,
+          amount: parse.amount,
+          note: parse.note,
+          account: parse.accountName || null,
+          date: new Date(parse.date),
+          source: 'ai',
+        },
+        include: { category: true },
+      });
+
+      const updated = await tx.chatMessage.updateMany({
+        where: { id: messageId, userId },
+        data: {
+          billId: bill.id,
+          metadata: { type: 'confirmed', parseResult: parse } as any,
+        },
+      });
+
+      if (updated.count === 0) {
+        throw new Error('确认失败：消息状态已变更');
+      }
+
+      await tx.chatMessage.create({
+        data: {
+          userId,
+          role: 'user',
+          content: '确认',
+          billId: bill.id,
+        },
+      });
+
+      return { confirmed: true, billId: bill.id, bill };
     });
-
-    if (!aiMessage || !aiMessage.metadata) {
-      return { confirmed: false, message: '消息不存在或无解析结果' };
-    }
-
-    const meta = aiMessage.metadata as unknown as AssistantMetadata;
-    if (meta.type !== 'confirm_card' || !meta.parseResult) {
-      return { confirmed: false, message: '该消息不是确认卡片' };
-    }
-
-    const parse = { ...meta.parseResult, ...edits };
-
-    const membership = await this.prisma.familyMember.findFirst({
-      where: { userId },
-      select: { familyId: true },
-    });
-
-    const bill = await this.prisma.bill.create({
-      data: {
-        userId,
-        familyId: membership?.familyId ?? null,
-        categoryId: parse.categoryId,
-        type: parse.type,
-        amount: parse.amount,
-        note: parse.note,
-        account: parse.accountName || null,
-        date: new Date(parse.date),
-        source: 'ai',
-      },
-      include: { category: true },
-    });
-
-    await this.prisma.chatMessage.update({
-      where: { id: messageId },
-      data: {
-        billId: bill.id,
-        metadata: { type: 'confirmed', parseResult: parse } as any,
-      },
-    });
-
-    await this.prisma.chatMessage.create({
-      data: { userId, role: 'user', content: '确认', billId: bill.id },
-    });
-
-    return { confirmed: true, billId: bill.id, bill };
   }
 
   /** 拒绝/取消确认卡片 */
   async rejectBill(userId: string, messageId: string) {
-    const aiMessage = await this.prisma.chatMessage.findFirst({
-      where: { id: messageId, userId, role: 'assistant' },
+    return this.prisma.$transaction(async (tx) => {
+      const aiMessage = await tx.chatMessage.findFirst({
+        where: { id: messageId, userId, role: 'assistant' },
+      });
+
+      if (!aiMessage || !aiMessage.metadata) {
+        return { rejected: false, message: '消息不存在' };
+      }
+
+      const meta = aiMessage.metadata as unknown as AssistantMetadata;
+      if (meta.type !== 'confirm_card') {
+        return { rejected: false, message: '该消息不是确认卡片' };
+      }
+
+      await tx.chatMessage.update({
+        where: { id: messageId },
+        data: { metadata: { ...meta, type: 'rejected' } as any },
+      });
+
+      await tx.chatMessage.create({
+        data: { userId, role: 'user', content: '取消' },
+      });
+
+      await tx.chatMessage.create({
+        data: {
+          userId,
+          role: 'assistant',
+          content: '好的，已取消这笔记录。有需要随时告诉我。',
+        },
+      });
+
+      return { rejected: true };
     });
-
-    if (!aiMessage || !aiMessage.metadata) {
-      return { rejected: false, message: '消息不存在' };
-    }
-
-    const meta = aiMessage.metadata as unknown as AssistantMetadata;
-    if (meta.type !== 'confirm_card') {
-      return { rejected: false, message: '该消息不是确认卡片' };
-    }
-
-    await this.prisma.chatMessage.update({
-      where: { id: messageId },
-      data: { metadata: { ...meta, type: 'rejected' } as any },
-    });
-
-    await this.prisma.chatMessage.create({
-      data: { userId, role: 'user', content: '取消' },
-    });
-
-    await this.prisma.chatMessage.create({
-      data: {
-        userId,
-        role: 'assistant',
-        content: '好的，已取消这笔记录。有需要随时告诉我。',
-      },
-    });
-
-    return { rejected: true };
   }
 
   // ── 降级：本地关键词解析 ──
@@ -498,12 +537,7 @@ export class ChatService {
       categoryName = '其他';
     }
 
-    const confidence =
-      categoryName !== '其他' && amount > 0
-        ? 'high'
-        : amount > 0
-          ? 'medium'
-          : 'low';
+    const confidence = amount > 0 ? 'medium' : 'low';
 
     let date = new Date().toISOString().split('T')[0];
     if (content.includes('昨天')) {
@@ -525,6 +559,7 @@ export class ChatService {
       note: content,
       date,
       accountName: '',
+      accountId: '',
       confidence,
       needsConfirm: true,
     };

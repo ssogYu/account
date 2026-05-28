@@ -18,7 +18,10 @@ export const BillState = Annotation.Root({
   note: Annotation<string>,
   date: Annotation<string>,
   categoryName: Annotation<string>,
+  categoryId: Annotation<string>,
+  categoryIcon: Annotation<string>,
   accountName: Annotation<string>,
+  accountId: Annotation<string>,
 
   confidence: Annotation<'high' | 'medium' | 'low'>,
   warning: Annotation<string>,
@@ -40,7 +43,7 @@ const ParseOutputSchema = z.object({
   categoryName: z.string().describe('分类名称，必须从可用分类中选择'),
   accountName: z
     .string()
-    .describe('账户名称，如微信/支付宝/现金/银行卡，未提及则为空字符串'),
+    .describe('账户名称，如微信/支付宝/现金，未提及则为空字符串'),
   confidence: z.enum(['high', 'medium', 'low']).describe('解析置信度'),
   warning: z.string().describe('异常提示，无异常则为空字符串'),
 });
@@ -73,11 +76,10 @@ function findCategoryInList(
 function findAccountInList(
   accountName: string,
   accountsJson: string,
-): { name: string; icon: string; id: string } | null {
+): { name: string; id: string } | null {
   try {
     const accounts = JSON.parse(accountsJson) as Array<{
       name: string;
-      icon: string;
       id: string;
     }>;
     return (
@@ -172,30 +174,39 @@ ${state.accountsJson}
 /** Step 2: 分类匹配校验 — 验证 LLM 返回的分类名是否在可用列表中 */
 function matchCategory(state: BillStateType): Partial<BillStateType> {
   if (!state.categoryName) {
+    const fallback = findCategoryInList('其他', state.categoriesJson);
     return {
       categoryName: '其他',
+      categoryId: fallback?.id ?? '',
+      categoryIcon: fallback?.icon ?? '',
       confidence: 'medium',
     };
   }
 
-  // 校验 LLM 返回的分类名是否真实存在于可用分类中
   const matched = findCategoryInList(state.categoryName, state.categoriesJson);
 
   if (!matched) {
-    // LLM 幻觉了自创分类，回退到"其他"并降低置信度
+    const fallback = findCategoryInList('其他', state.categoriesJson);
     return {
       categoryName: '其他',
+      categoryId: fallback?.id ?? '',
+      categoryIcon: fallback?.icon ?? '',
       confidence: 'medium',
     };
   }
 
-  // 分类名大小写可能不一致，用数据库中的标准名称替换
-  return { categoryName: matched.name };
+  return {
+    categoryName: matched.name,
+    categoryId: matched.id,
+    categoryIcon: matched.icon,
+  };
 }
 
 function matchAccount(state: BillStateType): Partial<BillStateType> {
   if (!state.accountName) {
     return {
+      accountName: '',
+      accountId: '',
       confidence: 'medium',
     };
   }
@@ -205,11 +216,15 @@ function matchAccount(state: BillStateType): Partial<BillStateType> {
   if (!matched) {
     return {
       accountName: '',
+      accountId: '',
       confidence: 'medium',
     };
   }
 
-  return { accountName: matched.name };
+  return {
+    accountName: matched.name,
+    accountId: matched.id,
+  };
 }
 
 /** Step 3: 置信度评估 — 决定是否需要用户确认 */

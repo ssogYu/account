@@ -28,7 +28,6 @@ export const DEFAULT_ACCOUNT_TYPES: { label: string; type: AccountType }[] = [
   { label: '微信', type: 'wechat' },
   { label: '支付宝', type: 'alipay' },
   { label: '现金', type: 'cash' },
-  { label: '银行卡', type: 'bank_card' },
 ];
 
 // 预算提醒阈值

@@ -29,7 +29,7 @@ export const INCOME_CATEGORIES: CategoryItem[] = [
   { key: '其他', icon: '📝' },
 ];
 
-export const ACCOUNTS = ['微信', '支付宝', '现金', '银行卡'] as const;
+export const ACCOUNTS = ['微信', '支付宝', '现金'] as const;
 
 /** 分类 → 图标映射（用于列表展示） */
 const allCategories = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];

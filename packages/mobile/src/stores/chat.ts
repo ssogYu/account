@@ -3,6 +3,7 @@ import axios from 'axios';
 import { chatService } from '@/services/chat';
 import type { ChatMessage, SendMessageResult, ConfirmBillParams } from '@/services/chat/types';
 import { AppError } from '@/services/api';
+import { useBillStore } from '@/stores/bill';
 
 interface ChatState {
   messages: ChatMessage[];
@@ -71,8 +72,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await chatService.confirmBill(params);
       if (result.confirmed) {
-        const history = await chatService.getHistory(50);
-        set({ messages: history.items });
+        set((state) => ({
+          messages: state.messages.map((msg) =>
+            msg.id === params.messageId
+              ? {
+                  ...msg,
+                  billId: result.billId ?? null,
+                  metadata: {
+                    ...msg.metadata!,
+                    type: 'confirmed' as const,
+                    parseResult: {
+                      ...msg.metadata!.parseResult!,
+                      ...params.edits,
+                    },
+                  },
+                }
+              : msg,
+          ),
+        }));
+        useBillStore.getState().fetchTodaySummary();
       }
       return result.confirmed;
     } catch (err) {
@@ -86,8 +104,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await chatService.rejectBill(messageId);
       if (result.rejected) {
-        const history = await chatService.getHistory(50);
-        set({ messages: history.items });
+        set((state) => {
+          const updated = state.messages.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, metadata: { ...msg.metadata!, type: 'rejected' as const } }
+              : msg,
+          );
+          return { messages: updated };
+        });
       }
       return result.rejected;
     } catch (err) {

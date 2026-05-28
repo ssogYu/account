@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useIsFocused } from 'expo-router';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useStatsStore } from '@/stores/stats';
@@ -28,9 +28,13 @@ export default function StatsScreen() {
     setActiveTab,
   } = useStatsStore();
 
+  const isFocused = useIsFocused();
+
   useEffect(() => {
-    fetchAll();
-  }, []);
+    if (isFocused) {
+      fetchAll();
+    }
+  }, [isFocused]);
 
   // ── 月份切换 ──
   const handlePrevMonth = () => {

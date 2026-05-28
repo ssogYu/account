@@ -46,12 +46,17 @@ export class ConfirmBillDto {
   @IsOptional()
   note?: string;
 
-  /** 便捷访问：提取edits */
+  @ApiPropertyOptional({ description: '修改后的账户名称' })
+  @IsString()
+  @IsOptional()
+  accountName?: string;
+
   get edits() {
     const result: Record<string, unknown> = {};
     if (this.categoryId !== undefined) result.categoryId = this.categoryId;
     if (this.amount !== undefined) result.amount = this.amount;
     if (this.note !== undefined) result.note = this.note;
+    if (this.accountName !== undefined) result.accountName = this.accountName;
     return Object.keys(result).length > 0 ? result : undefined;
   }
 }

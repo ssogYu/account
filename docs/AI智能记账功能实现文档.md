@@ -24,7 +24,10 @@
                               │ OpenAI │ Gemini │ Ollama      │
                               └─────────────────────────────┘
                                     ↓
-                              [确认卡片 → 用户确认 → 创建账单]
+                        ┌── needsConfirm=false ──→ 直接创建账单入库
+                        │                        → 返回 confirmed + billId
+                        │
+                        └── needsConfirm=true ──→ 确认卡片 → 用户确认 → 创建账单入库
 ```
 
 ---
@@ -217,12 +220,24 @@ sendMessage(userId, dto):
   1. 保存用户消息
   2. 获取用户可用分类
   3. 调用 LangGraph 编排图 (runBillGraph)
-     ├── 成功: 返回 ParseResult
-     └── 失败: 降级到本地关键词解析 (localParse)
-  4. 生成 AI 回复 (确认卡片 or 引导消息)
-  5. 保存 AI 消息 (含 metadata)
+     ├── 成功: 返回 ParseResult (含 needsConfirm)
+     └── 失败: 降级到本地关键词解析 (localParse, needsConfirm=true)
+  4. 根据 needsConfirm 分流:
+     ├── needsConfirm=true  → 返回 confirm_card，等用户确认
+     └── needsConfirm=false → 调用 createBillFromParse 直接入库，返回 confirmed + billId
+  5. 保存 AI 消息 (含 metadata 和 billId)
   6. 返回结果
 ```
+
+#### 高置信度免确认
+
+当 LLM 解析结果为高置信度（`confidence=high`）且无异常提示（`warning` 为空）时，`evaluateAndReply` 节点设置 `needsConfirm=false`。此时 `ChatService.sendMessage` 会：
+
+1. 调用 `createBillFromParse()` 直接创建账单入库
+2. 返回 `metadata: { type: 'confirmed', parseResult }` + `billId`
+3. 前端渲染"已记录 ✓"的 ConfirmCard（无操作按钮）
+
+这避免了高置信度场景下用户每次都需要手动确认的繁琐操作。
 
 #### 降级策略
 
@@ -240,14 +255,34 @@ confirmBill(userId, messageId, edits?):
   1. 查找 AI 消息，验证 metadata.type === 'confirm_card'
   2. 合并用户修改 (edits)
   3. 创建账单 (source: 'ai')
-  4. 更新消息 metadata → type: 'confirmed'
-  5. 创建确认消息 + 已记录消息
+  4. 更新消息 metadata → type: 'confirmed', billId
+  5. 创建用户"确认"消息
+  （不再额外创建"已记录"助手消息，原确认卡片已变为已确认状态）
 
 rejectBill(userId, messageId):
   1. 验证消息类型
   2. 更新 metadata → type: 'rejected'
-  3. 创建取消消息
+  3. 创建取消消息 + AI 回复消息
 ```
+
+#### createBillFromParse（高置信度直接入库）
+
+```typescript
+private async createBillFromParse(userId: string, parse: ParseResult) {
+  // 查询用户家庭组
+  const membership = await this.prisma.familyMember.findFirst({ ... });
+  // 创建账单
+  return this.prisma.bill.create({
+    data: {
+      userId, familyId, categoryId, type, amount, note, date,
+      source: 'ai',
+    },
+    include: { category: true },
+  });
+}
+```
+
+> **设计说明**: `createBillFromParse` 与 `confirmBill` 中的账单创建逻辑一致（都查询家庭组、创建 Bill 记录、设置 source='ai'），抽为独立方法避免重复。
 
 ---
 
@@ -331,20 +366,36 @@ function usePulse(delay: number) {
 
 ### 4.1 完整对话记账流程
 
+#### 高置信度（免确认）
+
 ```
 1. 用户输入 "午饭花了25"
 2. → POST /api/v1/chat/send { content: "午饭花了25" }
 3. → ChatService.sendMessage()
-4. → LangGraph: semanticParse (LLM 解析)
-5. → LangGraph: matchCategory (分类校验)
-6. → LangGraph: evaluateAndReply (回复生成)
-7. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResult: {...} } } }
-8. → 前端渲染确认卡片
-9. 用户点击"确认记账"
-10. → POST /api/v1/chat/confirm/:messageId
-11. → ChatService.confirmBill()
-12. → 创建 Bill 记录 (source: 'ai')
-13. → 前端刷新账单列表和今日汇总
+4. → LangGraph: semanticParse → matchCategory → evaluateAndReply
+5. → evaluateAndReply: confidence=high, warning=空 → needsConfirm=false
+6. → ChatService: needsConfirm=false → createBillFromParse() 直接入库
+7. → 返回 { assistantMessage: { metadata: { type: 'confirmed', parseResult }, billId } }
+8. → 前端渲染"已记录 ✓"的 ConfirmCard（无操作按钮）
+```
+
+#### 中/低置信度（需确认）
+
+```
+1. 用户输入 "午饭花了25"
+2. → POST /api/v1/chat/send { content: "午饭花了25" }
+3. → ChatService.sendMessage()
+4. → LangGraph: semanticParse → matchCategory → evaluateAndReply
+5. → evaluateAndReply: confidence≠high 或 warning≠空 → needsConfirm=true
+6. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResult } } }
+7. → 前端渲染确认卡片（带"确认记账"和"取消"按钮）
+8. 用户点击"确认记账"
+9. → POST /api/v1/chat/confirm/:messageId
+10. → ChatService.confirmBill()
+11. → 创建 Bill 记录 (source: 'ai')
+12. → 更新消息 metadata → type: 'confirmed', billId
+13. → 前端刷新历史，确认卡片变为"已记录"状态
+14. → 前端刷新账单列表和今日汇总
 ```
 
 ### 4.2 降级流程
@@ -353,9 +404,11 @@ function usePulse(delay: number) {
 1. LLM 调用失败 (网络错误/API 限流)
 2. → ChatService 捕获异常
 3. → 降级到 localParse() 关键词解析
-4. → 返回结果 (置信度可能为 medium/low)
+4. → 返回结果 (置信度可能为 medium/low, needsConfirm=true)
 5. → 前端正常显示确认卡片
 ```
+
+> **设计说明**: 降级解析始终设置 `needsConfirm=true`，因为本地关键词解析的准确性低于 LLM，应更谨慎地要求用户确认。
 
 ---
 
@@ -377,9 +430,12 @@ function usePulse(delay: number) {
 
 ### Mobile 端修改文件
 
-| 文件                       | 说明               |
-| -------------------------- | ------------------ |
-| `src/app/(tabs)/index.tsx` | 首页对话界面重设计 |
+| 文件                                  | 说明                               |
+| ------------------------------------- | ---------------------------------- |
+| `src/app/(tabs)/index.tsx`            | 首页对话界面重设计                 |
+| `src/services/chat/types.ts`          | ParseResult 新增 needsConfirm 字段 |
+| `src/components/chat/ChatBubble.tsx`  | 支持高置信度 confirmed 消息渲染    |
+| `src/components/chat/ConfirmCard.tsx` | 确认卡片已确认状态渲染             |
 
 ---
 

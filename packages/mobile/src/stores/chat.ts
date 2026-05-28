@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import { chatService } from '@/services/chat';
 import type { ChatMessage, SendMessageResult, ConfirmBillParams } from '@/services/chat/types';
 import { AppError } from '@/services/api';
@@ -8,19 +9,22 @@ interface ChatState {
   isLoading: boolean;
   isSending: boolean;
   error: string | null;
+  abortController: AbortController | null;
 
   fetchHistory: () => Promise<void>;
   sendMessage: (content: string) => Promise<SendMessageResult | null>;
+  cancelSend: () => void;
   confirmBill: (params: ConfirmBillParams) => Promise<boolean>;
   rejectBill: (messageId: string) => Promise<boolean>;
   clearError: () => void;
 }
 
-export const useChatStore = create<ChatState>((set) => ({
+export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isLoading: false,
   isSending: false,
   error: null,
+  abortController: null,
 
   async fetchHistory() {
     set({ isLoading: true, error: null });
@@ -34,18 +38,32 @@ export const useChatStore = create<ChatState>((set) => ({
   },
 
   async sendMessage(content: string) {
-    set({ isSending: true, error: null });
+    const controller = new AbortController();
+    set({ isSending: true, error: null, abortController: controller });
     try {
-      const result = await chatService.sendMessage({ content });
+      const result = await chatService.sendMessage({ content }, controller.signal);
       set((state) => ({
         messages: [...state.messages, result.userMessage, result.assistantMessage],
         isSending: false,
+        abortController: null,
       }));
       return result;
     } catch (err) {
+      if (axios.isCancel(err)) {
+        set({ isSending: false, abortController: null });
+        return null;
+      }
       const message = err instanceof AppError ? err.message : '发送消息失败';
-      set({ error: message, isSending: false });
+      set({ error: message, isSending: false, abortController: null });
       return null;
+    }
+  },
+
+  cancelSend() {
+    const { abortController } = get();
+    if (abortController) {
+      abortController.abort();
+      set({ isSending: false, abortController: null });
     }
   },
 
@@ -53,7 +71,6 @@ export const useChatStore = create<ChatState>((set) => ({
     try {
       const result = await chatService.confirmBill(params);
       if (result.confirmed) {
-        // 确认成功后刷新历史（后端会新增确认和已记录两条消息）
         const history = await chatService.getHistory(50);
         set({ messages: history.items });
       }
@@ -69,7 +86,6 @@ export const useChatStore = create<ChatState>((set) => ({
     try {
       const result = await chatService.rejectBill(messageId);
       if (result.rejected) {
-        // 取消后刷新历史
         const history = await chatService.getHistory(50);
         set({ messages: history.items });
       }

@@ -7,36 +7,23 @@ import { z } from 'zod';
 
 /** 记账图的状态 */
 export const BillState = Annotation.Root({
-  /** 用户原始输入 */
   input: Annotation<string>,
-  /** 用户ID */
   userId: Annotation<string>,
-  /** 可用分类列表（JSON字符串） */
   categoriesJson: Annotation<string>,
+  accountsJson: Annotation<string>,
 
-  // ── 语义解析结果 ──
-  /** 解析是否成功 */
   parsed: Annotation<boolean>,
-  /** 收支类型 */
   type: Annotation<'expense' | 'income' | null>,
-  /** 金额 */
   amount: Annotation<number | null>,
-  /** 备注 */
   note: Annotation<string>,
-  /** 日期（YYYY-MM-DD） */
   date: Annotation<string>,
-  /** 分类名 */
   categoryName: Annotation<string>,
+  accountName: Annotation<string>,
 
-  // ── 置信度评估 ──
   confidence: Annotation<'high' | 'medium' | 'low'>,
-  /** 异常提示 */
   warning: Annotation<string>,
 
-  // ── 最终输出 ──
-  /** 是否需要用户确认 */
   needsConfirm: Annotation<boolean>,
-  /** 解析错误信息 */
   error: Annotation<string>,
 });
 
@@ -51,6 +38,9 @@ const ParseOutputSchema = z.object({
   note: z.string().describe('备注/描述'),
   date: z.string().describe('日期，格式 YYYY-MM-DD'),
   categoryName: z.string().describe('分类名称，必须从可用分类中选择'),
+  accountName: z
+    .string()
+    .describe('账户名称，如微信/支付宝/现金/银行卡，未提及则为空字符串'),
   confidence: z.enum(['high', 'medium', 'low']).describe('解析置信度'),
   warning: z.string().describe('异常提示，无异常则为空字符串'),
 });
@@ -72,6 +62,27 @@ function findCategoryInList(
     return (
       categories.find(
         (c) => c.name.toLowerCase() === categoryName.toLowerCase(),
+      ) ?? null
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
+    return null;
+  }
+}
+
+function findAccountInList(
+  accountName: string,
+  accountsJson: string,
+): { name: string; icon: string; id: string } | null {
+  try {
+    const accounts = JSON.parse(accountsJson) as Array<{
+      name: string;
+      icon: string;
+      id: string;
+    }>;
+    return (
+      accounts.find(
+        (a) => a.name.toLowerCase() === accountName.toLowerCase(),
       ) ?? null
     );
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -103,14 +114,27 @@ async function semanticParse(
 4. 日期格式为 YYYY-MM-DD，"今天"用${today}，"昨天"用${yesterday}
 5. 如果金额看起来异常（如午饭500），在warning中提醒
 6. confidence: high=金额+分类都明确, medium=金额明确但分类不确定, low=信息不完整
+7. 账户名必须从下面的可用账户中选择，用户未提及账户时accountName设为空字符串
 
 可用分类：
 ${state.categoriesJson}
 
+可用账户：
+${state.accountsJson}
+
 当前日期：${today}`;
 
   try {
+    // withStructuredOutput 是 LangChain 的"结构化输出"能力：
+    // 它将 Zod Schema（ParseOutputSchema）转换为 LLM 的 function/tool calling 参数，
+    // 让 LLM 的输出不再是自由文本，而是严格符合 Schema 定义的 JSON 对象。
+    // 底层原理：根据 Schema 自动生成 JSON Schema → 作为 tool 传给 LLM → LLM 调用该 tool → 解析返回值
     const structuredModel = chatModel.withStructuredOutput(ParseOutputSchema);
+
+    // invoke 发送消息给 LLM 并获取结构化结果：
+    // - SystemMessage: 系统提示词，定义 LLM 的角色和行为规则
+    // - HumanMessage: 用户输入（如"午饭花了25"）
+    // LLM 返回的 result 类型由 ParseOutputSchema 决定，TypeScript 可自动推断
     const result = await structuredModel.invoke([
       new SystemMessage(systemPrompt),
       new HumanMessage(state.input),
@@ -131,6 +155,7 @@ ${state.categoriesJson}
       note: result.note || state.input,
       date: result.date || today,
       categoryName: result.categoryName,
+      accountName: result.accountName || '',
       confidence: result.confidence,
       warning: result.warning || '',
       error: '',
@@ -168,13 +193,31 @@ function matchCategory(state: BillStateType): Partial<BillStateType> {
   return { categoryName: matched.name };
 }
 
+function matchAccount(state: BillStateType): Partial<BillStateType> {
+  if (!state.accountName) {
+    return {
+      confidence: 'medium',
+    };
+  }
+
+  const matched = findAccountInList(state.accountName, state.accountsJson);
+
+  if (!matched) {
+    return {
+      accountName: '',
+      confidence: 'medium',
+    };
+  }
+
+  return { accountName: matched.name };
+}
+
 /** Step 3: 置信度评估 — 决定是否需要用户确认 */
 function evaluateAndReply(state: BillStateType): Partial<BillStateType> {
   if (!state.parsed) {
     return { needsConfirm: false };
   }
 
-  // 有异常提示 或 置信度非 high 时需要用户确认
   const needsConfirm = state.confidence !== 'high' || !!state.warning;
 
   return { needsConfirm };
@@ -195,31 +238,20 @@ function routeAfterParse(
 /**
  * 创建记账 LangGraph 编排图
  *
- * 流程：用户输入 → LLM语义解析 → 分类匹配 → 置信度评估+回复生成
+ * 流程：用户输入 → LLM语义解析 → 分类匹配 → 账户匹配 → 置信度评估+回复生成
  */
 export function createBillGraph(chatModel: BaseChatModel) {
-  // 创建状态图，所有节点共享 BillState 中定义的状态字段
   const workflow = new StateGraph(BillState)
-    // 注册三个处理节点：
-    // 1. semanticParse — 调用 LLM 从用户输入中提取结构化记账数据（金额、分类、日期等）
-    // 2. matchCategory  — 校验 LLM 返回的分类名是否在可用列表中，防止幻觉自创分类
-    // 3. evaluateAndReply — 根据置信度决定是否需要用户确认
     .addNode('semanticParse', (state) => semanticParse(state, chatModel))
     .addNode('matchCategory', matchCategory)
+    .addNode('matchAccount', matchAccount)
     .addNode('evaluateAndReply', evaluateAndReply)
 
-    // 定义执行路径：
-    // 入口 → semanticParse（所有请求先经过 LLM 解析）
     .addEdge(START, 'semanticParse')
-    // semanticParse 之后根据解析结果走不同路径：
-    //   - 解析成功(parsed=true) → matchCategory（先校验分类再评估）
-    //   - 解析失败(parsed=false) → evaluateAndReply（直接结束）
     .addConditionalEdges('semanticParse', routeAfterParse)
-    // matchCategory → evaluateAndReply（分类校验完成后评估置信度）
-    .addEdge('matchCategory', 'evaluateAndReply')
-    // evaluateAndReply → 结束（评估完毕，流程结束）
+    .addEdge('matchCategory', 'matchAccount')
+    .addEdge('matchAccount', 'evaluateAndReply')
     .addEdge('evaluateAndReply', END);
 
-  // compile() 将图定义编译为可执行的 Runnable，调用时传入初始状态即可运行
   return workflow.compile();
 }

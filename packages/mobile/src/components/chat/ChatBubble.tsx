@@ -4,7 +4,7 @@ import { colors, spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import type { ChatMessage } from '@/services/chat/types';
-import { ConfirmCard } from './ConfirmCard';
+import { ConfirmCard, type ConfirmBillEdits } from './ConfirmCard';
 
 export function ChatBubble({
   message,
@@ -12,7 +12,7 @@ export function ChatBubble({
   onReject,
 }: {
   message: ChatMessage;
-  onConfirm: (messageId: string) => void;
+  onConfirm: (messageId: string, edits?: ConfirmBillEdits) => void;
   onReject: (messageId: string) => void;
 }) {
   const isUser = message.role === 'user';
@@ -23,7 +23,6 @@ export function ChatBubble({
   const isRejected = meta?.type === 'rejected';
   const showConfirmCard = (isConfirmCard || isConfirmed) && meta?.parseResult;
 
-  // 入场动画
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     anim.setValue(0);
@@ -37,7 +36,7 @@ export function ChatBubble({
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [16, 0],
+    outputRange: [12, 0],
   });
   const opacity = anim.interpolate({
     inputRange: [0, 1],
@@ -46,24 +45,15 @@ export function ChatBubble({
 
   return (
     <Animated.View
-      style={[
-        styles.row,
-        isUser && styles.rowUser,
-        { transform: [{ translateY }], opacity },
-      ]}
+      style={[styles.row, isUser && styles.rowUser, { transform: [{ translateY }], opacity }]}
     >
       {!isUser && (
         <View style={styles.avatar}>
           <View style={styles.avatarGlow} />
-          <MaterialCommunityIcons name="robot-happy-outline" size={18} color={colors.accent} />
+          <MaterialCommunityIcons name="robot-happy-outline" size={16} color={colors.accent} />
         </View>
       )}
-      <View
-        style={[
-          styles.bubble,
-          isUser ? styles.bubbleUser : styles.bubbleAssistant,
-        ]}
-      >
+      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
         {showConfirmCard ? (
           <ConfirmCard
             parseResult={meta!.parseResult!}
@@ -76,7 +66,7 @@ export function ChatBubble({
           <View style={styles.rejectedRow}>
             <CategoryIcon
               iconKey={meta.parseResult.categoryIcon}
-              size={14}
+              size={12}
               color={colors.textTertiary}
             />
             <Text style={styles.rejectedText}>
@@ -84,9 +74,7 @@ export function ChatBubble({
             </Text>
           </View>
         ) : (
-          <Text style={[styles.text, isUser && styles.textUser]}>
-            {message.content}
-          </Text>
+          <Text style={[styles.text, isUser && styles.textUser]}>{message.content}</Text>
         )}
       </View>
     </Animated.View>
@@ -96,65 +84,67 @@ export function ChatBubble({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm + 2,
+    paddingHorizontal: spacing.lg - 2,
     alignItems: 'flex-end',
   },
   rowUser: { justifyContent: 'flex-end' },
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(10, 132, 255, 0.12)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(10, 132, 255, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
+    marginRight: spacing.sm - 2,
     marginBottom: 2,
   },
   avatarGlow: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(10, 132, 255, 0.08)',
-    transform: [{ scale: 1.6 }],
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(10, 132, 255, 0.06)',
+    transform: [{ scale: 1.5 }],
   },
   bubble: {
-    maxWidth: '82%',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 4,
+    maxWidth: '80%',
+    paddingHorizontal: spacing.md - 2,
+    paddingVertical: spacing.sm + 2,
     borderRadius: radius.lg,
   },
   bubbleUser: {
-    backgroundColor: colors.accent,
+    backgroundColor: '#0A84FF',
     borderTopRightRadius: radius.xs,
-    borderBottomRightRadius: radius.xs,
+    borderBottomRightRadius: 4,
     borderBottomLeftRadius: radius.lg,
     borderTopLeftRadius: radius.lg,
   },
   bubbleAssistant: {
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: radius.xs,
-    borderBottomLeftRadius: radius.xs,
+    borderBottomLeftRadius: 4,
     borderBottomRightRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.separator,
   },
   text: {
-    ...typography.body,
-    fontSize: 15,
-    lineHeight: 22,
+    ...typography.subheadline,
+    lineHeight: 21,
     color: colors.text,
   },
-  textUser: { color: '#FFFFFF' },
+  textUser: {
+    color: '#FFFFFF',
+    fontWeight: '400',
+  },
   rejectedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs - 1,
   },
   rejectedText: {
-    ...typography.footnote,
+    ...typography.caption1,
     color: colors.textTertiary,
     textDecorationLine: 'line-through',
   },

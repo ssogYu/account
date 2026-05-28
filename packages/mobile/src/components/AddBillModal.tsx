@@ -17,6 +17,7 @@ import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCategoryStore } from '@/stores/category';
+import { useAccountStore } from '@/stores/account';
 import { CategoryIcon } from '@/components/icons';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -32,11 +33,23 @@ interface AddBillModalProps {
     account?: string;
     date?: string;
   }) => Promise<unknown>;
+  /** 传入已有账单进入编辑模式 */
+  billToEdit?: {
+    id: string;
+    type: 'expense' | 'income';
+    amount: number;
+    categoryId: string;
+    note?: string;
+    account?: string;
+    date?: string;
+  } | null;
 }
 
-export function AddBillModal({ visible, onClose, onSubmit }: AddBillModalProps) {
+export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBillModalProps) {
   const categories = useCategoryStore((s) => s.categories);
   const fetchCategories = useCategoryStore((s) => s.fetchCategories);
+  const accounts = useAccountStore((s) => s.accounts);
+  const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
 
   const [billType, setBillType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
@@ -50,16 +63,24 @@ export function AddBillModal({ visible, onClose, onSubmit }: AddBillModalProps) 
 
   const filteredCategories = categories.filter((c) => c.type === billType);
 
-  const ACCOUNTS = ['微信', '支付宝', '现金', '银行卡'] as const;
-
   useEffect(() => {
     if (visible) {
       fetchCategories();
-      setBillType('expense');
-      setAmount('');
-      setSelectedCategoryId('');
-      setNote('');
-      setAccount('');
+      fetchAccounts();
+      if (billToEdit) {
+        // 编辑模式：预填充数据
+        setBillType(billToEdit.type);
+        setAmount(String(billToEdit.amount));
+        setSelectedCategoryId(billToEdit.categoryId);
+        setNote(billToEdit.note ?? '');
+        setAccount(billToEdit.account ?? '');
+      } else {
+        setBillType('expense');
+        setAmount('');
+        setSelectedCategoryId('');
+        setNote('');
+        setAccount('');
+      }
       Animated.parallel([
         Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
         Animated.spring(slideY, { toValue: 0, tension: 68, friction: 12, useNativeDriver: true }),
@@ -124,7 +145,7 @@ export function AddBillModal({ visible, onClose, onSubmit }: AddBillModalProps) 
             </View>
 
             <View style={s.header}>
-              <Text style={s.headerTitle}>记一笔</Text>
+              <Text style={s.headerTitle}>{billToEdit ? '编辑账单' : '记一笔'}</Text>
               <TouchableOpacity
                 onPress={handleClose}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -211,15 +232,15 @@ export function AddBillModal({ visible, onClose, onSubmit }: AddBillModalProps) 
               <View style={s.fieldSection}>
                 <Text style={s.fieldLabel}>账户</Text>
                 <View style={s.accountRow}>
-                  {ACCOUNTS.map((acc) => (
+                  {accounts.map((acc) => (
                     <TouchableOpacity
-                      key={acc}
-                      style={[s.accountItem, account === acc && s.accountItemActive]}
-                      onPress={() => setAccount(acc === account ? '' : acc)}
+                      key={acc.id}
+                      style={[s.accountItem, account === acc.name && s.accountItemActive]}
+                      onPress={() => setAccount(acc.name === account ? '' : acc.name)}
                       activeOpacity={0.6}
                     >
-                      <Text style={[s.accountText, account === acc && s.accountTextActive]}>
-                        {acc}
+                      <Text style={[s.accountText, account === acc.name && s.accountTextActive]}>
+                        {acc.name}
                       </Text>
                     </TouchableOpacity>
                   ))}

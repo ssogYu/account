@@ -9,6 +9,7 @@ import { FamilyModule } from './modules/family';
 import { UploadModule } from './modules/upload';
 import { BillModule } from './modules/bill';
 import { CategoryModule } from './modules/category';
+import { AccountModule } from './modules/account';
 import { ChatModule } from './modules/chat';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
@@ -23,6 +24,7 @@ import { TransformInterceptor } from './common/interceptors';
     UploadModule,
     BillModule,
     CategoryModule,
+    AccountModule,
     ChatModule,
   ],
   controllers: [],

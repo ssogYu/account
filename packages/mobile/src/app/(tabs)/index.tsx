@@ -25,12 +25,14 @@ import {
   WELCOME_MESSAGES,
   QUICK_INPUTS,
 } from '@/components/chat';
+import type { ConfirmBillEdits } from '@/components/chat/ConfirmCard';
 
 export default function HomeScreen() {
   const messages = useChatStore((s) => s.messages);
   const isSending = useChatStore((s) => s.isSending);
   const fetchHistory = useChatStore((s) => s.fetchHistory);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const cancelSend = useChatStore((s) => s.cancelSend);
   const confirmBill = useChatStore((s) => s.confirmBill);
   const rejectBill = useChatStore((s) => s.rejectBill);
   const todaySummary = useBillStore((s) => s.todaySummary);
@@ -68,8 +70,18 @@ export default function HomeScreen() {
   );
 
   const handleConfirm = useCallback(
-    async (messageId: string) => {
-      const ok = await confirmBill({ messageId });
+    async (messageId: string, edits?: ConfirmBillEdits) => {
+      const ok = await confirmBill({
+        messageId,
+        edits: edits
+          ? {
+              categoryId: edits.categoryId,
+              amount: edits.amount,
+              note: edits.note,
+              accountName: edits.accountName,
+            }
+          : undefined,
+      });
       if (ok) {
         await Promise.all([fetchBills({ page: 1, pageSize: 20 }), fetchTodaySummary()]);
       }
@@ -183,14 +195,24 @@ export default function HomeScreen() {
               editable={!isSending}
               maxLength={200}
             />
-            <TouchableOpacity
-              style={[styles.sendBtn, (!inputText.trim() || isSending) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!inputText.trim() || isSending}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons name="arrow-up" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
+            {isSending ? (
+              <TouchableOpacity
+                style={styles.cancelSendBtn}
+                onPress={cancelSend}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="close" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={!inputText.trim()}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="arrow-up" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -337,5 +359,14 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: colors.textQuaternary,
+  },
+  cancelSendBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.fillSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.xs,
   },
 });

@@ -10,8 +10,10 @@ import type {
 } from './types';
 
 export const chatService = {
-  async sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
-    const { data } = await api.post<ApiResponse<SendMessageResult>>('/chat/send', params);
+  async sendMessage(params: SendMessageParams, signal?: AbortSignal): Promise<SendMessageResult> {
+    const { data } = await api.post<ApiResponse<SendMessageResult>>('/chat/send', params, {
+      signal,
+    });
     return data.data;
   },
 

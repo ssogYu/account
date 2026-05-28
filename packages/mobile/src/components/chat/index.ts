@@ -1,4 +1,4 @@
-export { ConfirmCard } from './ConfirmCard';
+export { ConfirmCard, type ConfirmBillEdits } from './ConfirmCard';
 export { ChatBubble } from './ChatBubble';
 export { TypingIndicator } from './TypingIndicator';
 export { FloatingNav } from './FloatingNav';

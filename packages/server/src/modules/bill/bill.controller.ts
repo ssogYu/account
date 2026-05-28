@@ -54,6 +54,37 @@ export class BillController {
     return this.billService.getTodaySummary(user.id);
   }
 
+  @Get('stats/category')
+  @SwaggerApiResponse({ status: 200, description: '获取分类汇总统计' })
+  @ResponseMessage('获取成功')
+  getCategoryStats(
+    @CurrentUser() user: { id: string },
+    @Query('month') month?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.billService.getCategoryStats(user.id, month, type);
+  }
+
+  @Get('stats/daily')
+  @SwaggerApiResponse({ status: 200, description: '获取每日趋势统计' })
+  @ResponseMessage('获取成功')
+  getDailyStats(
+    @CurrentUser() user: { id: string },
+    @Query('month') month?: string,
+  ) {
+    return this.billService.getDailyStats(user.id, month);
+  }
+
+  @Get('stats/comparison')
+  @SwaggerApiResponse({ status: 200, description: '获取月度对比统计' })
+  @ResponseMessage('获取成功')
+  getMonthlyComparison(
+    @CurrentUser() user: { id: string },
+    @Query('month') month?: string,
+  ) {
+    return this.billService.getMonthlyComparison(user.id, month);
+  }
+
   @Get(':id')
   @SwaggerApiResponse({ status: 200, description: '获取账单详情' })
   @ApiNotFoundResponse({ description: '账单不存在' })

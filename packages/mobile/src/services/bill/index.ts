@@ -9,6 +9,7 @@ import type {
   UpdateBillParams,
   QueryBillParams,
 } from './types';
+import type { CategoryStats, DailyStats, MonthlyComparison } from './stats.types';
 
 export const billService = {
   async create(params: CreateBillParams): Promise<Bill> {
@@ -44,6 +45,27 @@ export const billService = {
 
   async getTodaySummary(): Promise<TodaySummary> {
     const { data } = await api.get<ApiResponse<TodaySummary>>('/bill/today');
+    return data.data;
+  },
+
+  async getCategoryStats(month?: string, type?: string): Promise<CategoryStats> {
+    const { data } = await api.get<ApiResponse<CategoryStats>>('/bill/stats/category', {
+      params: { ...(month ? { month } : {}), ...(type ? { type } : {}) },
+    });
+    return data.data;
+  },
+
+  async getDailyStats(month?: string): Promise<DailyStats> {
+    const { data } = await api.get<ApiResponse<DailyStats>>('/bill/stats/daily', {
+      params: month ? { month } : undefined,
+    });
+    return data.data;
+  },
+
+  async getMonthlyComparison(month?: string): Promise<MonthlyComparison> {
+    const { data } = await api.get<ApiResponse<MonthlyComparison>>('/bill/stats/comparison', {
+      params: month ? { month } : undefined,
+    });
     return data.data;
   },
 };

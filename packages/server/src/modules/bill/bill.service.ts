@@ -44,7 +44,7 @@ export class BillService {
       month,
     } = query;
 
-    const where = this.buildListWhere(userId, {
+    const where = await this.buildListWhere(userId, {
       type,
       categoryId,
       startDate,
@@ -150,9 +150,183 @@ export class BillService {
     return this.aggregateSummary(userId, start, end);
   }
 
+  /** 获取分类汇总统计 */
+  async getCategoryStats(userId: string, month?: string, type?: string) {
+    const targetMonth = month ?? this.getCurrentMonth();
+    const [year, m] = targetMonth.split('-').map(Number);
+    const start = new Date(year, m - 1, 1);
+    const end = new Date(year, m, 1);
+
+    const membership = await this.prisma.familyMember.findFirst({
+      where: { userId },
+      select: { familyId: true },
+    });
+
+    const dateFilter = { gte: start, lt: end };
+    const baseWhere: Prisma.BillWhereInput = membership
+      ? { familyId: membership.familyId, date: dateFilter }
+      : { userId, date: dateFilter };
+
+    const where: Prisma.BillWhereInput = {
+      ...baseWhere,
+      ...(type ? { type } : {}),
+    };
+
+    const bills = await this.prisma.bill.findMany({
+      where,
+      include: { category: true },
+    });
+
+    // 按分类汇总
+    const categoryMap = new Map<
+      string,
+      {
+        categoryId: string;
+        categoryName: string;
+        categoryIcon: string;
+        amount: number;
+        count: number;
+      }
+    >();
+
+    for (const bill of bills) {
+      const key = bill.categoryId;
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, {
+          categoryId: bill.categoryId,
+          categoryName: bill.category?.name ?? '未知',
+          categoryIcon: bill.category?.icon ?? 'other_exp',
+          amount: 0,
+          count: 0,
+        });
+      }
+      const entry = categoryMap.get(key)!;
+      entry.amount += Number(bill.amount);
+      entry.count += 1;
+    }
+
+    const items = Array.from(categoryMap.values()).sort(
+      (a, b) => b.amount - a.amount,
+    );
+    const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+
+    return {
+      month: targetMonth,
+      type: type ?? 'all',
+      totalAmount,
+      items: items.map((item) => ({
+        ...item,
+        percentage:
+          totalAmount > 0
+            ? Math.round((item.amount / totalAmount) * 10000) / 100
+            : 0,
+      })),
+    };
+  }
+
+  /** 获取每日趋势统计 */
+  async getDailyStats(userId: string, month?: string) {
+    const targetMonth = month ?? this.getCurrentMonth();
+    const [year, m] = targetMonth.split('-').map(Number);
+    const start = new Date(year, m - 1, 1);
+    const end = new Date(year, m, 1);
+
+    const membership = await this.prisma.familyMember.findFirst({
+      where: { userId },
+      select: { familyId: true },
+    });
+
+    const dateFilter = { gte: start, lt: end };
+    const baseWhere: Prisma.BillWhereInput = membership
+      ? { familyId: membership.familyId, date: dateFilter }
+      : { userId, date: dateFilter };
+
+    const [expenseBills, incomeBills] = await Promise.all([
+      this.prisma.bill.findMany({
+        where: { ...baseWhere, type: 'expense' },
+        select: { date: true, amount: true },
+      }),
+      this.prisma.bill.findMany({
+        where: { ...baseWhere, type: 'income' },
+        select: { date: true, amount: true },
+      }),
+    ]);
+
+    // 按日汇总
+    const dailyMap = new Map<string, { expense: number; income: number }>();
+    const daysInMonth = new Date(year, m, 0).getDate();
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      dailyMap.set(key, { expense: 0, income: 0 });
+    }
+
+    for (const bill of expenseBills) {
+      const key = this.toLocalDateKey(bill.date);
+      if (dailyMap.has(key)) {
+        dailyMap.get(key)!.expense += Number(bill.amount);
+      }
+    }
+
+    for (const bill of incomeBills) {
+      const key = this.toLocalDateKey(bill.date);
+      if (dailyMap.has(key)) {
+        dailyMap.get(key)!.income += Number(bill.amount);
+      }
+    }
+
+    const items = Array.from(dailyMap.entries()).map(([date, data]) => ({
+      date,
+      expense: Math.round(data.expense * 100) / 100,
+      income: Math.round(data.income * 100) / 100,
+    }));
+
+    return { month: targetMonth, items };
+  }
+
+  /** 获取月度对比统计 */
+  async getMonthlyComparison(userId: string, month?: string) {
+    const currentMonth = month ?? this.getCurrentMonth();
+    const [year, m] = currentMonth.split('-').map(Number);
+    const prevMonthDate = new Date(year, m - 2, 1);
+    const prevMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+    const [current, previous] = await Promise.all([
+      this.getSummary(userId, currentMonth),
+      this.getSummary(userId, prevMonth),
+    ]);
+
+    const expenseChange = previous.totalExpense
+      ? Math.round(
+          ((current.totalExpense - previous.totalExpense) /
+            previous.totalExpense) *
+            10000,
+        ) / 100
+      : current.totalExpense > 0
+        ? 100
+        : 0;
+
+    const incomeChange = previous.totalIncome
+      ? Math.round(
+          ((current.totalIncome - previous.totalIncome) /
+            previous.totalIncome) *
+            10000,
+        ) / 100
+      : current.totalIncome > 0
+        ? 100
+        : 0;
+
+    return {
+      current: { ...current, month: currentMonth },
+      previous: { ...previous, month: prevMonth },
+      expenseChange,
+      incomeChange,
+    };
+  }
+
   // ── 私有方法 ──
 
-  private buildListWhere(
+  private async buildListWhere(
     userId: string,
     filters: {
       type?: string;
@@ -161,8 +335,15 @@ export class BillService {
       endDate?: string;
       month?: string;
     },
-  ): Prisma.BillWhereInput {
-    const where: Prisma.BillWhereInput = { userId };
+  ): Promise<Prisma.BillWhereInput> {
+    const membership = await this.prisma.familyMember.findFirst({
+      where: { userId },
+      select: { familyId: true },
+    });
+
+    const where: Prisma.BillWhereInput = membership
+      ? { familyId: membership.familyId }
+      : { userId };
 
     if (filters.type) {
       where.type = filters.type;
@@ -219,5 +400,13 @@ export class BillService {
   private getCurrentMonth(): string {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  /** 将 Date 对象转为本地日期字符串 YYYY-MM-DD（避免 toISOString 的 UTC 偏移） */
+  private toLocalDateKey(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 }

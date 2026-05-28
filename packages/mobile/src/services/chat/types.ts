@@ -7,7 +7,9 @@ export interface ParseResult {
   categoryId: string;
   note: string;
   date: string;
+  accountName: string;
   confidence: 'high' | 'medium' | 'low';
+  needsConfirm?: boolean;
 }
 
 /** AI消息的metadata结构 */
@@ -59,5 +61,6 @@ export interface ConfirmBillParams {
     categoryId?: string;
     amount?: number;
     note?: string;
+    accountName?: string;
   };
 }

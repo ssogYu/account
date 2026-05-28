@@ -22,6 +22,7 @@ export default function StatsScreen() {
     selectedType,
     isLoading,
     activeTab,
+    monthSummary,
     fetchAll,
     setSelectedMonth,
     setSelectedType,
@@ -36,7 +37,6 @@ export default function StatsScreen() {
     }
   }, [isFocused]);
 
-  // ── 月份切换 ──
   const handlePrevMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const d = new Date(year, month - 2, 1);
@@ -60,34 +60,32 @@ export default function StatsScreen() {
   };
 
   const isExpense = selectedType === 'expense';
+  const expense = monthSummary?.totalExpense ?? 0;
+  const income = monthSummary?.totalIncome ?? 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
 
-      {/* ── 顶部标题栏 ── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.6}>
-          <MaterialCommunityIcons name="chevron-left" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>统计</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+        <View style={styles.headerTop}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.6}>
+            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
+          </TouchableOpacity>
 
-      {/* ── 月份选择器 + 收支切换 ── */}
-      <View style={styles.topBar}>
-        {/* 月份选择 */}
-        <View style={styles.monthRow}>
-          <TouchableOpacity onPress={handlePrevMonth} activeOpacity={0.6} style={styles.monthArrow}>
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
-          <Text style={styles.monthLabel}>{formatMonthLabel(selectedMonth)}</Text>
-          <TouchableOpacity onPress={handleNextMonth} activeOpacity={0.6} style={styles.monthArrow}>
-            <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
+          <View style={styles.monthSelector}>
+            <TouchableOpacity onPress={handlePrevMonth} activeOpacity={0.6} style={styles.monthArrow}>
+              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <Text style={styles.monthLabel}>{formatMonthLabel(selectedMonth)}</Text>
+            <TouchableOpacity onPress={handleNextMonth} activeOpacity={0.6} style={styles.monthArrow}>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.headerPlaceholder} />
         </View>
 
-        {/* 收支切换 */}
         <View style={styles.typeSwitch}>
           <TouchableOpacity
             style={[styles.typeBtn, isExpense && styles.typeBtnActive]}
@@ -95,6 +93,11 @@ export default function StatsScreen() {
             activeOpacity={0.7}
           >
             <Text style={[styles.typeBtnText, isExpense && { color: colors.error }]}>支出</Text>
+            {isExpense && (
+              <Text style={[styles.typeBtnAmount, { color: colors.error }]}>
+                ¥{expense.toFixed(0)}
+              </Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.typeBtn, !isExpense && styles.typeBtnActive]}
@@ -102,43 +105,34 @@ export default function StatsScreen() {
             activeOpacity={0.7}
           >
             <Text style={[styles.typeBtnText, !isExpense && { color: colors.success }]}>收入</Text>
+            {!isExpense && (
+              <Text style={[styles.typeBtnAmount, { color: colors.success }]}>
+                ¥{income.toFixed(0)}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── 流水/图表 Tab ── */}
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.mainTab, activeTab === 'flow' && styles.mainTabActive]}
+          style={styles.tab}
           onPress={() => setActiveTab('flow')}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons
-            name="receipt-text-outline"
-            size={16}
-            color={activeTab === 'flow' ? colors.text : colors.textTertiary}
-          />
-          <Text style={[styles.mainTabText, activeTab === 'flow' && styles.mainTabTextActive]}>
-            流水
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'flow' && styles.tabTextActive]}>流水</Text>
+          {activeTab === 'flow' && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.mainTab, activeTab === 'chart' && styles.mainTabActive]}
+          style={styles.tab}
           onPress={() => setActiveTab('chart')}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons
-            name="chart-pie"
-            size={16}
-            color={activeTab === 'chart' ? colors.text : colors.textTertiary}
-          />
-          <Text style={[styles.mainTabText, activeTab === 'chart' && styles.mainTabTextActive]}>
-            图表
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'chart' && styles.tabTextActive]}>图表</Text>
+          {activeTab === 'chart' && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
       </View>
 
-      {/* ── 内容区 ── */}
       {isLoading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -158,118 +152,108 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
 
-  // ── 顶部标题栏 ──
   header: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: spacing.md,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.fillSecondary,
   },
-  headerTitle: {
-    ...typography.headline,
-    color: colors.text,
-    fontSize: 17,
-  },
-  headerPlaceholder: {
-    width: 36,
-  },
-
-  // ── 顶部栏 ──
-  topBar: {
+  monthSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  monthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   monthArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.fillSecondary,
   },
   monthLabel: {
     ...typography.headline,
     color: colors.text,
     fontSize: 16,
-    minWidth: 80,
+    minWidth: 90,
     textAlign: 'center',
   },
+  headerPlaceholder: {
+    width: 34,
+  },
 
-  // 收支切换
   typeSwitch: {
     flexDirection: 'row',
     backgroundColor: colors.fillTertiary,
-    borderRadius: radius.sm,
-    padding: 2,
+    borderRadius: radius.md,
+    padding: 3,
   },
   typeBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 1,
-    borderRadius: radius.xs,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
   },
   typeBtnActive: {
     backgroundColor: colors.bgElevated,
     ...shadows.subtle,
   },
   typeBtnText: {
+    ...typography.footnote,
+    fontWeight: '600',
+    color: colors.textTertiary,
+  },
+  typeBtnAmount: {
     ...typography.caption1,
     fontWeight: '700',
-    color: colors.textTertiary,
-    fontSize: 12,
   },
 
-  // ── 流水/图表 Tab ──
   tabBar: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator,
   },
-  mainTab: {
-    flexDirection: 'row',
+  tab: {
+    flex: 1,
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-    borderRadius: radius.md,
-    backgroundColor: colors.fillTertiary,
+    paddingVertical: spacing.sm,
+    position: 'relative',
   },
-  mainTabActive: {
-    backgroundColor: colors.bgElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-    ...shadows.subtle,
-  },
-  mainTabText: {
+  tabText: {
     ...typography.footnote,
     color: colors.textTertiary,
     fontWeight: '500',
   },
-  mainTabTextActive: {
+  tabTextActive: {
     color: colors.text,
     fontWeight: '700',
   },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '30%',
+    right: '30%',
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.accent,
+  },
 
-  // 加载
   loadingWrap: {
     flex: 1,
     alignItems: 'center',

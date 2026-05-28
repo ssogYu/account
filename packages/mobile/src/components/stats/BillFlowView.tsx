@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,106 +11,75 @@ import {
   PanResponder,
   GestureResponderEvent,
 } from 'react-native';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { colors, spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { AddBillModal } from '@/components/AddBillModal';
 import { useStatsStore, type DayGroup } from '@/stores/stats';
-import { useCategoryStore } from '@/stores/category';
 import { billService } from '@/services/bill';
 import type { Bill } from '@/services/bill/types';
 
 const SWIPE_THRESHOLD = -60; // 触发显示操作按钮的滑动阈值
 const ACTION_WIDTH = 140; // 操作按钮总宽度（编辑70 + 删除70）
 
-// ── 月度汇总卡片 ──
-function MonthSummaryCard() {
-  const { monthSummary } = useStatsStore();
-  const expense = monthSummary?.totalExpense ?? 0;
-  const income = monthSummary?.totalIncome ?? 0;
-  const balance = monthSummary?.balance ?? 0;
-
-  return (
-    <View style={s.summaryCard}>
-      <View style={s.summaryRow}>
-        <View style={s.summaryItem}>
-          <Text style={s.summaryLabel}>支出</Text>
-          <Text style={[s.summaryValue, { color: colors.error }]}>¥{expense.toFixed(2)}</Text>
-        </View>
-        <View style={s.summaryDivider} />
-        <View style={s.summaryItem}>
-          <Text style={s.summaryLabel}>收入</Text>
-          <Text style={[s.summaryValue, { color: colors.success }]}>¥{income.toFixed(2)}</Text>
-        </View>
-        <View style={s.summaryDivider} />
-        <View style={s.summaryItem}>
-          <Text style={s.summaryLabel}>结余</Text>
-          <Text style={[s.summaryValue, { color: balance >= 0 ? colors.success : colors.error }]}>
-            ¥{balance.toFixed(2)}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ── 筛选栏 ──
-function FilterBar() {
-  const { flowFilter, drillCategoryName, setFlowFilter, resetFlowFilter, selectedType } =
-    useStatsStore();
-  const categories = useCategoryStore((s) => s.categories);
-  const fetchCategories = useCategoryStore((s) => s.fetchCategories);
+// ── 流水头部（结余 + 筛选） ──
+function FlowHeader() {
+  const {
+    monthSummary,
+    flowFilter,
+    drillCategoryName,
+    setFlowFilter,
+    resetFlowFilter,
+    categoryStats,
+  } = useStatsStore();
   const [expanded, setExpanded] = useState(false);
 
+  const balance = monthSummary?.balance ?? 0;
   const hasFilter = !!flowFilter.type || !!flowFilter.categoryId || !!drillCategoryName;
 
   const activeLabel =
     flowFilter.type === 'expense' ? '支出' : flowFilter.type === 'income' ? '收入' : null;
 
   const activeCategory = flowFilter.categoryId
-    ? categories.find((c) => c.id === flowFilter.categoryId)
+    ? categoryStats?.items.find((c) => c.categoryId === flowFilter.categoryId)
     : null;
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const filteredCategories = categories.filter((c) => {
-    if (flowFilter.type) return c.type === flowFilter.type;
-    return c.type === selectedType;
-  });
+  const billCategories = categoryStats?.items ?? [];
 
   const filterLabelParts: string[] = [];
   if (activeLabel) filterLabelParts.push(activeLabel);
-  if (activeCategory) filterLabelParts.push(activeCategory.name);
+  if (activeCategory) filterLabelParts.push(activeCategory.categoryName);
 
   return (
-    <View style={s.filterWrap}>
-      <View style={s.filterRow}>
-        <TouchableOpacity
-          style={[s.filterBtn, hasFilter && s.filterBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => setExpanded(!expanded)}
-        >
-          <MaterialCommunityIcons
-            name="filter-variant"
-            size={16}
-            color={hasFilter ? colors.accent : colors.textTertiary}
-          />
-          <Text style={[s.filterBtnText, hasFilter && s.filterBtnTextActive]}>
-            {filterLabelParts.length > 0 ? `筛选：${filterLabelParts.join('·')}` : '筛选'}
+    <View style={s.flowHeader}>
+      <View style={s.flowHeaderTop}>
+        <View style={s.balanceWrap}>
+          <Text style={s.balanceLabel}>结余</Text>
+          <Text style={[s.balanceValue, { color: balance >= 0 ? colors.success : colors.error }]}>
+            {balance >= 0 ? '+' : ''}¥{balance.toFixed(2)}
           </Text>
-          <MaterialCommunityIcons
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={14}
-            color={hasFilter ? colors.accent : colors.textQuaternary}
-          />
-        </TouchableOpacity>
-        {hasFilter && (
-          <TouchableOpacity style={s.resetBtn} onPress={resetFlowFilter} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="close-circle" size={20} color={colors.textTertiary} />
+        </View>
+        <View style={s.filterActions}>
+          <TouchableOpacity
+            style={[s.filterBtn, hasFilter && s.filterBtnActive]}
+            activeOpacity={0.7}
+            onPress={() => setExpanded(!expanded)}
+          >
+            <MaterialCommunityIcons
+              name="filter-variant"
+              size={14}
+              color={hasFilter ? colors.accent : colors.textTertiary}
+            />
+            <Text style={[s.filterBtnText, hasFilter && s.filterBtnTextActive]}>
+              {filterLabelParts.length > 0 ? filterLabelParts.join('·') : '筛选'}
+            </Text>
           </TouchableOpacity>
-        )}
+          {hasFilter && (
+            <TouchableOpacity style={s.resetBtn} onPress={resetFlowFilter} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="close-circle" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {drillCategoryName && !expanded && (
@@ -157,24 +126,32 @@ function FilterBar() {
             showsVerticalScrollIndicator={false}
           >
             <View style={s.filterChips}>
-              {filteredCategories.map((cat) => (
+              {billCategories.map((cat) => (
                 <TouchableOpacity
-                  key={cat.id}
-                  style={[s.chip, flowFilter.categoryId === cat.id && s.chipActive]}
+                  key={cat.categoryId}
+                  style={[s.chip, flowFilter.categoryId === cat.categoryId && s.chipActive]}
                   onPress={() =>
                     setFlowFilter({
-                      categoryId: flowFilter.categoryId === cat.id ? undefined : cat.id,
+                      categoryId:
+                        flowFilter.categoryId === cat.categoryId ? undefined : cat.categoryId,
                     })
                   }
                   activeOpacity={0.7}
                 >
                   <CategoryIcon
-                    iconKey={cat.icon}
+                    iconKey={cat.categoryIcon}
                     size={12}
-                    color={flowFilter.categoryId === cat.id ? colors.accent : colors.textTertiary}
+                    color={
+                      flowFilter.categoryId === cat.categoryId ? colors.accent : colors.textTertiary
+                    }
                   />
-                  <Text style={[s.chipText, flowFilter.categoryId === cat.id && s.chipTextActive]}>
-                    {cat.name}
+                  <Text
+                    style={[
+                      s.chipText,
+                      flowFilter.categoryId === cat.categoryId && s.chipTextActive,
+                    ]}
+                  >
+                    {cat.categoryName}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -332,7 +309,9 @@ function DateHeader({ group }: { group: DayGroup }) {
     <View style={s.dateHeader}>
       <Text style={s.dateHeaderText}>{group.label}</Text>
       {group.dayExpense > 0 && (
-        <Text style={s.dateHeaderSub}>支出 ¥{group.dayExpense.toFixed(0)}</Text>
+        <Text style={[s.dateHeaderSub, { color: colors.error }]}>
+          支出 ¥{group.dayExpense.toFixed(0)}
+        </Text>
       )}
       {group.dayIncome > 0 && (
         <Text style={[s.dateHeaderSub, { color: colors.success }]}>
@@ -404,21 +383,12 @@ export function BillFlowView() {
     [deleteBill, handleEdit],
   );
 
-  const listHeader = useCallback(
-    () => (
-      <View>
-        <MonthSummaryCard />
-        <FilterBar />
-      </View>
-    ),
-    [],
-  );
+  const listHeader = useCallback(() => <FlowHeader />, []);
 
   if (flowGroups.length === 0) {
     return (
       <View style={s.emptyWrap}>
-        <MonthSummaryCard />
-        <FilterBar />
+        <FlowHeader />
         <View style={s.emptyState}>
           <MaterialCommunityIcons
             name="receipt-text-outline"
@@ -487,58 +457,43 @@ const s = StyleSheet.create({
   },
 
   // 月度汇总卡片
-  summaryCard: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-    ...shadows.card,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+  flowHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  summaryRow: {
+  flowHeaderTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
+  balanceWrap: {
+    gap: 2,
   },
-  summaryLabel: {
+  balanceLabel: {
     ...typography.caption1,
     color: colors.textTertiary,
   },
-  summaryValue: {
-    ...typography.headline,
+  balanceValue: {
+    ...typography.title3,
     fontWeight: '800',
-    fontSize: 15,
   },
-  summaryDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 28,
-    backgroundColor: colors.separator,
+  filterActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
 
   // 筛选栏
-  filterWrap: {
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.fillTertiary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.xs,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    gap: 3,
   },
   filterBtnActive: {
     backgroundColor: colors.accentSubtle,
@@ -546,7 +501,7 @@ const s = StyleSheet.create({
     borderColor: colors.accent,
   },
   filterBtnText: {
-    ...typography.footnote,
+    ...typography.caption1,
     color: colors.textTertiary,
   },
   filterBtnTextActive: {

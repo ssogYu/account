@@ -12,7 +12,6 @@ import type { CategoryStatItem, DailyStatItem } from '@/services/bill/stats.type
 
 const PIE_SIZE = 180;
 
-// ── 分类饼图（纯 View 环形图） ──
 function CategoryPieChart({
   items,
   totalAmount,
@@ -26,8 +25,7 @@ function CategoryPieChart({
 }) {
   const accentColor = onType === 'expense' ? colors.error : colors.success;
 
-  // 计算每个分段的起止角度
-  let currentAngle = -90; // 从12点方向开始
+  let currentAngle = -90;
   const slices = items.map((item, i) => {
     const angle = totalAmount > 0 ? (item.amount / totalAmount) * 360 : 0;
     const start = currentAngle;
@@ -42,12 +40,10 @@ function CategoryPieChart({
 
   return (
     <View style={pieStyles.container}>
-      {/* 环形图 */}
       <View style={pieStyles.chartWrap}>
         <View style={pieStyles.pieOuter}>
           {slices.map((slice) => {
             if (slice.sweepAngle <= 0) return null;
-            // 使用绝对定位的彩色扇形块模拟
             const rotation = slice.startAngle;
             return (
               <View
@@ -63,7 +59,6 @@ function CategoryPieChart({
               </View>
             );
           })}
-          {/* 中心遮罩形成环形 */}
           <View style={pieStyles.pieHole}>
             <Text style={[pieStyles.centerAmount, { color: accentColor }]}>
               ¥{totalAmount.toFixed(0)}
@@ -73,7 +68,6 @@ function CategoryPieChart({
         </View>
       </View>
 
-      {/* 图例列表（可点击下钻） */}
       <View style={pieStyles.legend}>
         {items.slice(0, 6).map((item, i) => (
           <TouchableOpacity
@@ -187,22 +181,17 @@ const pieStyles = StyleSheet.create({
   },
 });
 
-// ── 趋势折线图（简化版：用柱状图 + 折线点模拟） ──
 type TrendPeriod = 'day' | 'week' | 'month' | 'year';
 
-/** 按周聚合每日数据 */
 function aggregateByWeek(items: DailyStatItem[]): DailyStatItem[] {
   const weeks: Map<string, { expense: number; income: number }> = new Map();
   for (const item of items) {
-    // item.date 是 YYYY-MM-DD 格式，直接解析避免 UTC 偏移
     const [yStr, mStr, dStr] = item.date.split('-');
     const d = new Date(parseInt(yStr!), parseInt(mStr!) - 1, parseInt(dStr!), 12, 0, 0);
-    // 获取该日期所在周的周一
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d);
     monday.setDate(diff);
-    // 用本地日期方法生成 key
     const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
     if (!weeks.has(key)) weeks.set(key, { expense: 0, income: 0 });
     const w = weeks.get(key)!;
@@ -216,11 +205,10 @@ function aggregateByWeek(items: DailyStatItem[]): DailyStatItem[] {
   }));
 }
 
-/** 按月聚合（跨月场景，当前只有单月数据，直接返回合计） */
 function aggregateByMonth(items: DailyStatItem[]): DailyStatItem[] {
   const months: Map<string, { expense: number; income: number }> = new Map();
   for (const item of items) {
-    const key = item.date.substring(0, 7); // YYYY-MM
+    const key = item.date.substring(0, 7);
     if (!months.has(key)) months.set(key, { expense: 0, income: 0 });
     const m = months.get(key)!;
     m.expense += item.expense;
@@ -253,7 +241,6 @@ function TrendChart() {
     );
   }
 
-  // 根据周期聚合数据
   const displayItems =
     period === 'day'
       ? dailyStats.items
@@ -261,11 +248,10 @@ function TrendChart() {
         ? aggregateByWeek(dailyStats.items)
         : period === 'month'
           ? aggregateByMonth(dailyStats.items)
-          : aggregateByMonth(dailyStats.items); // year 同 month（单月数据场景）
+          : aggregateByMonth(dailyStats.items);
 
   return (
     <View style={chartStyles.trendWrap}>
-      {/* 时间维度切换 */}
       <View style={chartStyles.periodBar}>
         {periods.map((p) => (
           <TouchableOpacity
@@ -283,13 +269,11 @@ function TrendChart() {
         ))}
       </View>
 
-      {/* 柱状图 */}
       <DailyBarChart items={displayItems} displayType={selectedType} />
     </View>
   );
 }
 
-// ── 图表视图主体 ──
 export function ChartView() {
   const { categoryStats, monthlyComparison, selectedType, drillToFlow } = useStatsStore();
 
@@ -302,12 +286,16 @@ export function ChartView() {
       contentContainerStyle={chartStyles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      {/* 分类饼图 */}
       {categoryStats && categoryStats.items.length > 0 && (
         <View style={chartStyles.section}>
-          <Text style={chartStyles.sectionTitle}>
-            {selectedType === 'expense' ? '支出' : '收入'}分类
-          </Text>
+          <View style={chartStyles.sectionHeader}>
+            <Text style={chartStyles.sectionTitle}>
+              {selectedType === 'expense' ? '支出' : '收入'}分类
+            </Text>
+            <Text style={chartStyles.sectionSub}>
+              共{categoryStats.items.length}个分类
+            </Text>
+          </View>
           <View style={chartStyles.card}>
             <CategoryPieChart
               items={categoryStats.items}
@@ -319,7 +307,6 @@ export function ChartView() {
         </View>
       )}
 
-      {/* 收支趋势 */}
       <View style={chartStyles.section}>
         <Text style={chartStyles.sectionTitle}>收支趋势</Text>
         <View style={chartStyles.card}>
@@ -327,11 +314,10 @@ export function ChartView() {
         </View>
       </View>
 
-      {/* 分类排行榜 */}
       {categoryStats && categoryStats.items.length > 0 && (
         <View style={chartStyles.section}>
           <Text style={chartStyles.sectionTitle}>
-            {selectedType === 'expense' ? '支出' : '收入'}排行榜
+            {selectedType === 'expense' ? '支出' : '收入'}排行
           </Text>
           <View style={chartStyles.card}>
             <CategoryRanking items={categoryStats.items} onType={selectedType} />
@@ -339,7 +325,6 @@ export function ChartView() {
         </View>
       )}
 
-      {/* 月度对比 */}
       {monthlyComparison && (
         <View style={chartStyles.section}>
           <Text style={chartStyles.sectionTitle}>月度对比</Text>
@@ -353,16 +338,26 @@ export function ChartView() {
 const chartStyles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 120,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     gap: spacing.lg,
   },
   section: {
+    gap: spacing.sm,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     gap: spacing.sm,
   },
   sectionTitle: {
     ...typography.headline,
     color: colors.text,
     fontSize: 16,
-    paddingHorizontal: spacing.xs,
+  },
+  sectionSub: {
+    ...typography.caption1,
+    color: colors.textTertiary,
   },
   card: {
     backgroundColor: colors.bgElevated,
@@ -373,7 +368,6 @@ const chartStyles = StyleSheet.create({
     ...shadows.card,
   },
 
-  // 趋势图
   trendWrap: {
     gap: spacing.md,
   },
@@ -401,7 +395,6 @@ const chartStyles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // 空状态
   emptySection: {
     alignItems: 'center',
     justifyContent: 'center',

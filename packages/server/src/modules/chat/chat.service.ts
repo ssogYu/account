@@ -145,7 +145,8 @@ export class ChatService {
     try {
       const chatModel = this.llmService.getModel();
       const graph = createBillGraph(chatModel);
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       const result = await graph.invoke({
         input,
@@ -212,7 +213,7 @@ export class ChatService {
             amount: parse.amount,
             note: parse.note,
             account: parse.accountName || null,
-            date: new Date(parse.date),
+            date: this.parseLocalDate(parse.date),
             source: 'ai',
           },
           include: { category: true },
@@ -330,7 +331,7 @@ export class ChatService {
           amount: parse.amount,
           note: parse.note,
           account: parse.accountName || null,
-          date: new Date(parse.date),
+          date: this.parseLocalDate(parse.date),
           source: 'ai',
         },
         include: { category: true },
@@ -471,7 +472,7 @@ export class ChatService {
               amount: parse.amount,
               note: parse.note,
               account: parse.accountName || null,
-              date: new Date(parse.date),
+              date: this.parseLocalDate(parse.date),
               source: 'ai',
             },
             include: { category: true },
@@ -713,15 +714,16 @@ export class ChatService {
 
     const confidence = amount > 0 ? 'medium' : 'low';
 
-    let date = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    let date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     if (content.includes('昨天')) {
       const d = new Date();
       d.setDate(d.getDate() - 1);
-      date = d.toISOString().split('T')[0];
+      date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     } else if (content.includes('前天')) {
       const d = new Date();
       d.setDate(d.getDate() - 2);
-      date = d.toISOString().split('T')[0];
+      date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
     return {
@@ -777,5 +779,10 @@ export class ChatService {
 
   private buildGuideMessage(_content: string): string {
     return `我还没理解你的记账意图？\n\n你可以这样告诉我：\n• "午饭花了25"\n• "打车15元"\n• "午饭25，打车15，奶茶8"\n• "收到工资8000"\n\n直接描述你的消费，我会帮你自动识别。`;
+  }
+
+  private parseLocalDate(dateStr: string): Date {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
   }
 }

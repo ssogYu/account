@@ -148,6 +148,8 @@ function BillItem({
   const isSwipedOpen = useRef(false);
   const isExpense = bill.type === 'expense';
   const amount = Number(bill.amount);
+  const displayName = bill.note || bill.category?.name || '未分类';
+  const truncatedName = displayName.length > 5 ? displayName.slice(0, 5) + '…' : displayName;
 
   const animateTo = (toValue: number) => {
     Animated.spring(translateX, {
@@ -253,11 +255,15 @@ function BillItem({
           <View style={s.billInfo}>
             <View style={s.billTitleRow}>
               <Text style={s.billNote} numberOfLines={1}>
-                {bill.note || bill.category?.name || '未分类'}
+                {truncatedName}
               </Text>
               {showMemberTag && bill.user && bill.userId !== currentUserId && (
                 <View style={s.memberTag}>
-                  <Text style={s.memberTagText}>{bill.user.nickname?.[0] ?? '?'}</Text>
+                  <Text style={s.memberTagText}>
+                    {(bill.user.nickname && bill.user.nickname.length > 5
+                      ? bill.user.nickname.slice(0, 5) + '…'
+                      : bill.user.nickname) || '?'}
+                  </Text>
                 </View>
               )}
               {bill.account ? (

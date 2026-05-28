@@ -25,7 +25,7 @@ export class BillService {
         amount: dto.amount,
         note: dto.note ?? null,
         account: dto.account ?? null,
-        date: dto.date ? new Date(dto.date) : new Date(),
+        date: dto.date ? this.parseLocalDate(dto.date) : new Date(),
         source: dto.source ?? 'manual',
       },
       include: { category: true },
@@ -106,7 +106,7 @@ export class BillService {
         ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
         ...(dto.note !== undefined && { note: dto.note }),
         ...(dto.account !== undefined && { account: dto.account }),
-        ...(dto.date !== undefined && { date: new Date(dto.date) }),
+        ...(dto.date !== undefined && { date: this.parseLocalDate(dto.date) }),
       },
       include: { category: true },
     });
@@ -144,12 +144,8 @@ export class BillService {
 
   /** 获取今日收支汇总 */
   async getTodaySummary(userId: string) {
-    const today = new Date();
-    const start = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-    );
+    const todayStr = this.toLocalDateKey(new Date());
+    const start = this.parseLocalDate(todayStr);
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
 
@@ -379,8 +375,9 @@ export class BillService {
       where.date = { gte: new Date(year, m - 1, 1), lt: new Date(year, m, 1) };
     } else if (filters.startDate || filters.endDate) {
       const dateFilter: Prisma.DateTimeFilter = {};
-      if (filters.startDate) dateFilter.gte = new Date(filters.startDate);
-      if (filters.endDate) dateFilter.lt = new Date(filters.endDate);
+      if (filters.startDate)
+        dateFilter.gte = this.parseLocalDate(filters.startDate);
+      if (filters.endDate) dateFilter.lt = this.parseLocalDate(filters.endDate);
       where.date = dateFilter;
     }
 
@@ -437,5 +434,11 @@ export class BillService {
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+  }
+
+  /** 将 YYYY-MM-DD 字符串解析为本地时区零点的 Date（避免 new Date("2026-05-29") 产生 UTC 零点） */
+  private parseLocalDate(dateStr: string): Date {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
   }
 }

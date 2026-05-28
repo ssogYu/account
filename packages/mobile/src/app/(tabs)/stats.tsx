@@ -6,7 +6,6 @@ import {
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useIsFocused } from 'expo-router';
@@ -130,50 +129,6 @@ export default function StatsScreen() {
             )}
           </TouchableOpacity>
         </View>
-
-        {familyInfo && familyInfo.members.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.memberBar}
-            contentContainerStyle={styles.memberBarContent}
-          >
-            <TouchableOpacity
-              style={[styles.memberChip, !selectedMemberId && styles.memberChipActive]}
-              onPress={() => setSelectedMemberId(null)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[styles.memberChipText, !selectedMemberId && styles.memberChipTextActive]}
-              >
-                全部
-              </Text>
-            </TouchableOpacity>
-            {familyInfo.members.map((member) => {
-              const isActive = selectedMemberId === member.userId;
-              const isMe = member.userId === currentUserId;
-              return (
-                <TouchableOpacity
-                  key={member.userId}
-                  style={[styles.memberChip, isActive && styles.memberChipActive]}
-                  onPress={() => setSelectedMemberId(isActive ? null : member.userId)}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    style={[styles.memberAvatarSmall, isActive && styles.memberAvatarSmallActive]}
-                  >
-                    <Text style={styles.memberAvatarCharSmall}>
-                      {member.user.nickname?.[0] ?? '?'}
-                    </Text>
-                  </View>
-                  <Text style={[styles.memberChipText, isActive && styles.memberChipTextActive]}>
-                    {isMe ? '我' : member.user.nickname || '成员'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
       </View>
 
       <View style={styles.tabBar}>
@@ -203,6 +158,66 @@ export default function StatsScreen() {
         <BillFlowView />
       ) : (
         <ChartView />
+      )}
+
+      {familyInfo && familyInfo.members.length > 1 && (
+        <View style={styles.floatingMemberBar} pointerEvents="box-none">
+          <View style={styles.floatingMemberPill}>
+            <TouchableOpacity
+              style={[styles.floatingChip, !selectedMemberId && styles.floatingChipActive]}
+              onPress={() => setSelectedMemberId(null)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name="account-group-outline"
+                size={16}
+                color={!selectedMemberId ? '#fff' : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.floatingChipText,
+                  !selectedMemberId && styles.floatingChipTextActive,
+                ]}
+              >
+                全部
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.floatingDivider} />
+            {familyInfo.members.map((member) => {
+              const isActive = selectedMemberId === member.userId;
+              const isMe = member.userId === currentUserId;
+              const label = isMe
+                ? '我'
+                : member.user.nickname && member.user.nickname.length > 3
+                  ? member.user.nickname.slice(0, 3) + '…'
+                  : member.user.nickname || '成员';
+              return (
+                <TouchableOpacity
+                  key={member.userId}
+                  style={[styles.floatingChip, isActive && styles.floatingChipActive]}
+                  onPress={() => setSelectedMemberId(isActive ? null : member.userId)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.floatingAvatar, isActive && styles.floatingAvatarActive]}>
+                    <Text
+                      style={[
+                        styles.floatingAvatarChar,
+                        isActive && styles.floatingAvatarCharActive,
+                      ]}
+                    >
+                      {member.user.nickname?.[0] ?? '?'}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[styles.floatingChipText, isActive && styles.floatingChipTextActive]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -285,51 +300,70 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  memberBar: {
-    marginHorizontal: -spacing.lg,
+  floatingMemberBar: {
+    position: 'absolute',
+    bottom: spacing.xl + 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
   },
-  memberBarContent: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-  },
-  memberChip: {
+  floatingMemberPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    backgroundColor: colors.bgElevated,
     borderRadius: radius.xl,
-    backgroundColor: colors.fillTertiary,
+    paddingVertical: spacing.sm - 2,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.separatorOpaque,
+    ...shadows.elevated,
   },
-  memberChipActive: {
-    backgroundColor: colors.accentSubtle,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.accent,
+  floatingDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.separator,
+    marginHorizontal: spacing.xs,
   },
-  memberChipText: {
+  floatingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 1,
+    borderRadius: radius.lg,
+  },
+  floatingChipActive: {
+    backgroundColor: colors.accent,
+  },
+  floatingChipText: {
     ...typography.caption1,
-    color: colors.textTertiary,
+    color: colors.textSecondary,
+    fontSize: 13,
   },
-  memberChipTextActive: {
-    color: colors.accent,
+  floatingChipTextActive: {
+    color: '#fff',
     fontWeight: '600',
   },
-  memberAvatarSmall: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  floatingAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: colors.fillSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  memberAvatarSmallActive: {
-    backgroundColor: colors.accent,
+  floatingAvatarActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
-  memberAvatarCharSmall: {
+  floatingAvatarChar: {
     ...typography.caption2,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textSecondary,
+  },
+  floatingAvatarCharActive: {
+    color: '#fff',
   },
 
   tabBar: {

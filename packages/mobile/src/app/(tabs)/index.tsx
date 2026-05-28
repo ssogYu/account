@@ -9,6 +9,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from 'expo-router';
@@ -28,6 +29,102 @@ import {
   QUICK_INPUTS,
 } from '@/components/chat';
 import type { ConfirmBillEdits } from '@/components/chat/ConfirmCard';
+
+function TodayTicker({ expense, income }: { expense: number; income: number }) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const items = [
+    { label: '今日支出', value: `¥${expense.toFixed(2)}`, color: colors.error },
+    { label: '今日收入', value: `¥${income.toFixed(2)}`, color: colors.success },
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setCurrentIndex((prev) => (prev + 1) % items.length);
+        translateY.setValue(1);
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [items.length]);
+
+  const current = items[currentIndex] ?? items[0];
+
+  return (
+    <View style={tStyles.container}>
+      <View style={tStyles.badge}>
+        <View style={[tStyles.dot, { backgroundColor: current.color }]} />
+      </View>
+      <Animated.View
+        style={[
+          tStyles.textWrap,
+          {
+            transform: [
+              {
+                translateY: translateY.interpolate({
+                  inputRange: [-1, 0, 1],
+                  outputRange: [-22, 0, 22],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Text style={tStyles.label}>{current.label}</Text>
+        <Text style={[tStyles.value, { color: current.color }]}>{current.value}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
+const tStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    overflow: 'hidden',
+    height: 28,
+  },
+  badge: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  textWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  label: {
+    ...typography.caption1,
+    color: colors.textTertiary,
+    fontSize: 12,
+  },
+  value: {
+    ...typography.footnote,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+});
 
 export default function HomeScreen() {
   const messages = useChatStore((s) => s.messages);
@@ -139,14 +236,8 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
 
-      {/* 顶部栏 */}
       <View style={styles.header}>
-        <View style={styles.logoWrap}>
-          <View style={styles.logoIcon}>
-            <MaterialCommunityIcons name="robot-happy-outline" size={18} color={colors.accent} />
-          </View>
-          <Text style={styles.logoText}>AI 记账</Text>
-        </View>
+        <TodayTicker expense={totalExpense} income={totalIncome} />
         <TouchableOpacity
           style={styles.menuBtn}
           onPress={() => setNavVisible(!navVisible)}
@@ -155,28 +246,6 @@ export default function HomeScreen() {
           <MaterialCommunityIcons name="menu" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
-
-      {/* 今日汇总条 */}
-      {(totalExpense > 0 || totalIncome > 0) && (
-        <View style={styles.summaryBar}>
-          {totalExpense > 0 && (
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>今日支出</Text>
-              <Text style={[styles.summaryValue, { color: colors.error }]}>
-                ¥{totalExpense.toFixed(0)}
-              </Text>
-            </View>
-          )}
-          {totalIncome > 0 && (
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>今日收入</Text>
-              <Text style={[styles.summaryValue, { color: colors.success }]}>
-                ¥{totalIncome.toFixed(0)}
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
 
       {/* 对话区域 */}
       <FlatList
@@ -254,13 +323,10 @@ export default function HomeScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* 悬浮手动记账按钮 */}
       <FabButton onPress={() => setAddModalVisible(true)} />
 
-      {/* 悬浮导航菜单 */}
       <FloatingNav visible={navVisible} onToggle={() => setNavVisible(!navVisible)} />
 
-      {/* 手动记账弹窗 */}
       <AddBillModal
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
@@ -284,24 +350,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.separator,
   },
-  logoWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  logoIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(10, 132, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    ...typography.headline,
-    color: colors.text,
-    fontSize: 17,
-  },
   menuBtn: {
     width: 36,
     height: 36,
@@ -309,28 +357,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.fillSecondary,
-  },
-  summaryBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.xxl,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-    backgroundColor: colors.bgSecondary,
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  summaryLabel: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-  summaryValue: {
-    ...typography.footnote,
-    fontWeight: '700',
   },
   chatContent: {
     paddingVertical: spacing.md,

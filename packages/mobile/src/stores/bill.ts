@@ -61,8 +61,8 @@ export const useBillStore = create<BillState>((set, get) => ({
     try {
       const summary = await billService.getTodaySummary();
       set({ todaySummary: summary });
-    } catch {
-      // 静默失败
+    } catch (err) {
+      console.error('[fetchTodaySummary] failed:', err);
     }
   },
 

@@ -132,7 +132,6 @@ ${state.accountsJson}
     // 让 LLM 的输出不再是自由文本，而是严格符合 Schema 定义的 JSON 对象。
     // 底层原理：根据 Schema 自动生成 JSON Schema → 作为 tool 传给 LLM → LLM 调用该 tool → 解析返回值
     const structuredModel = chatModel.withStructuredOutput(ParseOutputSchema);
-
     // invoke 发送消息给 LLM 并获取结构化结果：
     // - SystemMessage: 系统提示词，定义 LLM 的角色和行为规则
     // - HumanMessage: 用户输入（如"午饭花了25"）

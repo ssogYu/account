@@ -106,7 +106,6 @@ export class ChatService {
       let assistantContent: string;
       let metadata: AssistantMetadata;
       let billId: string | null = null;
-
       if (parseResult) {
         if (parseResult.needsConfirm) {
           assistantContent = this.buildConfirmMessage(parseResult);
@@ -150,7 +149,6 @@ export class ChatService {
     try {
       const chatModel = this.llmService.getModel();
       const graph = createBillGraph(chatModel);
-
       const today = new Date().toISOString().split('T')[0];
 
       const result = await graph.invoke({
@@ -173,7 +171,6 @@ export class ChatService {
         needsConfirm: true,
         error: '',
       });
-
       if (!result.parsed || !result.amount) {
         this.logger.log(`LangGraph: 解析失败或非记账意图 - input="${input}"`);
         return null;

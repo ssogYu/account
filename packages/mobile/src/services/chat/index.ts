@@ -5,8 +5,10 @@ import type {
   SendMessageResult,
   ChatHistoryResult,
   ConfirmBillResult,
+  ConfirmAllBillsResult,
   RejectBillResult,
   ConfirmBillParams,
+  ConfirmAllBillsParams,
 } from './types';
 
 export const chatService = {
@@ -27,7 +29,18 @@ export const chatService = {
   async confirmBill(params: ConfirmBillParams): Promise<ConfirmBillResult> {
     const { data } = await api.post<ApiResponse<ConfirmBillResult>>(
       `/chat/confirm/${params.messageId}`,
-      params.edits ?? {},
+      {
+        billIndex: params.billIndex,
+        ...params.edits,
+      },
+    );
+    return data.data;
+  },
+
+  async confirmAllBills(params: ConfirmAllBillsParams): Promise<ConfirmAllBillsResult> {
+    const { data } = await api.post<ApiResponse<ConfirmAllBillsResult>>(
+      `/chat/confirm-all/${params.messageId}`,
+      {},
     );
     return data.data;
   },

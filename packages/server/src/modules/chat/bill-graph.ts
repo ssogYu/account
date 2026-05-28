@@ -3,9 +3,20 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
-// ── 图状态定义 ──
+export interface BillItem {
+  type: 'expense' | 'income' | null;
+  amount: number | null;
+  note: string;
+  date: string;
+  categoryName: string;
+  categoryId: string;
+  categoryIcon: string;
+  accountName: string;
+  accountId: string;
+  confidence: 'high' | 'medium' | 'low';
+  warning: string;
+}
 
-/** 记账图的状态 */
 export const BillState = Annotation.Root({
   input: Annotation<string>,
   userId: Annotation<string>,
@@ -13,31 +24,16 @@ export const BillState = Annotation.Root({
   accountsJson: Annotation<string>,
 
   parsed: Annotation<boolean>,
-  type: Annotation<'expense' | 'income' | null>,
-  amount: Annotation<number | null>,
-  note: Annotation<string>,
-  date: Annotation<string>,
-  categoryName: Annotation<string>,
-  categoryId: Annotation<string>,
-  categoryIcon: Annotation<string>,
-  accountName: Annotation<string>,
-  accountId: Annotation<string>,
-
-  confidence: Annotation<'high' | 'medium' | 'low'>,
-  warning: Annotation<string>,
-
+  bills: Annotation<BillItem[]>,
   needsConfirm: Annotation<boolean>,
   error: Annotation<string>,
 });
 
 export type BillStateType = typeof BillState.State;
 
-// ── LLM 输出 Schema ──
-
-const ParseOutputSchema = z.object({
-  parsed: z.boolean().describe('是否成功解析为记账意图'),
-  type: z.enum(['expense', 'income']).nullable().describe('收支类型'),
-  amount: z.number().nullable().describe('金额'),
+const SingleBillSchema = z.object({
+  type: z.enum(['expense', 'income']).describe('收支类型'),
+  amount: z.number().describe('金额，必须为正数'),
   note: z.string().describe('备注/描述'),
   date: z.string().describe('日期，格式 YYYY-MM-DD'),
   categoryName: z.string().describe('分类名称，必须从可用分类中选择'),
@@ -48,9 +44,15 @@ const ParseOutputSchema = z.object({
   warning: z.string().describe('异常提示，无异常则为空字符串'),
 });
 
-// ── 辅助函数 ──
+const ParseOutputSchema = z.object({
+  parsed: z.boolean().describe('是否成功解析为记账意图'),
+  bills: z
+    .array(SingleBillSchema)
+    .describe(
+      '解析出的账单列表，单笔消费返回1项，多笔消费返回多项。如"午饭25和打车15"应返回2项',
+    ),
+});
 
-/** 从 categoriesJson 中查找匹配的分类，返回 null 表示未匹配 */
 function findCategoryInList(
   categoryName: string,
   categoriesJson: string,
@@ -93,9 +95,6 @@ function findAccountInList(
   }
 }
 
-// ── 节点函数 ──
-
-/** Step 1: LLM 语义解析 */
 async function semanticParse(
   state: BillStateType,
   chatModel: BaseChatModel,
@@ -110,13 +109,15 @@ async function semanticParse(
   const systemPrompt = `你是一个智能记账助手。用户会告诉你消费信息，你需要从中提取结构化数据。
 
 规则：
-1. 如果用户输入不包含记账意图（如闲聊、提问等），设置 parsed=false
+1. 如果用户输入不包含记账意图（如闲聊、提问等），设置 parsed=false，bills 为空数组
 2. 金额必须为正数
 3. 分类名必须从下面的可用分类中选择，不要自创分类
 4. 日期格式为 YYYY-MM-DD，"今天"用${today}，"昨天"用${yesterday}
 5. 如果金额看起来异常（如午饭500），在warning中提醒
 6. confidence: high=金额+分类都明确, medium=金额明确但分类不确定, low=信息不完整
 7. 账户名必须从下面的可用账户中选择，用户未提及账户时accountName设为空字符串
+8. 用户可能一次输入多笔消费（如"午饭25，打车15，奶茶8"），必须将每笔消费拆分为 bills 数组中的独立项
+9. 如果用户只输入了一笔消费，bills 数组中只有一项
 
 可用分类：
 ${state.categoriesJson}
@@ -127,144 +128,137 @@ ${state.accountsJson}
 当前日期：${today}`;
 
   try {
-    // withStructuredOutput 是 LangChain 的"结构化输出"能力：
-    // 它将 Zod Schema（ParseOutputSchema）转换为 LLM 的 function/tool calling 参数，
-    // 让 LLM 的输出不再是自由文本，而是严格符合 Schema 定义的 JSON 对象。
-    // 底层原理：根据 Schema 自动生成 JSON Schema → 作为 tool 传给 LLM → LLM 调用该 tool → 解析返回值
     const structuredModel = chatModel.withStructuredOutput(ParseOutputSchema);
-    // invoke 发送消息给 LLM 并获取结构化结果：
-    // - SystemMessage: 系统提示词，定义 LLM 的角色和行为规则
-    // - HumanMessage: 用户输入（如"午饭花了25"）
-    // LLM 返回的 result 类型由 ParseOutputSchema 决定，TypeScript 可自动推断
     const result = await structuredModel.invoke([
       new SystemMessage(systemPrompt),
       new HumanMessage(state.input),
     ]);
 
-    if (!result.parsed) {
+    if (!result.parsed || result.bills.length === 0) {
       return {
         parsed: false,
+        bills: [],
         needsConfirm: false,
         error: '',
       };
     }
 
+    const bills: BillItem[] = result.bills.map((b) => ({
+      type: b.type,
+      amount: b.amount,
+      note: b.note || state.input,
+      date: b.date || today,
+      categoryName: b.categoryName,
+      accountName: b.accountName || '',
+      categoryId: '',
+      categoryIcon: '',
+      accountId: '',
+      confidence: b.confidence,
+      warning: b.warning || '',
+    }));
+
     return {
       parsed: true,
-      type: result.type,
-      amount: result.amount,
-      note: result.note || state.input,
-      date: result.date || today,
-      categoryName: result.categoryName,
-      accountName: result.accountName || '',
-      confidence: result.confidence,
-      warning: result.warning || '',
+      bills,
       error: '',
     };
   } catch (err) {
     return {
       parsed: false,
+      bills: [],
       error: `解析失败: ${err instanceof Error ? err.message : '未知错误'}`,
       needsConfirm: false,
     };
   }
 }
 
-/** Step 2: 分类匹配校验 — 验证 LLM 返回的分类名是否在可用列表中 */
-function matchCategory(state: BillStateType): Partial<BillStateType> {
-  if (!state.categoryName) {
-    const fallback = findCategoryInList('其他', state.categoriesJson);
+function matchCategoryAndAccount(state: BillStateType): Partial<BillStateType> {
+  const updatedBills: BillItem[] = state.bills.map((bill) => {
+    let categoryName = bill.categoryName;
+    let categoryId = '';
+    let categoryIcon = '';
+    let confidence = bill.confidence;
+
+    if (!bill.categoryName) {
+      const fallback = findCategoryInList('其他', state.categoriesJson);
+      categoryName = '其他';
+      categoryId = fallback?.id ?? '';
+      categoryIcon = fallback?.icon ?? '';
+      confidence = 'medium';
+    } else {
+      const matched = findCategoryInList(
+        bill.categoryName,
+        state.categoriesJson,
+      );
+      if (!matched) {
+        const fallback = findCategoryInList('其他', state.categoriesJson);
+        categoryName = '其他';
+        categoryId = fallback?.id ?? '';
+        categoryIcon = fallback?.icon ?? '';
+        confidence = 'medium';
+      } else {
+        categoryName = matched.name;
+        categoryId = matched.id;
+        categoryIcon = matched.icon;
+      }
+    }
+
+    let accountName = bill.accountName;
+    let accountId = '';
+    if (bill.accountName) {
+      const matched = findAccountInList(bill.accountName, state.accountsJson);
+      if (matched) {
+        accountName = matched.name;
+        accountId = matched.id;
+      } else {
+        accountName = '';
+        accountId = '';
+        confidence = 'medium';
+      }
+    }
+
     return {
-      categoryName: '其他',
-      categoryId: fallback?.id ?? '',
-      categoryIcon: fallback?.icon ?? '',
-      confidence: 'medium',
+      ...bill,
+      categoryName,
+      categoryId,
+      categoryIcon,
+      accountName,
+      accountId,
+      confidence,
     };
-  }
+  });
 
-  const matched = findCategoryInList(state.categoryName, state.categoriesJson);
-
-  if (!matched) {
-    const fallback = findCategoryInList('其他', state.categoriesJson);
-    return {
-      categoryName: '其他',
-      categoryId: fallback?.id ?? '',
-      categoryIcon: fallback?.icon ?? '',
-      confidence: 'medium',
-    };
-  }
-
-  return {
-    categoryName: matched.name,
-    categoryId: matched.id,
-    categoryIcon: matched.icon,
-  };
+  return { bills: updatedBills };
 }
 
-function matchAccount(state: BillStateType): Partial<BillStateType> {
-  if (!state.accountName) {
-    return {
-      accountName: '',
-      accountId: '',
-      confidence: 'medium',
-    };
-  }
-
-  const matched = findAccountInList(state.accountName, state.accountsJson);
-
-  if (!matched) {
-    return {
-      accountName: '',
-      accountId: '',
-      confidence: 'medium',
-    };
-  }
-
-  return {
-    accountName: matched.name,
-    accountId: matched.id,
-  };
-}
-
-/** Step 3: 置信度评估 — 决定是否需要用户确认 */
 function evaluateAndReply(state: BillStateType): Partial<BillStateType> {
-  if (!state.parsed) {
+  if (!state.parsed || state.bills.length === 0) {
     return { needsConfirm: false };
   }
 
-  const needsConfirm = state.confidence !== 'high' || !!state.warning;
+  const needsConfirm = state.bills.some(
+    (b) => b.confidence !== 'high' || !!b.warning,
+  );
 
   return { needsConfirm };
 }
 
-// ── 条件边 ──
-
-/** 决定解析后走哪条路径 */
 function routeAfterParse(
   state: BillStateType,
-): 'matchCategory' | 'evaluateAndReply' {
-  if (!state.parsed) return 'evaluateAndReply';
-  return 'matchCategory';
+): 'matchCategoryAndAccount' | 'evaluateAndReply' {
+  if (!state.parsed || state.bills.length === 0) return 'evaluateAndReply';
+  return 'matchCategoryAndAccount';
 }
 
-// ── 构建图 ──
-
-/**
- * 创建记账 LangGraph 编排图
- *
- * 流程：用户输入 → LLM语义解析 → 分类匹配 → 账户匹配 → 置信度评估+回复生成
- */
 export function createBillGraph(chatModel: BaseChatModel) {
   const workflow = new StateGraph(BillState)
     .addNode('semanticParse', (state) => semanticParse(state, chatModel))
-    .addNode('matchCategory', matchCategory)
-    .addNode('matchAccount', matchAccount)
+    .addNode('matchCategoryAndAccount', matchCategoryAndAccount)
     .addNode('evaluateAndReply', evaluateAndReply)
 
     .addEdge(START, 'semanticParse')
     .addConditionalEdges('semanticParse', routeAfterParse)
-    .addEdge('matchCategory', 'matchAccount')
-    .addEdge('matchAccount', 'evaluateAndReply')
+    .addEdge('matchCategoryAndAccount', 'evaluateAndReply')
     .addEdge('evaluateAndReply', END);
 
   return workflow.compile();

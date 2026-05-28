@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumber,
   Min,
+  IsInt,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -29,6 +30,12 @@ export class QueryChatDto {
 }
 
 export class ConfirmBillDto {
+  @ApiProperty({ description: '确认第几笔账单（从0开始）' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  billIndex!: number;
+
   @ApiPropertyOptional({ description: '修改后的分类ID' })
   @IsString()
   @IsOptional()

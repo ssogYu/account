@@ -1,18 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
-import { colors, spacing, radius, typography } from '@/theme';
+import { colors, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
-import type { ChatMessage } from '@/services/chat/types';
-import { ConfirmCard, type ConfirmBillEdits } from './ConfirmCard';
+import { ConfirmCard } from './ConfirmCard';
+import type { ChatMessage } from '../../services/chat/types';
+import type { ConfirmBillEdits } from './ConfirmCard';
 
 export function ChatBubble({
   message,
   onConfirm,
+  onConfirmAll,
   onReject,
 }: {
   message: ChatMessage;
-  onConfirm: (messageId: string, edits?: ConfirmBillEdits) => void;
+  onConfirm: (messageId: string, billIndex: number, edits?: ConfirmBillEdits) => void;
+  onConfirmAll: (messageId: string) => void;
   onReject: (messageId: string) => void;
 }) {
   const isUser = message.role === 'user';
@@ -21,7 +24,8 @@ export function ChatBubble({
   const isConfirmCard = meta?.type === 'confirm_card';
   const isConfirmed = meta?.type === 'confirmed' && !!message.billId;
   const isRejected = meta?.type === 'rejected';
-  const showConfirmCard = (isConfirmCard || isConfirmed) && meta?.parseResult;
+  const showConfirmCard =
+    (isConfirmCard || isConfirmed) && meta?.parseResults && meta.parseResults.length > 0;
 
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -56,22 +60,24 @@ export function ChatBubble({
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
         {showConfirmCard ? (
           <ConfirmCard
-            parseResult={meta!.parseResult!}
+            parseResults={meta!.parseResults!}
             messageId={message.id}
             confirmed={isConfirmed}
             onConfirm={onConfirm}
+            onConfirmAll={onConfirmAll}
             onReject={onReject}
           />
-        ) : isRejected && meta?.parseResult ? (
+        ) : isRejected && meta?.parseResults ? (
           <View style={styles.rejectedRow}>
-            <CategoryIcon
-              iconKey={meta.parseResult.categoryIcon}
-              size={12}
-              color={colors.textTertiary}
-            />
-            <Text style={styles.rejectedText}>
-              {meta.parseResult.categoryName} ¥{meta.parseResult.amount.toFixed(2)}（已取消）
-            </Text>
+            {meta.parseResults.map((pr, i) => (
+              <View key={i} style={styles.rejectedItem}>
+                <CategoryIcon iconKey={pr.categoryIcon} size={12} color={colors.textTertiary} />
+                <Text style={styles.rejectedText}>
+                  {pr.categoryName} ¥{pr.amount.toFixed(2)}
+                </Text>
+              </View>
+            ))}
+            <Text style={styles.rejectedLabel}>（已取消）</Text>
           </View>
         ) : (
           <Text style={[styles.text, isUser && styles.textUser]}>{message.content}</Text>
@@ -84,68 +90,75 @@ export function ChatBubble({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    marginBottom: spacing.sm + 2,
-    paddingHorizontal: spacing.lg - 2,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
-  rowUser: { justifyContent: 'flex-end' },
+  rowUser: {
+    justifyContent: 'flex-end',
+  },
   avatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(10, 132, 255, 0.10)',
+    backgroundColor: colors.accentSubtle,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm - 2,
-    marginBottom: 2,
+    marginRight: 8,
+    marginTop: 2,
+    position: 'relative',
   },
   avatarGlow: {
     position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(10, 132, 255, 0.06)',
-    transform: [{ scale: 1.5 }],
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 16,
+    backgroundColor: colors.accent,
+    opacity: 0.08,
   },
   bubble: {
     maxWidth: '80%',
-    paddingHorizontal: spacing.md - 2,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.lg,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   bubbleUser: {
-    backgroundColor: '#0A84FF',
-    borderTopRightRadius: radius.xs,
+    backgroundColor: colors.accent,
     borderBottomRightRadius: 4,
-    borderBottomLeftRadius: radius.lg,
-    borderTopLeftRadius: radius.lg,
   },
   bubbleAssistant: {
     backgroundColor: colors.bgElevated,
-    borderTopLeftRadius: radius.xs,
     borderBottomLeftRadius: 4,
-    borderBottomRightRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.separator,
   },
   text: {
-    ...typography.subheadline,
-    lineHeight: 21,
+    ...typography.body,
     color: colors.text,
+    lineHeight: 20,
   },
   textUser: {
     color: '#FFFFFF',
-    fontWeight: '400',
   },
   rejectedRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: spacing.xs - 1,
+    gap: 6,
+  },
+  rejectedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   rejectedText: {
-    ...typography.caption1,
+    ...typography.footnote,
     color: colors.textTertiary,
-    textDecorationLine: 'line-through',
+  },
+  rejectedLabel: {
+    ...typography.footnote,
+    color: colors.textQuaternary,
   },
 });

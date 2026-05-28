@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import axios from 'axios';
 import { chatService } from '@/services/chat';
-import type { ChatMessage, SendMessageResult, ConfirmBillParams } from '@/services/chat/types';
+import type {
+  ChatMessage,
+  SendMessageResult,
+  ConfirmBillParams,
+  ConfirmAllBillsParams,
+} from '@/services/chat/types';
 import { AppError } from '@/services/api';
 import { useBillStore } from '@/stores/bill';
 
@@ -16,6 +21,7 @@ interface ChatState {
   sendMessage: (content: string) => Promise<SendMessageResult | null>;
   cancelSend: () => void;
   confirmBill: (params: ConfirmBillParams) => Promise<boolean>;
+  confirmAllBills: (params: ConfirmAllBillsParams) => Promise<boolean>;
   rejectBill: (messageId: string) => Promise<boolean>;
   clearError: () => void;
 }
@@ -81,10 +87,43 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   metadata: {
                     ...msg.metadata!,
                     type: 'confirmed' as const,
-                    parseResult: {
-                      ...msg.metadata!.parseResult!,
-                      ...params.edits,
-                    },
+                    parseResults: msg.metadata!.parseResults!.map((pr, i) =>
+                      i === params.billIndex
+                        ? { ...pr, ...params.edits, needsConfirm: false }
+                        : pr,
+                    ),
+                  },
+                }
+              : msg,
+          ),
+        }));
+        useBillStore.getState().fetchTodaySummary();
+      }
+      return result.confirmed;
+    } catch (err) {
+      const message = err instanceof AppError ? err.message : '确认账单失败';
+      set({ error: message });
+      return false;
+    }
+  },
+
+  async confirmAllBills(params: ConfirmAllBillsParams) {
+    try {
+      const result = await chatService.confirmAllBills(params);
+      if (result.confirmed) {
+        set((state) => ({
+          messages: state.messages.map((msg) =>
+            msg.id === params.messageId
+              ? {
+                  ...msg,
+                  billId: result.billIds?.[0] ?? null,
+                  metadata: {
+                    ...msg.metadata!,
+                    type: 'confirmed' as const,
+                    parseResults: msg.metadata!.parseResults!.map((pr) => ({
+                      ...pr,
+                      needsConfirm: false,
+                    })),
                   },
                 }
               : msg,

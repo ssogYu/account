@@ -37,7 +37,7 @@ export class ChatController {
   }
 
   @Post('confirm/:messageId')
-  @ApiOperation({ summary: '确认AI生成的账单' })
+  @ApiOperation({ summary: '确认AI生成的单笔账单' })
   @SwaggerApiResponse({ status: 200, description: '确认成功' })
   @ResponseMessage('确认成功')
   confirmBill(
@@ -45,7 +45,23 @@ export class ChatController {
     @Param('messageId') messageId: string,
     @Body() dto: ConfirmBillDto,
   ) {
-    return this.chatService.confirmBill(user.id, messageId, dto.edits);
+    return this.chatService.confirmBill(
+      user.id,
+      messageId,
+      dto.billIndex,
+      dto.edits,
+    );
+  }
+
+  @Post('confirm-all/:messageId')
+  @ApiOperation({ summary: '确认AI生成的全部账单' })
+  @SwaggerApiResponse({ status: 200, description: '全部确认成功' })
+  @ResponseMessage('全部确认成功')
+  confirmAllBills(
+    @CurrentUser() user: { id: string },
+    @Param('messageId') messageId: string,
+  ) {
+    return this.chatService.confirmAllBills(user.id, messageId);
   }
 
   @Post('reject/:messageId')

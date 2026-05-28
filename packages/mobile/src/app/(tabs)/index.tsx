@@ -35,6 +35,7 @@ export default function HomeScreen() {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const cancelSend = useChatStore((s) => s.cancelSend);
   const confirmBill = useChatStore((s) => s.confirmBill);
+  const confirmAllBills = useChatStore((s) => s.confirmAllBills);
   const rejectBill = useChatStore((s) => s.rejectBill);
   const todaySummary = useBillStore((s) => s.todaySummary);
   const fetchTodaySummary = useBillStore((s) => s.fetchTodaySummary);
@@ -75,9 +76,10 @@ export default function HomeScreen() {
   );
 
   const handleConfirm = useCallback(
-    async (messageId: string, edits?: ConfirmBillEdits) => {
+    async (messageId: string, billIndex: number, edits?: ConfirmBillEdits) => {
       const ok = await confirmBill({
         messageId,
+        billIndex,
         edits: edits
           ? {
               categoryId: edits.categoryId,
@@ -92,6 +94,16 @@ export default function HomeScreen() {
       }
     },
     [confirmBill, fetchBills, fetchTodaySummary],
+  );
+
+  const handleConfirmAll = useCallback(
+    async (messageId: string) => {
+      const ok = await confirmAllBills({ messageId });
+      if (ok) {
+        await Promise.all([fetchBills({ page: 1, pageSize: 20 }), fetchTodaySummary()]);
+      }
+    },
+    [confirmAllBills, fetchBills, fetchTodaySummary],
   );
 
   const handleReject = useCallback(
@@ -134,7 +146,7 @@ export default function HomeScreen() {
         <View style={styles.summaryBar}>
           {totalExpense > 0 && (
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>支出</Text>
+              <Text style={styles.summaryLabel}>今日支出</Text>
               <Text style={[styles.summaryValue, { color: colors.error }]}>
                 ¥{totalExpense.toFixed(0)}
               </Text>
@@ -142,7 +154,7 @@ export default function HomeScreen() {
           )}
           {totalIncome > 0 && (
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>收入</Text>
+              <Text style={styles.summaryLabel}>今日收入</Text>
               <Text style={[styles.summaryValue, { color: colors.success }]}>
                 ¥{totalIncome.toFixed(0)}
               </Text>
@@ -157,7 +169,12 @@ export default function HomeScreen() {
         data={displayMessages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ChatBubble message={item} onConfirm={handleConfirm} onReject={handleReject} />
+          <ChatBubble
+            message={item}
+            onConfirm={handleConfirm}
+            onConfirmAll={handleConfirmAll}
+            onReject={handleReject}
+          />
         )}
         contentContainerStyle={styles.chatContent}
         onContentSizeChange={scrollToBottom}

@@ -1,4 +1,3 @@
-/** 解析结果结构（与后端一致） */
 export interface ParseResult {
   type: 'expense' | 'income';
   amount: number;
@@ -11,12 +10,12 @@ export interface ParseResult {
   accountId: string;
   confidence: 'high' | 'medium' | 'low';
   needsConfirm?: boolean;
+  warning?: string;
 }
 
-/** AI消息的metadata结构 */
 export interface AssistantMetadata {
   type: 'confirm_card' | 'guide' | 'confirmed' | 'rejected';
-  parseResult?: ParseResult;
+  parseResults?: ParseResult[];
 }
 
 export interface ChatMessage {
@@ -36,7 +35,7 @@ export interface SendMessageParams {
 export interface SendMessageResult {
   userMessage: ChatMessage;
   assistantMessage: ChatMessage;
-  parseResult: ParseResult | null;
+  parseResults: ParseResult[] | null;
 }
 
 export interface ChatHistoryResult {
@@ -51,6 +50,13 @@ export interface ConfirmBillResult {
   message?: string;
 }
 
+export interface ConfirmAllBillsResult {
+  confirmed: boolean;
+  billIds?: string[];
+  bills?: unknown[];
+  message?: string;
+}
+
 export interface RejectBillResult {
   rejected: boolean;
   message?: string;
@@ -58,6 +64,7 @@ export interface RejectBillResult {
 
 export interface ConfirmBillParams {
   messageId: string;
+  billIndex: number;
   edits?: {
     categoryId?: string;
     amount?: number;
@@ -65,4 +72,8 @@ export interface ConfirmBillParams {
     accountName?: string;
     accountId?: string;
   };
+}
+
+export interface ConfirmAllBillsParams {
+  messageId: string;
 }

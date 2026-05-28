@@ -104,11 +104,14 @@ export class LlmService {
 
 #### 支持的模型厂商
 
-| 厂商          | 配置键   | 模型示例         | 说明                           |
-| ------------- | -------- | ---------------- | ------------------------------ |
-| OpenAI        | `openai` | gpt-4o-mini      | 支持 OpenAI 兼容 API           |
-| Google Gemini | `gemini` | gemini-2.0-flash | 使用 @langchain/google-genai   |
-| Ollama        | `ollama` | qwen2.5:7b       | 本地部署，通过 OpenAI 兼容 API |
+| 厂商          | 配置键     | 模型示例         | 说明                            |
+| ------------- | ---------- | ---------------- | ------------------------------- |
+| OpenAI        | `openai`   | gpt-4o-mini      | 支持 OpenAI 兼容 API            |
+| Google Gemini | `gemini`   | gemini-2.0-flash | 使用 @langchain/google-genai    |
+| DeepSeek      | `deepseek` | deepseek-chat    | 使用 @langchain/deepseek 官方包 |
+| Ollama        | `ollama`   | qwen2.5:7b       | 本地部署，通过 OpenAI 兼容 API  |
+
+> **DeepSeek 注意事项**: 使用 `@langchain/deepseek` 官方包的 `ChatDeepSeek` 类（非 `ChatOpenAI + baseURL` 兼容方案）。DeepSeek V4 默认启用思考模式（thinking mode），与 `tool_choice` 参数不兼容，需在构造函数中添加 `modelKwargs: { thinking: { type: 'disabled' } }` 显式禁用思考模式。
 
 #### 环境变量配置
 
@@ -133,6 +136,12 @@ GEMINI_MAX_TOKENS=1024
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
 OLLAMA_TEMPERATURE=0
+
+# DeepSeek 配置
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=          # 可选，默认 https://api.deepseek.com
+DEEPSEEK_TEMPERATURE=0
 ```
 
 ---
@@ -144,24 +153,33 @@ OLLAMA_TEMPERATURE=0
 #### 图状态定义
 
 ```typescript
+export interface BillItem {
+  type: 'expense' | 'income' | null;
+  amount: number | null;
+  note: string;
+  date: string;
+  categoryName: string;
+  categoryId: string;
+  categoryIcon: string;
+  accountName: string;
+  accountId: string;
+  confidence: 'high' | 'medium' | 'low';
+  warning: string;
+}
+
 export const BillState = Annotation.Root({
   input: Annotation<string>, // 用户原始输入
   userId: Annotation<string>, // 用户ID
   categoriesJson: Annotation<string>, // 可用分类列表
+  accountsJson: Annotation<string>, // 可用账户列表
   parsed: Annotation<boolean>, // 解析是否成功
-  type: Annotation<'expense' | 'income' | null>, // 收支类型
-  amount: Annotation<number | null>, // 金额
-  note: Annotation<string>, // 备注
-  date: Annotation<string>, // 日期（YYYY-MM-DD）
-  categoryName: Annotation<string>, // 分类名
-  confidence: Annotation<'high' | 'medium' | 'low'>, // 置信度
-  warning: Annotation<string>, // 异常提示
+  bills: Annotation<BillItem[]>, // 解析出的账单列表（支持多笔消费）
   needsConfirm: Annotation<boolean>, // 是否需要确认
   error: Annotation<string>, // 错误信息
 });
 ```
 
-> **设计说明**: `categoryId`、`categoryIcon`、`replyText` 已从图状态中移除。`categoryId`/`categoryIcon` 由 `ChatService` 在图外查数据库填充（图内无法访问数据库），`replyText` 由 `ChatService.buildConfirmMessage()` 生成（图内生成的回复文本未被消费方使用，属于死代码）。
+> **设计说明**: 从单消费字段（type/amount/note等）迁移为 `bills: BillItem[]` 数组，支持一次输入多笔消费的场景。`categoryId`/`categoryIcon`/`accountId` 由 `matchCategoryAndAccount` 节点在图内填充（通过 JSON 字符串匹配），`replyText` 由 `ChatService.buildConfirmMessage()` 在图外生成。
 
 #### 节点流程
 
@@ -174,16 +192,18 @@ START → semanticParse → [条件边]
 **节点1: semanticParse (LLM 语义解析)**
 
 - 使用 `chatModel.withStructuredOutput()` 让 LLM 输出结构化数据
-- Schema 包含: parsed, type, amount, note, date, categoryName, confidence, warning
-- Prompt 中注入可用分类列表，确保 LLM 选择正确分类
-- 如果非记账意图，返回 parsed=false 和引导消息
+- Schema 包含: parsed, bills 数组（每项含 type, amount, note, date, categoryName, accountName, confidence, warning）
+- Prompt 中注入可用分类列表和账户列表，确保 LLM 选择正确分类和账户
+- 支持多笔消费解析：用户输入"午饭25，打车15"时，LLM 一次返回 bills 数组含2项
+- 如果非记账意图，返回 parsed=false 和空 bills 数组
 
-**节点2: matchCategory (分类匹配校验)**
+**节点2: matchCategoryAndAccount (分类和账户匹配校验)**
 
-- 校验 LLM 返回的 `categoryName` 是否真实存在于可用分类列表中（防止 LLM 幻觉自创分类）
-- 使用 `findCategoryInList()` 对 `categoriesJson` 做大小写不敏感匹配
-- 匹配成功时用数据库标准名称替换（处理大小写不一致）
-- 匹配失败或 `categoryName` 为空时回退到"其他"分类，并降低置信度为 medium
+- 校验 LLM 返回的每笔 bill 的 `categoryName` 是否真实存在于可用分类列表中（防止 LLM 幻觉自创分类）
+- 校验 LLM 返回的每笔 bill 的 `accountName` 是否真实存在于可用账户列表中
+- 使用 `findCategoryInList()` / `findAccountInList()` 对 JSON 字符串做大小写不敏感匹配
+- 匹配成功时用数据库标准名称替换，并填充 categoryId/categoryIcon/accountId
+- 匹配失败或为空时回退到"其他"分类或清空账户，并降低置信度为 medium
 
 **节点3: evaluateAndReply (置信度评估)**
 
@@ -195,17 +215,24 @@ START → semanticParse → [条件边]
 #### LLM 结构化输出 Schema
 
 ```typescript
+const SingleBillSchema = z.object({
+  type: z.enum(['expense', 'income']).describe('收支类型'),
+  amount: z.number().describe('金额，必须为正数'),
+  note: z.string().describe('备注/描述'),
+  date: z.string().describe('日期，格式 YYYY-MM-DD'),
+  categoryName: z.string().describe('分类名称，必须从可用分类中选择'),
+  accountName: z.string().describe('账户名称，未提及则为空字符串'),
+  confidence: z.enum(['high', 'medium', 'low']).describe('解析置信度'),
+  warning: z.string().describe('异常提示，无异常则为空字符串'),
+});
+
 const ParseOutputSchema = z.object({
-  parsed: z.boolean(),
-  type: z.enum(['expense', 'income']).nullable(),
-  amount: z.number().nullable(),
-  note: z.string(),
-  date: z.string(),
-  categoryName: z.string(),
-  confidence: z.enum(['high', 'medium', 'low']),
-  warning: z.string(),
+  parsed: z.boolean().describe('是否成功解析为记账意图'),
+  bills: z.array(SingleBillSchema).describe('解析出的账单列表，单笔消费返回1项，多笔消费返回多项'),
 });
 ```
+
+> **多消费设计**: `bills` 字段定义为 `z.array(SingleBillSchema)`，LLM 一次返回多笔消费数组。单笔消费时数组长度为1，多笔消费时数组长度对应消费笔数。Prompt 中明确要求"用户可能一次输入多笔消费，必须将每笔消费拆分为 bills 数组中的独立项"。
 
 ---
 
@@ -218,9 +245,9 @@ const ParseOutputSchema = z.object({
 ```
 sendMessage(userId, dto):
   1. 保存用户消息
-  2. 获取用户可用分类
+  2. 获取用户可用分类和账户
   3. 调用 LangGraph 编排图 (runBillGraph)
-     ├── 成功: 返回 ParseResult (含 needsConfirm)
+     ├── 成功: 返回 ParseResult[] (含 needsConfirm)
      └── 失败: 降级到本地关键词解析 (localParse, needsConfirm=true)
   4. 根据 needsConfirm 分流:
      ├── needsConfirm=true  → 返回 confirm_card，等用户确认
@@ -243,21 +270,35 @@ sendMessage(userId, dto):
 
 当 LLM 调用失败时（网络错误、API 限流、模型不可用等），自动降级到本地关键词解析：
 
-1. **金额提取**: 正则匹配 `数字+元/块/¥` 或 `动词+数字`
-2. **收支判断**: 关键词匹配（收入/工资/红包 → income）
-3. **分类推荐**: 关键词映射到分类名
-4. **日期解析**: 支持"今天/昨天/前天"，统一输出 `YYYY-MM-DD` 格式（与 LLM 解析和 `confirmBill` 保持一致）
+1. **多消费拆分**: `splitMultiExpense()` 按逗号/分号/顿号/换行符分割输入，仅当每个分段都包含数字时才拆分为多笔（避免误拆）
+2. **金额提取**: 正则匹配 `数字+元/块/¥` 或 `动词+数字`
+3. **收支判断**: 关键词匹配（收入/工资/红包 → income）
+4. **分类推荐**: 关键词映射到分类名
+5. **日期解析**: 支持"今天/昨天/前天"，统一输出 `YYYY-MM-DD` 格式（与 LLM 解析和 `confirmBill` 保持一致）
+6. **每笔独立解析**: `parseSingleExpense()` 对每个分段独立解析，返回 `ParseResult | null`，最终汇总为 `ParseResult[]`
 
 #### 确认/取消流程
 
 ```
-confirmBill(userId, messageId, edits?):
+confirmBill(userId, messageId, billIndex, edits?):
   1. 查找 AI 消息，验证 metadata.type === 'confirm_card'
-  2. 合并用户修改 (edits)
-  3. 创建账单 (source: 'ai')
-  4. 更新消息 metadata → type: 'confirmed', billId
-  5. 创建用户"确认"消息
+  2. 校验 billIndex 不越界
+  3. 合并用户修改 (edits) 到 parseResults[billIndex]
+  4. 设置 parseResults[billIndex].needsConfirm = false
+  5. 创建账单 (source: 'ai')
+  6. 检查是否所有 parseResults 都已确认 (allConfirmed)
+     ├── allConfirmed=true  → 更新 metadata.type = 'confirmed'
+     └── allConfirmed=false → 保持 metadata.type = 'confirm_card'
+  7. 更新消息 metadata
+  8. 创建用户"确认"消息
   （不再额外创建"已记录"助手消息，原确认卡片已变为已确认状态）
+
+confirmAllBills(userId, messageId):
+  1. 查找 AI 消息，验证 metadata.type === 'confirm_card'
+  2. 遍历 parseResults，为每笔创建账单 (source: 'ai')
+  3. 更新 metadata → type: 'confirmed'，所有 parseResults.needsConfirm = false
+  4. 创建用户"全部确认"消息
+  5. 返回 { confirmed: true, billIds, bills }
 
 rejectBill(userId, messageId):
   1. 验证消息类型
@@ -302,6 +343,8 @@ private async createBillFromParse(userId: string, parse: ParseResult) {
 
 #### 确认卡片设计
 
+**单笔消费确认卡片：**
+
 ```
 ┌──────────────────────────────────┐
 │  [图标] 餐饮        支出  ¥25.00 │
@@ -313,6 +356,33 @@ private async createBillFromParse(userId: string, parse: ParseResult) {
 └──────────────────────────────────┘
 ```
 
+**多笔消费确认卡片：**
+
+```
+┌──────────────────────────────────┐
+│  识别到 3 笔消费     合计 ¥48.00 │
+│ ─────────────────────────────── │
+│  ¥25.00  支出  餐饮              │
+│  📅 今天                         │
+│  [确认此笔]                      │
+│ ─────────────────────────────── │
+│  ¥15.00  支出  交通              │
+│  📅 今天                         │
+│  [确认此笔]                      │
+│ ─────────────────────────────── │
+│  ¥8.00   支出  餐饮              │
+│  📅 今天                         │
+│  [确认此笔]                      │
+│ ─────────────────────────────── │
+│  [  取消  ]  [ ✓ 全部确认（3笔）]│
+└──────────────────────────────────┘
+```
+
+**已确认状态：**
+
+- 单笔：显示 "✓ 餐饮 · ¥25.00 · 已记录"
+- 多笔：显示 "✓ 3 笔已记录 · 合计 ¥48.00"
+
 **关键设计点**:
 
 - 支出用红色系 (error)，收入用绿色系 (success)
@@ -321,6 +391,9 @@ private async createBillFromParse(userId: string, parse: ParseResult) {
 - 分隔线区分信息区和操作区
 - 确认按钮带 check 图标
 - 已确认状态显示 ✓ 徽章
+- 多笔消费时自动识别，展示"识别到N笔消费"头部和合计金额
+- 多笔消费支持"确认此笔"（单笔确认）和"全部确认"（批量确认）
+- 单笔确认后该笔显示 ✓ 徽章，全部确认后卡片整体变为已确认状态
 
 #### 打字指示器
 
@@ -372,10 +445,10 @@ function usePulse(delay: number) {
 1. 用户输入 "午饭花了25"
 2. → POST /api/v1/chat/send { content: "午饭花了25" }
 3. → ChatService.sendMessage()
-4. → LangGraph: semanticParse → matchCategory → evaluateAndReply
+4. → LangGraph: semanticParse → matchCategoryAndAccount → evaluateAndReply
 5. → evaluateAndReply: confidence=high, warning=空 → needsConfirm=false
 6. → ChatService: needsConfirm=false → createBillFromParse() 直接入库
-7. → 返回 { assistantMessage: { metadata: { type: 'confirmed', parseResult }, billId } }
+7. → 返回 { assistantMessage: { metadata: { type: 'confirmed', parseResults: [...] }, billId } }
 8. → 前端渲染"已记录 ✓"的 ConfirmCard（无操作按钮）
 ```
 
@@ -385,17 +458,35 @@ function usePulse(delay: number) {
 1. 用户输入 "午饭花了25"
 2. → POST /api/v1/chat/send { content: "午饭花了25" }
 3. → ChatService.sendMessage()
-4. → LangGraph: semanticParse → matchCategory → evaluateAndReply
+4. → LangGraph: semanticParse → matchCategoryAndAccount → evaluateAndReply
 5. → evaluateAndReply: confidence≠high 或 warning≠空 → needsConfirm=true
-6. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResult } } }
+6. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResults: [...] } } }
 7. → 前端渲染确认卡片（带"确认记账"和"取消"按钮）
 8. 用户点击"确认记账"
-9. → POST /api/v1/chat/confirm/:messageId
+9. → POST /api/v1/chat/confirm/:messageId { billIndex: 0 }
 10. → ChatService.confirmBill()
 11. → 创建 Bill 记录 (source: 'ai')
 12. → 更新消息 metadata → type: 'confirmed', billId
 13. → 前端刷新历史，确认卡片变为"已记录"状态
 14. → 前端刷新账单列表和今日汇总
+```
+
+#### 多笔消费（批量确认）
+
+```
+1. 用户输入 "午饭25，打车15，奶茶8"
+2. → POST /api/v1/chat/send { content: "午饭25，打车15，奶茶8" }
+3. → ChatService.sendMessage()
+4. → LangGraph: semanticParse → LLM 返回 bills 数组（3项）
+5. → matchCategoryAndAccount: 每笔独立匹配分类和账户
+6. → evaluateAndReply: needsConfirm=true
+7. → 返回 { assistantMessage: { metadata: { type: 'confirm_card', parseResults: [3项] } } }
+8. → 前端渲染多笔确认卡片（"识别到3笔消费"，每笔可独立确认，底部"全部确认"按钮）
+9a. 用户点击"确认此笔" → POST /chat/confirm/:messageId { billIndex: 1 }
+    → 仅创建该笔账单，卡片保持 confirm_card 状态（其他笔未确认）
+9b. 用户点击"全部确认" → POST /chat/confirm-all/:messageId
+    → 创建所有账单，卡片变为 confirmed 状态
+10. → 前端刷新账单列表和今日汇总
 ```
 
 ### 4.2 降级流程
@@ -416,26 +507,30 @@ function usePulse(delay: number) {
 
 ### Server 端新增/修改文件
 
-| 文件                                     | 说明                        |
-| ---------------------------------------- | --------------------------- |
-| `src/modules/llm/llm.service.ts`         | LLM 统一适配服务            |
-| `src/modules/llm/llm.module.ts`          | LLM NestJS 模块             |
-| `src/modules/llm/index.ts`               | 导出                        |
-| `src/modules/chat/bill-graph.ts`         | LangGraph 记账编排图        |
-| `src/modules/chat/chat.service.ts`       | 重构：集成 LangGraph + 降级 |
-| `src/modules/chat/chat.module.ts`        | 导入 LlmModule              |
-| `src/config/configuration/llm.config.ts` | LLM 配置定义                |
-| `src/config/config.module.ts`            | 注册 llmConfig              |
-| `.env.example`                           | 新增 LLM 环境变量           |
+| 文件                                     | 说明                                          |
+| ---------------------------------------- | --------------------------------------------- |
+| `src/modules/llm/llm.service.ts`         | LLM 统一适配服务（含 DeepSeek）               |
+| `src/modules/llm/llm.module.ts`          | LLM NestJS 模块                               |
+| `src/modules/llm/index.ts`               | 导出                                          |
+| `src/modules/chat/bill-graph.ts`         | LangGraph 记账编排图（支持多消费 bills 数组） |
+| `src/modules/chat/chat.service.ts`       | 重构：集成 LangGraph + 降级 + 多消费确认      |
+| `src/modules/chat/chat.controller.ts`    | 新增 confirm-all 接口                         |
+| `src/modules/chat/chat.module.ts`        | 导入 LlmModule                                |
+| `src/modules/chat/dto/chat.dto.ts`       | 移除 ConfirmAllBillsDto，简化 ConfirmBillDto  |
+| `src/config/configuration/llm.config.ts` | LLM 配置定义（含 DeepSeek）                   |
+| `src/config/config.module.ts`            | 注册 llmConfig                                |
+| `.env.example`                           | 新增 LLM + DeepSeek 环境变量                  |
 
 ### Mobile 端修改文件
 
-| 文件                                  | 说明                               |
-| ------------------------------------- | ---------------------------------- |
-| `src/app/(tabs)/index.tsx`            | 首页对话界面重设计                 |
-| `src/services/chat/types.ts`          | ParseResult 新增 needsConfirm 字段 |
-| `src/components/chat/ChatBubble.tsx`  | 支持高置信度 confirmed 消息渲染    |
-| `src/components/chat/ConfirmCard.tsx` | 确认卡片已确认状态渲染             |
+| 文件                                  | 说明                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/app/(tabs)/index.tsx`            | 首页对话界面重设计                                                           |
+| `src/services/chat/types.ts`          | ParseResult 新增 needsConfirm 字段，AssistantMetadata 改为 parseResults 数组 |
+| `src/services/chat/index.ts`          | 新增 confirmAllBills API 调用                                                |
+| `src/stores/chat.ts`                  | 新增 confirmAllBills action，confirmBill 支持 billIndex                      |
+| `src/components/chat/ChatBubble.tsx`  | 支持多消费 confirmed/rejected 消息渲染                                       |
+| `src/components/chat/ConfirmCard.tsx` | 多消费确认卡片（单笔确认/全部确认/独立编辑）                                 |
 
 ---
 
@@ -443,14 +538,15 @@ function usePulse(delay: number) {
 
 ### Server 端新增依赖
 
-| 包名                      | 版本    | 说明                     |
-| ------------------------- | ------- | ------------------------ |
-| `@langchain/core`         | ^1.1.48 | LangChain 核心抽象       |
-| `@langchain/openai`       | ^1.4.7  | OpenAI Chat Model        |
-| `@langchain/google-genai` | ^2.1.31 | Google Gemini Chat Model |
-| `@langchain/langgraph`    | ^1.3.2  | LangGraph 编排框架       |
-| `langchain`               | ^1.4.2  | LangChain 主包           |
-| `zod`                     | -       | Schema 验证 (结构化输出) |
+| 包名                      | 版本    | 说明                                        |
+| ------------------------- | ------- | ------------------------------------------- |
+| `@langchain/core`         | ^1.1.48 | LangChain 核心抽象                          |
+| `@langchain/openai`       | ^1.4.7  | OpenAI Chat Model                           |
+| `@langchain/google-genai` | ^2.1.31 | Google Gemini Chat Model                    |
+| `@langchain/deepseek`     | -       | DeepSeek Chat Model（官方包，非 community） |
+| `@langchain/langgraph`    | ^1.3.2  | LangGraph 编排框架                          |
+| `langchain`               | ^1.4.2  | LangChain 主包                              |
+| `zod`                     | -       | Schema 验证 (结构化输出)                    |
 
 ---
 
@@ -459,7 +555,7 @@ function usePulse(delay: number) {
 ### 7.1 配置 LLM
 
 1. 复制 `.env.example` 为 `.env`
-2. 设置 `LLM_PROVIDER` 为 `openai`、`gemini` 或 `ollama`
+2. 设置 `LLM_PROVIDER` 为 `openai`、`gemini`、`deepseek` 或 `ollama`
 3. 填写对应厂商的 API Key 和模型配置
 4. 重启服务
 

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useIsFocused } from 'expo-router';
+import { useIsFocused } from 'expo-router';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useStatsStore } from '@/stores/stats';
@@ -17,7 +17,6 @@ import { BillFlowView } from '@/components/stats/BillFlowView';
 import { ChartView } from '@/components/stats/ChartView';
 
 export default function StatsScreen() {
-  const router = useRouter();
   const {
     selectedMonth,
     selectedType,
@@ -74,14 +73,6 @@ export default function StatsScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => router.back()}
-            activeOpacity={0.6}
-          >
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
-          </TouchableOpacity>
-
           <View style={styles.monthSelector}>
             <TouchableOpacity
               onPress={handlePrevMonth}
@@ -99,8 +90,6 @@ export default function StatsScreen() {
               <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-
-          <View style={styles.headerPlaceholder} />
         </View>
 
         <View style={styles.typeSwitch}>
@@ -238,15 +227,7 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.fillSecondary,
   },
   monthSelector: {
     flexDirection: 'row',
@@ -266,9 +247,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minWidth: 90,
     textAlign: 'center',
-  },
-  headerPlaceholder: {
-    width: 34,
   },
 
   typeSwitch: {

@@ -24,16 +24,6 @@ export const QUICK_INPUTS = [
   { label: '工资', text: '收到工资' },
 ];
 
-// ── 导航菜单项 ──
-
-export const NAV_ITEMS = [
-  { key: 'home', label: '首页', icon: 'message-text-outline', route: '/(tabs)' },
-  { key: 'stats', label: '统计', icon: 'chart-bar', route: '/(tabs)/stats' },
-  { key: 'profile', label: '我的', icon: 'account-outline', route: '/(tabs)/profile' },
-] as const;
-
-// ── 工具函数 ──
-
 export function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   const today = new Date();

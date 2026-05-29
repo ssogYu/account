@@ -20,14 +20,7 @@ import { useAccountStore } from '@/stores/account';
 import { AddBillModal } from '@/components/AddBillModal';
 import { colors, spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import {
-  ChatBubble,
-  TypingIndicator,
-  FloatingNav,
-  FabButton,
-  WELCOME_MESSAGES,
-  QUICK_INPUTS,
-} from '@/components/chat';
+import { ChatBubble, TypingIndicator, WELCOME_MESSAGES, QUICK_INPUTS } from '@/components/chat';
 import type { ConfirmBillEdits } from '@/components/chat/ConfirmCard';
 
 function TodayTicker({ expense, income }: { expense: number; income: number }) {
@@ -144,7 +137,6 @@ export default function HomeScreen() {
 
   const [inputText, setInputText] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [navVisible, setNavVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const isFocused = useIsFocused();
@@ -238,13 +230,6 @@ export default function HomeScreen() {
 
       <View style={styles.header}>
         <TodayTicker expense={totalExpense} income={totalIncome} />
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={() => setNavVisible(!navVisible)}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="menu" size={22} color={colors.text} />
-        </TouchableOpacity>
       </View>
 
       {/* 对话区域 */}
@@ -323,10 +308,6 @@ export default function HomeScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      <FabButton onPress={() => setAddModalVisible(true)} />
-
-      <FloatingNav visible={navVisible} onToggle={() => setNavVisible(!navVisible)} />
-
       <AddBillModal
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
@@ -344,19 +325,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.separator,
-  },
-  menuBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.fillSecondary,
   },
   chatContent: {
     paddingVertical: spacing.md,

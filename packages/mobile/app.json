@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "记账啦！宝儿",
+    "icon": "./assets/logo.png",
     "slug": "ai-account-book",
     "version": "0.1.0",
     "orientation": "portrait",

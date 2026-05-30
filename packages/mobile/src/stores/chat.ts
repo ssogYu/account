@@ -8,16 +8,20 @@ import type {
   ConfirmAllBillsParams,
 } from '@/services/chat/types';
 import { AppError } from '@/services/api';
+import { showToast } from '@/components/ui/Toast';
 import { useBillStore } from '@/stores/bill';
 
 interface ChatState {
   messages: ChatMessage[];
+  nextCursor: string | null;
+  hasMore: boolean;
   isLoading: boolean;
   isSending: boolean;
   error: string | null;
   abortController: AbortController | null;
 
   fetchHistory: () => Promise<void>;
+  loadMore: () => Promise<void>;
   sendMessage: (content: string) => Promise<SendMessageResult | null>;
   cancelSend: () => void;
   confirmBill: (params: ConfirmBillParams) => Promise<boolean>;
@@ -28,6 +32,8 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
+  nextCursor: null,
+  hasMore: true,
   isLoading: false,
   isSending: false,
   error: null,
@@ -36,11 +42,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
   async fetchHistory() {
     set({ isLoading: true, error: null });
     try {
-      const result = await chatService.getHistory(50);
-      set({ messages: result.items, isLoading: false });
+      const result = await chatService.getHistory(30);
+      set({
+        messages: result.items,
+        nextCursor: result.nextCursor,
+        hasMore: !!result.nextCursor,
+        isLoading: false,
+      });
     } catch (err) {
       const message = err instanceof AppError ? err.message : '获取对话历史失败';
       set({ error: message, isLoading: false });
+      showToast(message);
+    }
+  },
+
+  async loadMore() {
+    const { nextCursor, hasMore, isLoading } = get();
+    if (!hasMore || isLoading || !nextCursor) return;
+
+    set({ isLoading: true });
+    try {
+      const result = await chatService.getHistory(30, nextCursor);
+      set((state) => ({
+        messages: [...result.items, ...state.messages],
+        nextCursor: result.nextCursor,
+        hasMore: !!result.nextCursor,
+        isLoading: false,
+      }));
+    } catch (err) {
+      const message = err instanceof AppError ? err.message : '加载更多失败';
+      set({ error: message, isLoading: false });
+      showToast(message);
     }
   },
 
@@ -62,6 +94,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       const message = err instanceof AppError ? err.message : '发送消息失败';
       set({ error: message, isSending: false, abortController: null });
+      showToast(message);
       return null;
     }
   },
@@ -122,6 +155,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (err) {
       const message = err instanceof AppError ? err.message : '确认账单失败';
       set({ error: message });
+      showToast(message);
       return false;
     }
   },
@@ -169,6 +203,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (err) {
       const message = err instanceof AppError ? err.message : '确认账单失败';
       set({ error: message });
+      showToast(message);
       return false;
     }
   },
@@ -212,6 +247,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (err) {
       const message = err instanceof AppError ? err.message : '取消失败';
       set({ error: message });
+      showToast(message);
       return false;
     }
   },

@@ -419,6 +419,10 @@ export function BillFlowView() {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.3}
         showsVerticalScrollIndicator={false}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
       />
       <AddBillModal
         visible={editModalVisible}

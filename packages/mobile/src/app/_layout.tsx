@@ -1,8 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { useAuthStore } from '@/stores/auth';
+import { ToastProvider } from '@/components/ui/Toast';
 import { colors } from '@/theme';
+
+SplashScreen.preventAutoHideAsync();
 
 function AuthGuard() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -45,9 +49,16 @@ function LoadingScreen() {
 export default function RootLayout() {
   const isHydrated = useAuthStore((s) => s.isHydrated);
 
+  useEffect(() => {
+    if (isHydrated) {
+      SplashScreen.hideAsync();
+    }
+  }, [isHydrated]);
+
   return (
     <>
       <AuthGuard />
+      <ToastProvider />
       {!isHydrated ? (
         <LoadingScreen />
       ) : (

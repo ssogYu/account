@@ -10,6 +10,7 @@ import type {
   QueryBillParams,
 } from '@/services/bill/types';
 import { AppError } from '@/services/api';
+import { showToast } from '@/components/ui/Toast';
 
 interface BillState {
   bills: Bill[];
@@ -54,6 +55,7 @@ export const useBillStore = create<BillState>((set, get) => ({
     } catch (err) {
       const message = err instanceof AppError ? err.message : '获取账单列表失败';
       set({ error: message, isLoading: false });
+      showToast(message);
     }
   },
 
@@ -76,57 +78,94 @@ export const useBillStore = create<BillState>((set, get) => ({
   },
 
   async createBill(params: CreateBillParams) {
-    set({ isLoading: true, error: null });
+    const tempId = `temp-${Date.now()}`;
+    const optimisticBill: Bill = {
+      id: tempId,
+      userId: '',
+      familyId: null,
+      categoryId: params.categoryId,
+      type: params.type,
+      amount: String(params.amount),
+      note: params.note ?? null,
+      account: params.account ?? null,
+      date: params.date ?? new Date().toISOString().split('T')[0],
+      source: params.source ?? 'manual',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const prevBills = get().bills;
+    set({
+      bills: [optimisticBill, ...prevBills],
+      total: get().total + 1,
+      isLoading: false,
+    });
+
     try {
       const bill = await billService.create(params);
-      const { fetchBills, fetchTodaySummary, fetchMonthSummary } = get();
-      await Promise.all([
-        fetchBills({ page: 1, pageSize: 20 }),
-        fetchTodaySummary(),
-        fetchMonthSummary(),
-      ]);
-      set({ isLoading: false });
+      set((state) => ({
+        bills: state.bills.map((b) => (b.id === tempId ? bill : b)),
+      }));
+      get().fetchTodaySummary();
+      get().fetchMonthSummary();
       return bill;
     } catch (err) {
+      set({ bills: prevBills, total: get().total - 1 });
       const message = err instanceof AppError ? err.message : '创建账单失败';
-      set({ error: message, isLoading: false });
+      set({ error: message });
+      showToast(message);
       throw err;
     }
   },
 
   async updateBill(id: string, params: UpdateBillParams) {
-    set({ isLoading: true, error: null });
+    const prevBills = get().bills;
+    set((state) => ({
+      bills: state.bills.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              ...params,
+              amount: params.amount != null ? String(params.amount) : b.amount,
+              updatedAt: new Date().toISOString(),
+            }
+          : b,
+      ),
+    }));
+
     try {
       const bill = await billService.update(id, params);
-      const { fetchBills, fetchTodaySummary, fetchMonthSummary } = get();
-      await Promise.all([
-        fetchBills({ page: get().page, pageSize: 20 }),
-        fetchTodaySummary(),
-        fetchMonthSummary(),
-      ]);
-      set({ isLoading: false });
+      set((state) => ({
+        bills: state.bills.map((b) => (b.id === id ? bill : b)),
+      }));
+      get().fetchTodaySummary();
+      get().fetchMonthSummary();
       return bill;
     } catch (err) {
+      set({ bills: prevBills });
       const message = err instanceof AppError ? err.message : '更新账单失败';
-      set({ error: message, isLoading: false });
+      set({ error: message });
+      showToast(message);
       throw err;
     }
   },
 
   async deleteBill(id: string) {
-    set({ isLoading: true, error: null });
+    const prevBills = get().bills;
+    set((state) => ({
+      bills: state.bills.filter((b) => b.id !== id),
+      total: state.total - 1,
+    }));
+
     try {
       await billService.remove(id);
-      const { fetchBills, fetchTodaySummary, fetchMonthSummary } = get();
-      await Promise.all([
-        fetchBills({ page: get().page, pageSize: 20 }),
-        fetchTodaySummary(),
-        fetchMonthSummary(),
-      ]);
-      set({ isLoading: false });
+      get().fetchTodaySummary();
+      get().fetchMonthSummary();
     } catch (err) {
+      set({ bills: prevBills, total: prevBills.length });
       const message = err instanceof AppError ? err.message : '删除账单失败';
-      set({ error: message, isLoading: false });
+      set({ error: message });
+      showToast(message);
       throw err;
     }
   },

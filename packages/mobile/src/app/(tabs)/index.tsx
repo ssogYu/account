@@ -122,7 +122,9 @@ const tStyles = StyleSheet.create({
 export default function HomeScreen() {
   const messages = useChatStore((s) => s.messages);
   const isSending = useChatStore((s) => s.isSending);
+  const hasMore = useChatStore((s) => s.hasMore);
   const fetchHistory = useChatStore((s) => s.fetchHistory);
+  const loadMore = useChatStore((s) => s.loadMore);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const cancelSend = useChatStore((s) => s.cancelSend);
   const confirmBill = useChatStore((s) => s.confirmBill);
@@ -251,6 +253,14 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         ListFooterComponent={isSending ? <TypingIndicator /> : null}
+        onEndReached={() => {
+          if (hasMore) loadMore();
+        }}
+        onEndReachedThreshold={0.3}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={15}
       />
 
       {/* 底部输入区域 */}
@@ -266,6 +276,7 @@ export default function HomeScreen() {
               style={styles.quickBtn}
               onPress={() => handleQuickInput(q.text)}
               activeOpacity={0.6}
+              accessibilityLabel={`快捷输入: ${q.label}`}
             >
               <Text style={styles.quickBtnText}>{q.label}</Text>
             </TouchableOpacity>
@@ -285,12 +296,14 @@ export default function HomeScreen() {
               returnKeyType="send"
               editable={!isSending}
               maxLength={200}
+              accessibilityLabel="输入消费信息"
             />
             {isSending ? (
               <TouchableOpacity
                 style={styles.cancelSendBtn}
                 onPress={cancelSend}
                 activeOpacity={0.7}
+                accessibilityLabel="取消发送"
               >
                 <MaterialCommunityIcons name="close" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -300,6 +313,7 @@ export default function HomeScreen() {
                 onPress={handleSend}
                 disabled={!inputText.trim()}
                 activeOpacity={0.7}
+                accessibilityLabel="发送消息"
               >
                 <MaterialCommunityIcons name="arrow-up" size={18} color="#FFFFFF" />
               </TouchableOpacity>

@@ -7,24 +7,30 @@ interface CategoryState {
   categories: Category[];
   isLoading: boolean;
   error: string | null;
+  lastFetchedAt: number | null;
 
-  fetchCategories: (params?: QueryCategoryParams) => Promise<void>;
+  fetchCategories: (params?: QueryCategoryParams, force?: boolean) => Promise<void>;
   createCategory: (params: CreateCategoryParams) => Promise<Category>;
   updateCategory: (id: string, params: UpdateCategoryParams) => Promise<Category>;
   deleteCategory: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
+const CACHE_TTL = 5 * 60 * 1000;
+
 export const useCategoryStore = create<CategoryState>((set, get) => ({
   categories: [],
   isLoading: false,
   error: null,
+  lastFetchedAt: null,
 
-  async fetchCategories(params?: QueryCategoryParams) {
+  async fetchCategories(params?: QueryCategoryParams, force?: boolean) {
+    const { lastFetchedAt, isLoading } = get();
+    if (!force && lastFetchedAt && Date.now() - lastFetchedAt < CACHE_TTL && !isLoading) return;
     set({ isLoading: true, error: null });
     try {
       const categories = await categoryService.findMany(params);
-      set({ categories, isLoading: false });
+      set({ categories, isLoading: false, lastFetchedAt: Date.now() });
     } catch (err) {
       const message = err instanceof AppError ? err.message : '获取分类失败';
       set({ error: message, isLoading: false });

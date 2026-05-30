@@ -7,24 +7,30 @@ interface AccountState {
   accounts: Account[];
   isLoading: boolean;
   error: string | null;
+  lastFetchedAt: number | null;
 
-  fetchAccounts: () => Promise<void>;
+  fetchAccounts: (force?: boolean) => Promise<void>;
   createAccount: (params: CreateAccountParams) => Promise<Account>;
   updateAccount: (id: string, params: UpdateAccountParams) => Promise<Account>;
   deleteAccount: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
+const CACHE_TTL = 5 * 60 * 1000;
+
 export const useAccountStore = create<AccountState>((set, get) => ({
   accounts: [],
   isLoading: false,
   error: null,
+  lastFetchedAt: null,
 
-  async fetchAccounts() {
+  async fetchAccounts(force?: boolean) {
+    const { lastFetchedAt, isLoading } = get();
+    if (!force && lastFetchedAt && Date.now() - lastFetchedAt < CACHE_TTL && !isLoading) return;
     set({ isLoading: true, error: null });
     try {
       const accounts = await accountService.findMany();
-      set({ accounts, isLoading: false });
+      set({ accounts, isLoading: false, lastFetchedAt: Date.now() });
     } catch (err) {
       const message = err instanceof AppError ? err.message : '获取账户失败';
       set({ error: message, isLoading: false });

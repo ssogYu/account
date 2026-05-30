@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
 
   floatingMemberBar: {
     position: 'absolute',
-    bottom: spacing.xl + 60,
+    bottom: spacing.xl,
     left: 0,
     right: 0,
     alignItems: 'center',

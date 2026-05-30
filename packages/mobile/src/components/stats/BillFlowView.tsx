@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,15 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Animated,
   Alert,
-  PanResponder,
-  GestureResponderEvent,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  type WithSpringConfig,
+} from 'react-native-reanimated';
 import { colors, spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
@@ -20,8 +24,14 @@ import { useAuthStore } from '@/stores/auth';
 import { billService } from '@/services/bill';
 import type { Bill } from '@/services/bill/types';
 
-const SWIPE_THRESHOLD = -60; // 触发显示操作按钮的滑动阈值
-const ACTION_WIDTH = 140; // 操作按钮总宽度（编辑70 + 删除70）
+const SWIPE_THRESHOLD = -60;
+const ACTION_WIDTH = 140;
+
+const SPRING_CONFIG: WithSpringConfig = {
+  damping: 20,
+  stiffness: 200,
+  mass: 0.5,
+};
 
 // ── 流水头部（结余 + 筛选） ──
 function FlowHeader() {
@@ -144,58 +154,55 @@ function BillItem({
   showMemberTag: boolean;
 }) {
   const currentUserId = useAuthStore((s) => s.user?.id);
-  const translateX = useRef(new Animated.Value(0)).current;
-  const isSwipedOpen = useRef(false);
+  const translateX = useSharedValue(0);
+  const isSwipedOpen = useSharedValue(false);
   const isExpense = bill.type === 'expense';
   const amount = Number(bill.amount);
   const displayName = bill.note || bill.category?.name || '未分类';
-  const truncatedName = displayName.length > 5 ? displayName.slice(0, 5) + '…' : displayName;
+  const truncatedName = displayName.length > 10 ? displayName.slice(0, 5) + '…' : displayName;
 
-  const animateTo = (toValue: number) => {
-    Animated.spring(translateX, {
-      toValue,
-      useNativeDriver: true,
-      friction: 9,
-      tension: 80,
-    }).start(() => {
-      isSwipedOpen.current = toValue !== 0;
-    });
-  };
+  const animateTo = useCallback(
+    (toValue: number) => {
+      translateX.value = withSpring(toValue, SPRING_CONFIG);
+      isSwipedOpen.value = toValue !== 0;
+    },
+    [translateX, isSwipedOpen],
+  );
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_: GestureResponderEvent, gestureState) => {
-        // 只在水平滑动时响应，且水平位移大于垂直位移
-        return (
-          Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
-        );
-      },
-      onPanResponderMove: (_: GestureResponderEvent, gestureState) => {
-        // 限制滑动范围：0 ~ -ACTION_WIDTH
-        const val = Math.max(-ACTION_WIDTH, Math.min(0, gestureState.dx));
-        translateX.setValue(val);
-      },
-      onPanResponderRelease: (_: GestureResponderEvent, gestureState) => {
-        if (isSwipedOpen.current) {
-          // 已展开状态：向右滑回或向左滑更多
-          if (gestureState.dx > 30 || gestureState.vx > 0.3) {
-            animateTo(0); // 收回
-          } else {
-            animateTo(-ACTION_WIDTH); // 保持展开
-          }
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-10, 10])
+    .onUpdate((event) => {
+      const base = isSwipedOpen.value ? -ACTION_WIDTH : 0;
+      const raw = base + event.translationX;
+      translateX.value = Math.max(-ACTION_WIDTH, Math.min(0, raw));
+    })
+    .onEnd((event) => {
+      const velocity = event.velocityX;
+      const translation = event.translationX;
+
+      if (isSwipedOpen.value) {
+        if (translation > 30 || velocity > 300) {
+          translateX.value = withSpring(0, SPRING_CONFIG);
+          isSwipedOpen.value = false;
         } else {
-          // 收起状态：向左滑够就展开
-          if (gestureState.dx < SWIPE_THRESHOLD || gestureState.vx < -0.3) {
-            animateTo(-ACTION_WIDTH); // 展开
-          } else {
-            animateTo(0); // 收回
-          }
+          translateX.value = withSpring(-ACTION_WIDTH, SPRING_CONFIG);
         }
-      },
-    }),
-  ).current;
+      } else {
+        if (translation < SWIPE_THRESHOLD || velocity < -300) {
+          translateX.value = withSpring(-ACTION_WIDTH, SPRING_CONFIG);
+          isSwipedOpen.value = true;
+        } else {
+          translateX.value = withSpring(0, SPRING_CONFIG);
+        }
+      }
+    });
 
-  const showDelete = () => {
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const showDelete = useCallback(() => {
     Alert.alert('确认删除', '删除后不可恢复，确定要删除这笔账单吗？', [
       {
         text: '取消',
@@ -211,20 +218,17 @@ function BillItem({
         },
       },
     ]);
-  };
+  }, [animateTo, onDelete, bill.id]);
+
+  const handleEdit = useCallback(() => {
+    animateTo(0);
+    onEdit(bill);
+  }, [animateTo, onEdit, bill]);
 
   return (
     <View style={s.billItemOuter}>
-      {/* 操作按钮（底层，右侧露出） */}
       <View style={s.swipeActions}>
-        <TouchableOpacity
-          style={s.swipeEdit}
-          activeOpacity={0.7}
-          onPress={() => {
-            animateTo(0);
-            onEdit(bill);
-          }}
-        >
+        <TouchableOpacity style={s.swipeEdit} activeOpacity={0.7} onPress={handleEdit}>
           <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.text} />
           <Text style={[s.swipeText, { color: '#fff' }]}>编辑</Text>
         </TouchableOpacity>
@@ -234,53 +238,51 @@ function BillItem({
         </TouchableOpacity>
       </View>
 
-      {/* 账单内容（上层，可滑动） */}
-      <Animated.View
-        style={[s.billItemWrap, { transform: [{ translateX }] }]}
-        {...panResponder.panHandlers}
-      >
-        <View style={s.billItem}>
-          <View
-            style={[
-              s.billIconBg,
-              { backgroundColor: isExpense ? `${colors.error}1F` : `${colors.success}1F` },
-            ]}
-          >
-            <CategoryIcon
-              iconKey={bill.category?.icon ?? 'other_exp'}
-              size={18}
-              color={isExpense ? colors.error : colors.success}
-            />
-          </View>
-          <View style={s.billInfo}>
-            <View style={s.billTitleRow}>
-              <Text style={s.billNote} numberOfLines={1}>
-                {truncatedName}
-              </Text>
-              {showMemberTag && bill.user && bill.userId !== currentUserId && (
-                <View style={s.memberTag}>
-                  <Text style={s.memberTagText}>
-                    {(bill.user.nickname && bill.user.nickname.length > 5
-                      ? bill.user.nickname.slice(0, 5) + '…'
-                      : bill.user.nickname) || '?'}
-                  </Text>
-                </View>
-              )}
-              {bill.account ? (
-                <View style={s.accountTag}>
-                  <Text style={s.accountTagText}>{bill.account}</Text>
-                </View>
-              ) : null}
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[s.billItemWrap, animatedStyle]}>
+          <View style={s.billItem}>
+            <View
+              style={[
+                s.billIconBg,
+                { backgroundColor: isExpense ? `${colors.error}1F` : `${colors.success}1F` },
+              ]}
+            >
+              <CategoryIcon
+                iconKey={bill.category?.icon ?? 'other_exp'}
+                size={18}
+                color={isExpense ? colors.error : colors.success}
+              />
             </View>
-            <Text style={s.billSub} numberOfLines={1}>
-              {bill.category?.name ?? '未分类'}
+            <View style={s.billInfo}>
+              <View style={s.billTitleRow}>
+                <Text style={s.billNote} numberOfLines={1}>
+                  {truncatedName}
+                </Text>
+                {showMemberTag && bill.user && bill.userId !== currentUserId && (
+                  <View style={s.memberTag}>
+                    <Text style={s.memberTagText}>
+                      {(bill.user.nickname && bill.user.nickname.length > 5
+                        ? bill.user.nickname.slice(0, 5) + '…'
+                        : bill.user.nickname) || '?'}
+                    </Text>
+                  </View>
+                )}
+                {bill.account ? (
+                  <View style={s.accountTag}>
+                    <Text style={s.accountTagText}>{bill.account}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={s.billSub} numberOfLines={1}>
+                {bill.category?.name ?? '未分类'}
+              </Text>
+            </View>
+            <Text style={[s.billAmount, { color: isExpense ? colors.error : colors.success }]}>
+              {isExpense ? '-' : '+'}¥{amount.toFixed(2)}
             </Text>
           </View>
-          <Text style={[s.billAmount, { color: isExpense ? colors.error : colors.success }]}>
-            {isExpense ? '-' : '+'}¥{amount.toFixed(2)}
-          </Text>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuthStore } from '@/stores/auth';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -56,7 +57,7 @@ export default function RootLayout() {
   }, [isHydrated]);
 
   return (
-    <>
+    <GestureHandlerRootView style={styles.root}>
       <AuthGuard />
       <ToastProvider />
       {!isHydrated ? (
@@ -71,11 +72,14 @@ export default function RootLayout() {
           }}
         />
       )}
-    </>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     backgroundColor: colors.bg,

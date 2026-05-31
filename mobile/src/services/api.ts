@@ -3,7 +3,7 @@ import type { ApiResponse } from '../shared';
 import { ErrorCode } from '../shared';
 import Constants from 'expo-constants';
 
-const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl ?? 'http://192.168.18.196:3000';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://192.168.18.196:3000';
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

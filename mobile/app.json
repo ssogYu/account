@@ -25,6 +25,9 @@
       "expo-font",
       "expo-web-browser"
     ],
+    "extra": {
+      "apiBaseUrl": "http://192.168.18.196:3000"
+    },
     "experiments": {
       "typedRoutes": true
     }

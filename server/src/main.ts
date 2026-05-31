@@ -26,10 +26,11 @@ async function bootstrap() {
   app.useLogger(logger);
   app.useGlobalInterceptors(new LoggerErrorInterceptor());
 
-  // if (appSettings.apiPrefix.length > 0) {
-  //   // 整个应用 API 统一挂到相同前缀下，便于版本管理和网关转发。
-  //   app.setGlobalPrefix(appSettings.apiPrefix);
-  // }
+  if (appSettings.apiPrefix.length > 0) {
+    app.setGlobalPrefix(appSettings.apiPrefix, {
+      exclude: ['health', '/', 'docs'],
+    });
+  }
 
   app.enableCors({
     origin: appSettings.appOrigin,

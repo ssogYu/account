@@ -64,11 +64,7 @@ while [ $RETRY -lt $MAX_RETRIES ]; do
     RETRY=$((RETRY+1))
 done
 
-log_step "5. 运行数据库迁移"
-docker compose -f "${DEPLOY_DIR}/docker-compose.prod.yml" exec -T server \
-    npx prisma migrate deploy --schema=prisma/schema.prisma 2>/dev/null || \
-    log_warn "数据库迁移可能需要手动执行"
-log_info "数据库迁移完成"
+log_step "5. 检查服务状态"
 
 echo ""
 echo "============================================"

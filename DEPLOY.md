@@ -88,7 +88,7 @@ cd /Users/ssngyu/Desktop/my-workspace/account
 rsync -avz --exclude 'node_modules' \
             --exclude 'dist' \
             --exclude '.git' \
-            --exclude 'packages/mobile' \
+            --exclude 'mobile' \
             ./ root@你的服务器公网IP:/srv/ai-account/
 ```
 
@@ -233,7 +233,7 @@ account-nginx       healthy
 ```bash
 cd /srv/ai-account
 docker compose -f deploy/docker-compose.prod.yml exec server \
-  npx prisma migrate deploy --schema=packages/server/prisma/schema.prisma
+  npx prisma migrate deploy --schema=prisma/schema.prisma
 ```
 
 ---
@@ -299,7 +299,7 @@ docker compose -f deploy/docker-compose.prod.yml up -d
 
 # 执行数据库迁移（如有新的 migration）
 docker compose -f deploy/docker-compose.prod.yml exec server \
-  npx prisma migrate deploy --schema=packages/server/prisma/schema.prisma
+  npx prisma migrate deploy --schema=prisma/schema.prisma
 
 # 清理旧镜像释放空间
 docker image prune -f
@@ -365,11 +365,11 @@ docker compose -f deploy/docker-compose.prod.yml exec nginx \
 ```bash
 # 重新执行所有迁移
 docker compose -f deploy/docker-compose.prod.yml exec server \
-  npx prisma migrate deploy --schema=packages/server/prisma/schema.prisma
+  npx prisma migrate deploy --schema=prisma/schema.prisma
 
 # 查看迁移状态
 docker compose -f deploy/docker-compose.prod.yml exec server \
-  npx prisma migrate status --schema=packages/server/prisma/schema.prisma
+  npx prisma migrate status --schema=prisma/schema.prisma
 ```
 
 ---

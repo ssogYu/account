@@ -7,19 +7,16 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
-
-COPY packages/shared/package.json packages/shared/tsconfig.json packages/shared/
-COPY packages/server/package.json packages/server/tsconfig.json packages/server/tsconfig.build.json packages/server/nest-cli.json packages/server/
+COPY package.json pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
-COPY packages/shared/src packages/shared/src/
-COPY packages/server/src packages/server/src/
-COPY packages/server/prisma packages/server/prisma/
+COPY prisma prisma/
+COPY src src/
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 
-RUN pnpm --filter @ai-account/shared build
-RUN pnpm --filter @ai-account/server build
+RUN pnpm prisma:generate
+RUN pnpm build
 
 FROM node:20-alpine AS production
 
@@ -32,18 +29,13 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY package.json pnpm-lock.yaml ./
 
-COPY packages/shared/package.json packages/shared/
-COPY packages/server/package.json packages/server/
-
-COPY --from=base /app/packages/shared/dist /app/packages/shared/dist/
-COPY --from=base /app/packages/server/dist /app/packages/server/dist/
-COPY --from=base /app/packages/server/prisma /app/packages/server/prisma/
+COPY --from=base /app/dist /app/dist/
+COPY --from=base /app/prisma /app/prisma/
 
 RUN pnpm install --prod --frozen-lockfile
-
-RUN pnpm --filter @ai-account/server prisma:generate
+RUN pnpm prisma:generate
 
 ENV NODE_ENV=production
 
@@ -53,4 +45,4 @@ USER node
 
 ENTRYPOINT ["/sbin/tini", "--"]
 
-CMD ["node", "packages/server/dist/main.js"]
+CMD ["node", "dist/main.js"]

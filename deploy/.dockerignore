@@ -16,5 +16,4 @@ test
 **/*.e2e-spec.ts
 .trae
 docs
-packages/mobile
 .DS_Store

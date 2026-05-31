@@ -13,6 +13,7 @@ import { AccountModule } from './modules/account';
 import { ChatModule } from './modules/chat';
 import { AllExceptionsFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { TransformInterceptor } from './common/interceptors';
     AccountModule,
     ChatModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggerErrorInterceptor },

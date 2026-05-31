@@ -87,6 +87,17 @@ EOF
 sysctl -p
 log_info "系统参数配置完成"
 
+log_step "9. 配置定时自动备份"
+BACKUP_SCRIPT="/srv/ai-account/deploy/scripts/backup.sh"
+CRON_JOB="0 2 * * * /bin/bash ${BACKUP_SCRIPT} >> /srv/ai-account/backups/cron.log 2>&1"
+
+if crontab -l 2>/dev/null | grep -qF "${BACKUP_SCRIPT}"; then
+    log_info "定时备份任务已存在，跳过"
+else
+    (crontab -l 2>/dev/null; echo "${CRON_JOB}") | crontab -
+    log_info "定时备份任务已添加 (每天凌晨 2:00)"
+fi
+
 echo ""
 echo "============================================"
 log_info "服务器初始化完成!"
@@ -96,4 +107,11 @@ echo "  1. 将项目代码上传到 /srv/ai-account/"
 echo "  2. 配置 deploy/.env.production"
 echo "  3. 配置 SSL 证书到 deploy/nginx/ssl/"
 echo "  4. 运行 deploy/scripts/deploy.sh"
+echo ""
+log_info "自动备份已配置:"
+echo "  - 备份脚本: ${BACKUP_SCRIPT}"
+echo "  - 备份目录: /srv/ai-account/backups/"
+echo "  - 执行时间: 每天 02:00"
+echo "  - 保留天数: 7 天 (可通过 BACKUP_RETENTION_DAYS 环境变量修改)"
+echo "  - 查看/编辑: crontab -e"
 echo "============================================"

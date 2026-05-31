@@ -310,13 +310,72 @@ docker image prune -f
 ```bash
 cd /srv/ai-account
 
-# 备份数据库
+# 手动备份数据库
 docker compose -f deploy/docker-compose.prod.yml exec postgres \
-  pg_dump -U admin account > backups/backup_$(date +%Y%m%d_%H%M%S).sql
+    pg_dump -U accountAdmin account > backups/backup_$(date +%Y%m%d_%H%M%S).sql
 
 # 恢复数据库
 docker compose -f deploy/docker-compose.prod.yml exec -T postgres \
-  psql -U admin account < backups/backup_20250101_120000.sql
+    psql -U accountAdmin account < backups/backup_20250101_120000.sql
+```
+
+### 自动备份
+
+项目提供了自动备份脚本，支持 PostgreSQL 数据库和 MinIO 文件存储的定时备份，并自动清理过期备份。
+
+**备份内容：**
+
+| 备份项     | 文件格式                          | 说明                        |
+| ---------- | --------------------------------- | --------------------------- |
+| PostgreSQL | `postgres_YYYYMMDD_HHMMSS.sql.gz` | 数据库全量导出，gzip 压缩   |
+| MinIO      | `minio_YYYYMMDD_HHMMSS.tar.gz`    | 文件存储目录打包，gzip 压缩 |
+
+**手动执行备份：**
+
+```bash
+cd /srv/ai-account
+bash deploy/scripts/backup.sh
+```
+
+**配置定时自动备份（cron）：**
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加以下内容：每天凌晨 2 点自动备份
+0 2 * * * /bin/bash /srv/ai-account/deploy/scripts/backup.sh >> /srv/ai-account/backups/cron.log 2>&1
+```
+
+**自定义保留天数：**
+
+默认保留 7 天的备份，可通过环境变量修改：
+
+```bash
+# 保留 30 天
+BACKUP_RETENTION_DAYS=30 bash deploy/scripts/backup.sh
+```
+
+或在 crontab 中指定：
+
+```
+0 2 * * * BACKUP_RETENTION_DAYS=30 /bin/bash /srv/ai-account/deploy/scripts/backup.sh >> /srv/ai-account/backups/cron.log 2>&1
+```
+
+**恢复备份：**
+
+```bash
+cd /srv/ai-account
+
+# 1. 恢复 PostgreSQL
+gunzip -c backups/postgres_20250101_020000.sql.gz | \
+    docker compose -f deploy/docker-compose.prod.yml exec -T postgres \
+    psql -U accountAdmin -d account
+
+# 2. 恢复 MinIO（如需恢复文件存储）
+gunzip -c backups/minio_20250101_020000.tar.gz | \
+    docker compose -f deploy/docker-compose.prod.yml exec -T minio \
+    tar xzf - -C /data
 ```
 
 ### SSL 证书续期

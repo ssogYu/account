@@ -59,18 +59,31 @@ log_info "PostgreSQL 备份完成: ${PG_BACKUP_FILE} (${PG_SIZE})"
 log_step "2. 备份 MinIO 文件存储"
 
 MINIO_BACKUP_FILE="${BACKUP_DIR}/minio_${TIMESTAMP}.tar.gz"
+MINIO_TEMP_DIR="${BACKUP_DIR}/.minio_temp_${TIMESTAMP}"
 
 if ! docker compose -f "${COMPOSE_FILE}" ps minio | grep -q "Up\|running"; then
     log_warn "MinIO 容器未运行，跳过文件备份"
 else
-    docker compose -f "${COMPOSE_FILE}" exec -T minio \
-        tar czf - -C /data account \
-        > "${MINIO_BACKUP_FILE}" 2>&1 || {
+    mkdir -p "${MINIO_TEMP_DIR}"
+
+    log_info "正在复制 MinIO 数据到临时目录..."
+    docker compose -f "${COMPOSE_FILE}" cp minio:/data/account "${MINIO_TEMP_DIR}/" 2>&1 || {
         EXIT_CODE=$?
-        log_error "MinIO 备份失败，tar 返回码: ${EXIT_CODE}"
-        rm -f "${MINIO_BACKUP_FILE}"
+        log_error "MinIO 数据复制失败，docker cp 返回码: ${EXIT_CODE}"
+        rm -rf "${MINIO_TEMP_DIR}"
         MINIO_BACKUP_FILE=""
     }
+
+    if [ -d "${MINIO_TEMP_DIR}/account" ]; then
+        log_info "正在打包 MinIO 数据..."
+        tar czf "${MINIO_BACKUP_FILE}" -C "${MINIO_TEMP_DIR}" account 2>&1 || {
+            EXIT_CODE=$?
+            log_error "MinIO 打包失败，tar 返回码: ${EXIT_CODE}"
+            rm -f "${MINIO_BACKUP_FILE}"
+            MINIO_BACKUP_FILE=""
+        }
+        rm -rf "${MINIO_TEMP_DIR}"
+    fi
 fi
 
 if [ -n "${MINIO_BACKUP_FILE}" ] && [ -f "${MINIO_BACKUP_FILE}" ]; then

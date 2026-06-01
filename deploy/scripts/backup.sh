@@ -60,19 +60,29 @@ log_step "2. 备份 MinIO 文件存储"
 
 MINIO_BACKUP_FILE="${BACKUP_DIR}/minio_${TIMESTAMP}.tar.gz"
 
-docker compose -f "${COMPOSE_FILE}" exec -T minio \
-    tar czf - -C /data account 2>/dev/null \
-    > "${MINIO_BACKUP_FILE}"
-
-if [ ! -s "${MINIO_BACKUP_FILE}" ]; then
-    log_warn "MinIO 备份为空或失败，删除空文件"
-    rm -f "${MINIO_BACKUP_FILE}"
-    MINIO_BACKUP_FILE=""
+if ! docker compose -f "${COMPOSE_FILE}" ps minio | grep -q "Up\|running"; then
+    log_warn "MinIO 容器未运行，跳过文件备份"
+else
+    docker compose -f "${COMPOSE_FILE}" exec -T minio \
+        tar czf - -C /data account \
+        > "${MINIO_BACKUP_FILE}" 2>&1 || {
+        EXIT_CODE=$?
+        log_error "MinIO 备份失败，tar 返回码: ${EXIT_CODE}"
+        rm -f "${MINIO_BACKUP_FILE}"
+        MINIO_BACKUP_FILE=""
+    }
 fi
 
 if [ -n "${MINIO_BACKUP_FILE}" ] && [ -f "${MINIO_BACKUP_FILE}" ]; then
-    MINIO_SIZE=$(du -h "${MINIO_BACKUP_FILE}" | cut -f1)
-    log_info "MinIO 备份完成: ${MINIO_BACKUP_FILE} (${MINIO_SIZE})"
+    FILE_SIZE=$(stat -f%z "${MINIO_BACKUP_FILE}" 2>/dev/null || stat -c%s "${MINIO_BACKUP_FILE}" 2>/dev/null || echo "0")
+    if [ "${FILE_SIZE}" -eq 0 ]; then
+        log_warn "MinIO 备份文件为空，删除"
+        rm -f "${MINIO_BACKUP_FILE}"
+        MINIO_BACKUP_FILE=""
+    else
+        MINIO_SIZE=$(du -h "${MINIO_BACKUP_FILE}" | cut -f1)
+        log_info "MinIO 备份完成: ${MINIO_BACKUP_FILE} (${MINIO_SIZE})"
+    fi
 else
     log_warn "MinIO 无数据或备份失败，已跳过"
 fi

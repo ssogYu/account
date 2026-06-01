@@ -349,7 +349,7 @@ const s = StyleSheet.create({
     width: 36,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: colors.textQuaternary,
+    backgroundColor: colors.textSecondary,
   },
   header: {
     flexDirection: 'row',

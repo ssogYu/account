@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { colors, typography } from '@/theme';
+import { useTheme } from '@/theme';
+import { typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { useCategoryStore } from '@/stores/category';
@@ -51,6 +52,7 @@ export function ConfirmCard({
   onConfirmAll: (messageId: string, edits: Record<number, BillEdits>) => void;
   onReject: (messageId: string) => void;
 }) {
+  const { colors } = useTheme();
   const categories = useCategoryStore((s) => s.categories);
   const accounts = useAccountStore((s) => s.accounts);
 
@@ -134,6 +136,261 @@ export function ConfirmCard({
     await onConfirmAll(messageId, editsMap);
     setBillStates((prev) => prev.map((s) => ({ ...s, confirmed: true })));
   };
+
+  const s = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: 14,
+          padding: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+
+        multiHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+          paddingBottom: 10,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator,
+        },
+        multiHeaderText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: '600',
+        },
+        multiHeaderTotal: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+          fontWeight: '700',
+        },
+
+        billsList: {
+          maxHeight: 400,
+        },
+        billItemContainer: {},
+        billDivider: {
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: colors.separator,
+          marginVertical: 12,
+        },
+
+        amountRow: {
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          marginBottom: 8,
+        },
+        amountSign: {
+          ...typography.title3,
+          fontWeight: '600',
+          marginRight: 2,
+        },
+        amountInput: {
+          ...typography.largeTitle,
+          fontWeight: '700',
+          letterSpacing: -1,
+          minWidth: 80,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator,
+          paddingBottom: 2,
+        },
+        typeTag: {
+          marginLeft: 10,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 4,
+          alignSelf: 'center',
+        },
+        typeTagText: {
+          fontSize: 10,
+          fontWeight: '700',
+          letterSpacing: 0.5,
+        },
+        confirmedBadge: {
+          marginLeft: 8,
+          alignSelf: 'center',
+        },
+
+        hintRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 8,
+        },
+        hintItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+        },
+        hintText: {
+          fontSize: 11,
+          color: colors.warning,
+          fontWeight: '500',
+        },
+
+        fields: {
+          backgroundColor: colors.fillTertiary,
+          borderRadius: 10,
+          overflow: 'hidden',
+        },
+        fieldRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+        },
+        fieldLabel: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+          fontWeight: '500',
+          fontSize: 13,
+        },
+        fieldLabelWarn: {
+          color: colors.warning,
+        },
+        fieldRight: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+        },
+        fieldIconBg: {
+          width: 22,
+          height: 22,
+          borderRadius: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        fieldValue: {
+          ...typography.footnote,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        fieldPlaceholderWarn: {
+          color: colors.warning,
+        },
+        fieldDivider: {
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: colors.separator,
+          marginHorizontal: 14,
+        },
+
+        pickerWrap: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 6,
+          paddingHorizontal: 14,
+          paddingBottom: 12,
+        },
+        pickerChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 6,
+          backgroundColor: colors.bgElevated,
+        },
+        pickerChipActive: {
+          backgroundColor: colors.accentSubtle,
+        },
+        pickerChipText: {
+          fontSize: 12,
+          color: colors.textTertiary,
+        },
+        pickerChipTextActive: {
+          color: colors.accent,
+          fontWeight: '600',
+        },
+
+        metaRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          marginTop: 12,
+          marginBottom: 14,
+        },
+        metaItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+        },
+        metaText: {
+          fontSize: 11,
+          color: colors.textQuaternary,
+        },
+        metaHint: {
+          fontSize: 11,
+          color: colors.warning,
+          fontWeight: '500',
+        },
+
+        singleConfirmBtn: {
+          height: 32,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 8,
+          borderWidth: 1,
+          marginTop: 8,
+          marginBottom: 4,
+        },
+        singleConfirmText: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+
+        actions: {
+          flexDirection: 'row',
+          gap: 10,
+          marginTop: 4,
+        },
+        cancelBtn: {
+          flex: 1,
+          height: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 10,
+          backgroundColor: colors.fillTertiary,
+        },
+        cancelText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: '600',
+        },
+        confirmBtn: {
+          flex: 1,
+          height: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 10,
+        },
+        confirmText: {
+          ...typography.footnote,
+          color: '#FFFFFF',
+          fontWeight: '700',
+          letterSpacing: 0.3,
+        },
+
+        confirmedInner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        },
+        confirmedDot: {
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+        },
+        confirmedText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+        },
+      }),
+    [colors],
+  );
 
   if (confirmed || allConfirmed) {
     if (isMulti) {
@@ -456,254 +713,3 @@ export function ConfirmCard({
 }
 
 export type ConfirmBillEdits = BillEdits;
-
-const s = StyleSheet.create({
-  card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-
-  multiHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  multiHeaderText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  multiHeaderTotal: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-    fontWeight: '700',
-  },
-
-  billsList: {
-    maxHeight: 400,
-  },
-  billItemContainer: {},
-  billDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.separator,
-    marginVertical: 12,
-  },
-
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 8,
-  },
-  amountSign: {
-    ...typography.title3,
-    fontWeight: '600',
-    marginRight: 2,
-  },
-  amountInput: {
-    ...typography.largeTitle,
-    fontWeight: '700',
-    letterSpacing: -1,
-    minWidth: 80,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-    paddingBottom: 2,
-  },
-  typeTag: {
-    marginLeft: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'center',
-  },
-  typeTagText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  confirmedBadge: {
-    marginLeft: 8,
-    alignSelf: 'center',
-  },
-
-  hintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  hintItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  hintText: {
-    fontSize: 11,
-    color: colors.warning,
-    fontWeight: '500',
-  },
-
-  fields: {
-    backgroundColor: colors.fillTertiary,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  fieldRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  fieldLabel: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  fieldLabelWarn: {
-    color: colors.warning,
-  },
-  fieldRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  fieldIconBg: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldValue: {
-    ...typography.footnote,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  fieldPlaceholderWarn: {
-    color: colors.warning,
-  },
-  fieldDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.separator,
-    marginHorizontal: 14,
-  },
-
-  pickerWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-  },
-  pickerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    backgroundColor: colors.bgElevated,
-  },
-  pickerChipActive: {
-    backgroundColor: colors.accentSubtle,
-  },
-  pickerChipText: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-  pickerChipTextActive: {
-    color: colors.accent,
-    fontWeight: '600',
-  },
-
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 12,
-    marginBottom: 14,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  metaText: {
-    fontSize: 11,
-    color: colors.textQuaternary,
-  },
-  metaHint: {
-    fontSize: 11,
-    color: colors.warning,
-    fontWeight: '500',
-  },
-
-  singleConfirmBtn: {
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  singleConfirmText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: colors.fillSecondary,
-  },
-  cancelText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  confirmBtn: {
-    flex: 1,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-  },
-  confirmText: {
-    ...typography.footnote,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-
-  confirmedInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  confirmedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  confirmedText: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-  },
-});

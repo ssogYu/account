@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing, typography } from '@/theme';
+import { useTheme } from '@/theme';
+import { spacing, typography } from '@/theme';
 import { CategoryIcon } from '@/components/icons';
 import type { CategoryStatItem } from '@/services/bill/stats.types';
 import { CHART_COLORS } from './chartColors';
@@ -9,13 +11,66 @@ interface CategoryRankingProps {
   onType: 'expense' | 'income';
 }
 
-/**
- * 分类排行 - 水平进度条 + 排名
- * 纯 View 实现，直观展示各分类金额对比
- */
 export function CategoryRanking({ items, onType }: CategoryRankingProps) {
+  const { colors } = useTheme();
   const accentColor = onType === 'expense' ? colors.error : colors.success;
   const maxAmount = items.length > 0 ? items[0].amount : 1;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { gap: spacing.md + 2 },
+        row: { gap: spacing.xs + 2 },
+        rankWrap: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+        },
+        rank: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+          fontWeight: '700',
+          width: 16,
+          textAlign: 'center',
+        },
+        iconBg: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        name: {
+          ...typography.footnote,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        barWrap: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          paddingLeft: 16 + spacing.sm + 28 + spacing.sm,
+        },
+        barTrack: {
+          flex: 1,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: colors.fillTertiary,
+          overflow: 'hidden',
+        },
+        barFill: {
+          height: '100%',
+          borderRadius: 3,
+        },
+        amount: {
+          ...typography.caption1,
+          fontWeight: '700',
+          width: 60,
+          textAlign: 'right',
+        },
+      }),
+    [colors],
+  );
 
   return (
     <View style={styles.container}>
@@ -24,7 +79,6 @@ export function CategoryRanking({ items, onType }: CategoryRankingProps) {
 
         return (
           <View key={item.categoryId} style={styles.row}>
-            {/* 排名 + 图标 */}
             <View style={styles.rankWrap}>
               <Text style={[styles.rank, i < 3 && { color: CHART_COLORS[i] }]}>{i + 1}</Text>
               <View style={[styles.iconBg, { backgroundColor: `${accentColor}1F` }]}>
@@ -33,7 +87,6 @@ export function CategoryRanking({ items, onType }: CategoryRankingProps) {
               <Text style={styles.name}>{item.categoryName}</Text>
             </View>
 
-            {/* 进度条 + 金额 */}
             <View style={styles.barWrap}>
               <View style={styles.barTrack}>
                 <View
@@ -54,59 +107,3 @@ export function CategoryRanking({ items, onType }: CategoryRankingProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: spacing.md + 2,
-  },
-  row: {
-    gap: spacing.xs + 2,
-  },
-  rankWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  rank: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-    fontWeight: '700',
-    width: 16,
-    textAlign: 'center',
-  },
-  iconBg: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  name: {
-    ...typography.footnote,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  barWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingLeft: 16 + spacing.sm + 28 + spacing.sm, // 对齐 rank + icon + gap
-  },
-  barTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.fillTertiary,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  amount: {
-    ...typography.caption1,
-    fontWeight: '700',
-    width: 60,
-    textAlign: 'right',
-  },
-});

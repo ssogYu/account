@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,8 @@ import { FamilyModal } from "@/components/FamilyModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { CategoryManageModal } from "@/components/CategoryManageModal";
 import { AccountManageModal } from "@/components/AccountManageModal";
-import { colors, spacing, radius, typography } from "@/theme";
+import { useTheme } from "@/theme";
+import { spacing, radius, typography } from "@/theme";
 import AntDesign from "@expo/vector-icons/AntDesign";
 
 const MENU_ITEMS = [
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const family = useFamilyStore((s) => s.family);
+  const { colors, resolvedScheme } = useTheme();
 
   const [familyModalVisible, setFamilyModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -45,23 +47,164 @@ export default function ProfileScreen() {
     }
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.bg,
+        },
+        scrollContent: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: 100,
+        },
+        pageTitleContainer: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: spacing.md,
+          marginBottom: spacing.xl,
+        },
+        pageTitle: {
+          ...typography.largeTitle,
+          color: colors.text,
+        },
+        profileCard: {
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          padding: spacing.lg,
+          marginBottom: spacing.lg,
+        },
+        avatarWrap: {
+          position: "relative",
+          marginRight: spacing.md,
+        },
+        avatar: {
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: colors.accent,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        avatarText: {
+          ...typography.title3,
+          color: "#FFFFFF",
+          fontWeight: "700",
+        },
+        avatarBadge: {
+          position: "absolute",
+          bottom: -2,
+          right: -2,
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: colors.accent,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 2,
+          borderColor: colors.bgElevated,
+        },
+        profileInfo: {
+          flex: 1,
+        },
+        profileName: {
+          ...typography.headline,
+          color: colors.text,
+          marginBottom: 2,
+        },
+        profileSub: {
+          ...typography.subheadline,
+          color: colors.textSecondary,
+        },
+        chevron: {
+          ...typography.title2,
+          color: colors.textTertiary,
+          fontWeight: "300",
+        },
+        familyCard: {
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          padding: spacing.lg,
+          marginBottom: spacing.lg,
+        },
+        familyLeft: {
+          flex: 1,
+        },
+        familyTitle: {
+          ...typography.headline,
+          color: colors.text,
+          marginBottom: 2,
+        },
+        familySubtitle: {
+          ...typography.subheadline,
+          color: colors.textSecondary,
+        },
+        menuGroup: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          marginBottom: spacing.lg,
+          overflow: "hidden",
+        },
+        menuItem: {
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md + 2,
+        },
+        menuItemBorder: {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator,
+        },
+        menuLeft: {
+          flex: 1,
+        },
+        menuTitle: {
+          ...typography.body,
+          color: colors.text,
+          fontSize: 15,
+        },
+        menuSubtitle: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+          marginTop: 2,
+        },
+        logoutBtn: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          paddingVertical: spacing.md + 2,
+          alignItems: "center",
+        },
+        logoutText: {
+          ...typography.body,
+          color: colors.error,
+          fontSize: 16,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar
+        barStyle={resolvedScheme === "dark" ? "light-content" : "dark-content"}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 页面标题 */}
         <View style={styles.pageTitleContainer}>
           <Text style={styles.pageTitle}>我的</Text>
-          {/* <TouchableOpacity onPress={() => handleMenuPress('settings')}>
+          <TouchableOpacity onPress={() => handleMenuPress("settings")}>
             <AntDesign name="setting" size={18} color={colors.textSecondary} />
-          </TouchableOpacity> */}
+          </TouchableOpacity>
         </View>
 
-        {/* 用户信息卡片 */}
         <TouchableOpacity
           style={styles.profileCard}
           onPress={() => setEditModalVisible(true)}
@@ -94,7 +237,6 @@ export default function ProfileScreen() {
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
 
-        {/* 家庭组入口 */}
         <TouchableOpacity
           style={styles.familyCard}
           onPress={() => setFamilyModalVisible(true)}
@@ -111,7 +253,6 @@ export default function ProfileScreen() {
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
 
-        {/* 菜单列表 */}
         <View style={styles.menuGroup}>
           {MENU_ITEMS.map((item, idx) => (
             <TouchableOpacity
@@ -134,7 +275,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* 退出登录 */}
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={logout}
@@ -163,148 +303,3 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 100,
-  },
-  pageTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  pageTitle: {
-    ...typography.largeTitle,
-    color: colors.text,
-  },
-
-  // ── 用户信息 ──
-  profileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  avatarWrap: {
-    position: "relative",
-    marginRight: spacing.md,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    ...typography.title3,
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  avatarBadge: {
-    position: "absolute",
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.bgElevated,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    ...typography.headline,
-    color: colors.text,
-    marginBottom: 2,
-  },
-  profileSub: {
-    ...typography.subheadline,
-    color: colors.textSecondary,
-  },
-  chevron: {
-    ...typography.title2,
-    color: colors.textTertiary,
-    fontWeight: "300",
-  },
-
-  // ── 家庭组入口 ──
-  familyCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  familyLeft: {
-    flex: 1,
-  },
-  familyTitle: {
-    ...typography.headline,
-    color: colors.text,
-    marginBottom: 2,
-  },
-  familySubtitle: {
-    ...typography.subheadline,
-    color: colors.textSecondary,
-  },
-
-  // ── 菜单 ──
-  menuGroup: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    marginBottom: spacing.lg,
-    overflow: "hidden",
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
-  },
-  menuItemBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  menuLeft: {
-    flex: 1,
-  },
-  menuTitle: {
-    ...typography.body,
-    color: colors.text,
-    fontSize: 15,
-  },
-  menuSubtitle: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-    marginTop: 2,
-  },
-
-  // ── 退出 ──
-  logoutBtn: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md + 2,
-    alignItems: "center",
-  },
-  logoutText: {
-    ...typography.body,
-    color: colors.error,
-    fontSize: 16,
-  },
-});

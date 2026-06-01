@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { useTheme } from '@/theme';
+import { spacing, radius, typography, shadows } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { useStatsStore } from '@/stores/stats';
@@ -11,6 +12,165 @@ import { CHART_COLORS } from './chartColors';
 import type { CategoryStatItem, DailyStatItem } from '@/services/bill/stats.types';
 
 const PIE_SIZE = 180;
+
+function usePieStyles() {
+  const { colors } = useTheme();
+  return useMemo(
+    () =>
+      StyleSheet.create({
+        container: { gap: spacing.md },
+        chartWrap: {
+          alignItems: 'center',
+          paddingVertical: spacing.md,
+        },
+        pieOuter: {
+          width: PIE_SIZE,
+          height: PIE_SIZE,
+          borderRadius: PIE_SIZE / 2,
+          overflow: 'hidden',
+          position: 'relative',
+          backgroundColor: colors.fillTertiary,
+        },
+        slice: {
+          position: 'absolute',
+          width: PIE_SIZE,
+          height: PIE_SIZE / 2,
+          transformOrigin: '50% 100%',
+          overflow: 'hidden',
+        },
+        sliceFill: {
+          width: PIE_SIZE,
+          height: PIE_SIZE / 2,
+        },
+        pieHole: {
+          position: 'absolute',
+          top: (PIE_SIZE - 110) / 2,
+          left: (PIE_SIZE - 110) / 2,
+          width: 110,
+          height: 110,
+          borderRadius: 55,
+          backgroundColor: colors.bgElevated,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        centerAmount: {
+          ...typography.headline,
+          fontWeight: '800',
+          fontSize: 16,
+        },
+        centerLabel: {
+          ...typography.caption2,
+          color: colors.textTertiary,
+        },
+        legend: { gap: spacing.sm },
+        legendItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+          paddingVertical: spacing.xs,
+        },
+        legendDot: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+        },
+        legendIconBg: {
+          width: 24,
+          height: 24,
+          borderRadius: 7,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        legendName: {
+          ...typography.footnote,
+          color: colors.text,
+          flex: 1,
+        },
+        legendPct: {
+          ...typography.caption1,
+          fontWeight: '700',
+          width: 48,
+          textAlign: 'right',
+        },
+      }),
+    [colors],
+  );
+}
+
+function useChartStyles() {
+  const { colors } = useTheme();
+  return useMemo(
+    () =>
+      StyleSheet.create({
+        scrollContent: {
+          paddingBottom: 120,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          gap: spacing.lg,
+        },
+        section: { gap: spacing.sm },
+        sectionHeader: {
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: spacing.sm,
+        },
+        sectionTitle: {
+          ...typography.headline,
+          color: colors.text,
+          fontSize: 16,
+        },
+        sectionSub: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+        },
+        card: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          padding: spacing.md,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+          ...shadows.card,
+        },
+        trendWrap: { gap: spacing.md },
+        periodBar: {
+          flexDirection: 'row',
+          backgroundColor: colors.fillTertiary,
+          borderRadius: radius.sm,
+          padding: 2,
+          alignSelf: 'flex-start',
+        },
+        periodBtn: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs,
+          borderRadius: radius.xs,
+        },
+        periodBtnActive: {
+          backgroundColor: colors.bg,
+        },
+        periodText: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+        },
+        periodTextActive: {
+          color: colors.text,
+          fontWeight: '600',
+        },
+        emptySection: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: spacing.xxl,
+          gap: spacing.sm,
+        },
+        emptyText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+        },
+      }),
+    [colors],
+  );
+}
 
 function CategoryPieChart({
   items,
@@ -23,6 +183,8 @@ function CategoryPieChart({
   onType: 'expense' | 'income';
   onSlicePress: (item: CategoryStatItem, index: number) => void;
 }) {
+  const pieStyles = usePieStyles();
+  const { colors } = useTheme();
   const accentColor = onType === 'expense' ? colors.error : colors.success;
 
   let currentAngle = -90;
@@ -98,89 +260,6 @@ function CategoryPieChart({
   );
 }
 
-const pieStyles = StyleSheet.create({
-  container: {
-    gap: spacing.md,
-  },
-  chartWrap: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  pieOuter: {
-    width: PIE_SIZE,
-    height: PIE_SIZE,
-    borderRadius: PIE_SIZE / 2,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: colors.fillTertiary,
-  },
-  slice: {
-    position: 'absolute',
-    width: PIE_SIZE,
-    height: PIE_SIZE / 2,
-    transformOrigin: '50% 100%',
-    overflow: 'hidden',
-  },
-  sliceFill: {
-    width: PIE_SIZE,
-    height: PIE_SIZE / 2,
-  },
-  pieHole: {
-    position: 'absolute',
-    top: (PIE_SIZE - 110) / 2,
-    left: (PIE_SIZE - 110) / 2,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: colors.bgElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-  centerAmount: {
-    ...typography.headline,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  centerLabel: {
-    ...typography.caption2,
-    color: colors.textTertiary,
-  },
-  legend: {
-    gap: spacing.sm,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendIconBg: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  legendName: {
-    ...typography.footnote,
-    color: colors.text,
-    flex: 1,
-  },
-  legendPct: {
-    ...typography.caption1,
-    fontWeight: '700',
-    width: 48,
-    textAlign: 'right',
-  },
-});
-
 type TrendPeriod = 'day' | 'week' | 'month' | 'year';
 
 function aggregateByWeek(items: DailyStatItem[]): DailyStatItem[] {
@@ -222,6 +301,8 @@ function aggregateByMonth(items: DailyStatItem[]): DailyStatItem[] {
 }
 
 function TrendChart() {
+  const chartStyles = useChartStyles();
+  const { colors } = useTheme();
   const { dailyStats, selectedType } = useStatsStore();
   const [period, setPeriod] = useState<TrendPeriod>('day');
 
@@ -275,6 +356,7 @@ function TrendChart() {
 }
 
 export function ChartView() {
+  const chartStyles = useChartStyles();
   const { categoryStats, monthlyComparison, selectedType, drillToFlow } = useStatsStore();
 
   const handleSlicePress = (item: CategoryStatItem) => {
@@ -334,75 +416,3 @@ export function ChartView() {
     </ScrollView>
   );
 }
-
-const chartStyles = StyleSheet.create({
-  scrollContent: {
-    paddingBottom: 120,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    gap: spacing.lg,
-  },
-  section: {
-    gap: spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    ...typography.headline,
-    color: colors.text,
-    fontSize: 16,
-  },
-  sectionSub: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-  card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-    ...shadows.card,
-  },
-
-  trendWrap: {
-    gap: spacing.md,
-  },
-  periodBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.fillTertiary,
-    borderRadius: radius.sm,
-    padding: 2,
-    alignSelf: 'flex-start',
-  },
-  periodBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.xs,
-  },
-  periodBtnActive: {
-    backgroundColor: colors.bg,
-  },
-  periodText: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-  periodTextActive: {
-    color: colors.text,
-    fontWeight: '600',
-  },
-
-  emptySection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-    gap: spacing.sm,
-  },
-  emptyText: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-  },
-});

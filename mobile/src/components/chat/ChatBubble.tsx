@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
-import { colors, typography } from '@/theme';
+import { useTheme } from '@/theme';
+import { typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { ConfirmCard } from './ConfirmCard';
@@ -18,6 +19,7 @@ export function ChatBubble({
   onConfirmAll: (messageId: string, edits: Record<number, ConfirmBillEdits>) => void;
   onReject: (messageId: string) => void;
 }) {
+  const { colors } = useTheme();
   const isUser = message.role === 'user';
   const meta = !isUser ? message.metadata : null;
 
@@ -46,6 +48,86 @@ export function ChatBubble({
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        row: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          marginBottom: 12,
+          paddingHorizontal: 16,
+        },
+        rowUser: {
+          justifyContent: 'flex-end',
+        },
+        avatar: {
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: colors.accentSubtle,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 8,
+          marginTop: 2,
+          position: 'relative',
+        },
+        avatarGlow: {
+          position: 'absolute',
+          top: -2,
+          left: -2,
+          right: -2,
+          bottom: -2,
+          borderRadius: 16,
+          backgroundColor: colors.accent,
+          opacity: 0.08,
+        },
+        bubble: {
+          maxWidth: '80%',
+          borderRadius: 16,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+        },
+        bubbleUser: {
+          backgroundColor: colors.accent,
+          borderBottomRightRadius: 4,
+        },
+        bubbleAssistant: {
+          backgroundColor: colors.bgElevated,
+          borderBottomLeftRadius: 4,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        text: {
+          ...typography.body,
+          color: colors.text,
+          lineHeight: 20,
+        },
+        textUser: {
+          color: '#FFFFFF',
+        },
+        rejectedRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 6,
+        },
+        rejectedItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+        },
+        rejectedText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+        },
+        rejectedLabel: {
+          ...typography.footnote,
+          color: colors.textQuaternary,
+        },
+      }),
+    [colors],
+  );
 
   return (
     <Animated.View
@@ -86,79 +168,3 @@ export function ChatBubble({
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
-  rowUser: {
-    justifyContent: 'flex-end',
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.accentSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-    marginTop: 2,
-    position: 'relative',
-  },
-  avatarGlow: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    right: -2,
-    bottom: -2,
-    borderRadius: 16,
-    backgroundColor: colors.accent,
-    opacity: 0.08,
-  },
-  bubble: {
-    maxWidth: '80%',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  bubbleUser: {
-    backgroundColor: colors.accent,
-    borderBottomRightRadius: 4,
-  },
-  bubbleAssistant: {
-    backgroundColor: colors.bgElevated,
-    borderBottomLeftRadius: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-  text: {
-    ...typography.body,
-    color: colors.text,
-    lineHeight: 20,
-  },
-  textUser: {
-    color: '#FFFFFF',
-  },
-  rejectedRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-  },
-  rejectedItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rejectedText: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-  },
-  rejectedLabel: {
-    ...typography.footnote,
-    color: colors.textQuaternary,
-  },
-});

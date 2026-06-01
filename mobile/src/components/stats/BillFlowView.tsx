@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import Animated, {
   withSpring,
   type WithSpringConfig,
 } from 'react-native-reanimated';
-import { colors, spacing, radius, typography } from '@/theme';
+import { useTheme } from '@/theme';
+import { spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { CategoryIcon } from '@/components/icons';
 import { AddBillModal } from '@/components/AddBillModal';
@@ -33,8 +34,246 @@ const SPRING_CONFIG: WithSpringConfig = {
   mass: 0.5,
 };
 
+function useBillFlowStyles() {
+  const { colors } = useTheme();
+  return useMemo(
+    () =>
+      StyleSheet.create({
+        flowContainer: { flex: 1 },
+        flowHeader: {
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.sm,
+          gap: spacing.sm,
+        },
+        flowHeaderTop: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        balanceWrap: { gap: 2 },
+        balanceLabel: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+        },
+        balanceValue: {
+          ...typography.title3,
+          fontWeight: '800',
+        },
+        filterActions: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+        },
+        filterBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.fillTertiary,
+          borderRadius: radius.sm,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xs + 2,
+          gap: 3,
+        },
+        filterBtnActive: {
+          backgroundColor: colors.accentSubtle,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.accent,
+        },
+        filterBtnText: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+        },
+        filterBtnTextActive: {
+          color: colors.accent,
+          fontWeight: '600',
+        },
+        resetBtn: {
+          width: 32,
+          height: 32,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        drillTag: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          alignSelf: 'flex-start',
+          backgroundColor: colors.accentSubtle,
+          borderRadius: radius.xs,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xs,
+          marginTop: spacing.sm,
+          gap: spacing.xs,
+        },
+        drillTagText: {
+          ...typography.caption1,
+          color: colors.accent,
+          fontWeight: '600',
+        },
+        filterExpanded: {
+          marginTop: spacing.sm,
+          gap: spacing.sm,
+        },
+        filterSectionLabel: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+          fontWeight: '600',
+        },
+        categoryScroll: { maxHeight: 120 },
+        filterChips: {
+          flexDirection: 'row',
+          gap: spacing.sm,
+        },
+        chip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs + 2,
+          borderRadius: radius.xs,
+          backgroundColor: colors.fillTertiary,
+        },
+        chipActive: { backgroundColor: colors.accentSubtle },
+        chipText: {
+          ...typography.caption1,
+          color: colors.textSecondary,
+        },
+        chipTextActive: {
+          color: colors.accent,
+          fontWeight: '600',
+        },
+        daySection: { marginBottom: spacing.sm },
+        dateHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: spacing.lg + spacing.xs,
+          paddingVertical: spacing.sm,
+          gap: spacing.sm,
+        },
+        dateHeaderText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: '600',
+        },
+        dateHeaderSub: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+        },
+        billItemOuter: {
+          position: 'relative',
+          overflow: 'hidden',
+          marginHorizontal: spacing.lg,
+          marginBottom: spacing.xs,
+          borderRadius: radius.md,
+        },
+        swipeActions: {
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          flexDirection: 'row',
+        },
+        swipeEdit: {
+          width: 70,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.fillSecondary,
+          gap: 2,
+        },
+        swipeDelete: {
+          width: 70,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.error,
+          borderTopRightRadius: radius.md,
+          borderBottomRightRadius: radius.md,
+          gap: 2,
+        },
+        swipeText: {
+          ...typography.caption2,
+          fontWeight: '600',
+        },
+        billItemWrap: { backgroundColor: colors.bgElevated },
+        billItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: spacing.md,
+          gap: spacing.sm,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+          borderRadius: radius.md,
+          backgroundColor: colors.bgElevated,
+        },
+        billIconBg: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        billInfo: { flex: 1, gap: 2 },
+        billTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+        },
+        accountTag: {
+          backgroundColor: colors.accentSubtle,
+          borderRadius: 3,
+          paddingHorizontal: 4,
+          paddingVertical: 1,
+        },
+        accountTagText: {
+          ...typography.caption2,
+          fontSize: 10,
+          color: colors.accent,
+          fontWeight: '600',
+        },
+        memberTag: {
+          backgroundColor: colors.fillSecondary,
+          borderRadius: 3,
+          paddingHorizontal: 4,
+          paddingVertical: 1,
+        },
+        memberTagText: {
+          ...typography.caption2,
+          fontSize: 10,
+          color: colors.textSecondary,
+          fontWeight: '600',
+        },
+        billNote: {
+          ...typography.footnote,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        billSub: {
+          ...typography.caption2,
+          color: colors.textTertiary,
+        },
+        billAmount: {
+          ...typography.footnote,
+          fontWeight: '700',
+        },
+        listContent: { paddingBottom: 120 },
+        emptyWrap: { flex: 1 },
+        emptyState: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: spacing.xxl * 2,
+          gap: spacing.md,
+        },
+        emptyText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+        },
+      }),
+    [colors],
+  );
+}
+
 // ── 流水头部（结余 + 筛选） ──
 function FlowHeader() {
+  const s = useBillFlowStyles();
+  const { colors } = useTheme();
   const {
     monthSummary,
     flowFilter,
@@ -153,6 +392,8 @@ function BillItem({
   onEdit: (bill: Bill) => void;
   showMemberTag: boolean;
 }) {
+  const s = useBillFlowStyles();
+  const { colors } = useTheme();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const translateX = useSharedValue(0);
   const isSwipedOpen = useSharedValue(false);
@@ -289,6 +530,8 @@ function BillItem({
 
 // ── 日期分组头 ──
 function DateHeader({ group }: { group: DayGroup }) {
+  const s = useBillFlowStyles();
+  const { colors } = useTheme();
   return (
     <View style={s.dateHeader}>
       <Text style={s.dateHeaderText}>{group.label}</Text>
@@ -309,6 +552,8 @@ function DateHeader({ group }: { group: DayGroup }) {
 
 // ── 流水视图主体 ──
 export function BillFlowView() {
+  const s = useBillFlowStyles();
+  const { colors } = useTheme();
   const { flowGroups, flowHasMore, deleteBill, fetchFlowList, flowPage, familyInfo } =
     useStatsStore();
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -333,7 +578,6 @@ export function BillFlowView() {
       await billService.update(billToEdit.id, data);
       setEditModalVisible(false);
       setBillToEdit(null);
-      // 刷新数据
       useStatsStore.setState({ flowPage: 1, flowGroups: [], flowHasMore: true });
       fetchFlowList();
       const { selectedMonth, selectedType } = useStatsStore.getState();
@@ -372,7 +616,7 @@ export function BillFlowView() {
         ))}
       </View>
     ),
-    [deleteBill, handleEdit, showMemberTag],
+    [deleteBill, handleEdit, showMemberTag, s],
   );
 
   const listHeader = useCallback(() => <FlowHeader />, []);
@@ -446,263 +690,3 @@ export function BillFlowView() {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  flowContainer: {
-    flex: 1,
-  },
-
-  // 月度汇总卡片
-  flowHeader: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  flowHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  balanceWrap: {
-    gap: 2,
-  },
-  balanceLabel: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-  balanceValue: {
-    ...typography.title3,
-    fontWeight: '800',
-  },
-  filterActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-
-  // 筛选栏
-  filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.fillTertiary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs + 2,
-    gap: 3,
-  },
-  filterBtnActive: {
-    backgroundColor: colors.accentSubtle,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.accent,
-  },
-  filterBtnText: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-  filterBtnTextActive: {
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  resetBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  drillTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.accentSubtle,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginTop: spacing.sm,
-    gap: spacing.xs,
-  },
-  drillTagText: {
-    ...typography.caption1,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  filterExpanded: {
-    marginTop: spacing.sm,
-    gap: spacing.sm,
-  },
-  filterSectionLabel: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-    fontWeight: '600',
-  },
-  categoryScroll: {
-    maxHeight: 120,
-  },
-  filterChips: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.xs,
-    backgroundColor: colors.fillTertiary,
-  },
-  chipActive: {
-    backgroundColor: colors.accentSubtle,
-  },
-  chipText: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-  },
-  chipTextActive: {
-    color: colors.accent,
-    fontWeight: '600',
-  },
-
-  // 日期分组
-  daySection: {
-    marginBottom: spacing.sm,
-  },
-  dateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg + spacing.xs,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  dateHeaderText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  dateHeaderSub: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-  },
-
-  // 账单条目 — 关键样式修复
-  billItemOuter: {
-    position: 'relative',
-    overflow: 'hidden',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-    borderRadius: radius.md,
-  },
-  swipeActions: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: 'row',
-  },
-  swipeEdit: {
-    width: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.fillSecondary,
-    gap: 2,
-  },
-  swipeDelete: {
-    width: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.error,
-    borderTopRightRadius: radius.md,
-    borderBottomRightRadius: radius.md,
-    gap: 2,
-  },
-  swipeText: {
-    ...typography.caption2,
-    fontWeight: '600',
-  },
-  billItemWrap: {
-    backgroundColor: colors.bgElevated,
-  },
-  billItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-  },
-  billIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  billInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  billTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  accountTag: {
-    backgroundColor: colors.accentSubtle,
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  accountTagText: {
-    ...typography.caption2,
-    fontSize: 10,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  memberTag: {
-    backgroundColor: colors.fillSecondary,
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  memberTagText: {
-    ...typography.caption2,
-    fontSize: 10,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  billNote: {
-    ...typography.footnote,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  billSub: {
-    ...typography.caption2,
-    color: colors.textTertiary,
-  },
-  billAmount: {
-    ...typography.footnote,
-    fontWeight: '700',
-  },
-
-  // 列表内容
-  listContent: {
-    paddingBottom: 120,
-  },
-
-  // 空状态
-  emptyWrap: {
-    flex: 1,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl * 2,
-    gap: spacing.md,
-  },
-  emptyText: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-  },
-});

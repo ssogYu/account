@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import * as SplashScreen from 'expo-splash-screen';
-import { useAuthStore } from '@/stores/auth';
-import { ToastProvider } from '@/components/ui/Toast';
-import { colors } from '@/theme';
+import { useEffect, useRef, useMemo } from "react";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as SplashScreen from "expo-splash-screen";
+import { useAuthStore } from "@/stores/auth";
+import { ToastProvider } from "@/components/ui/Toast";
+import { ThemeProvider, useTheme } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,27 +27,20 @@ function AuthGuard() {
   useEffect(() => {
     if (!isHydrated) return;
 
-    const inAuthGroup = segments[0] === 'auth';
+    const inAuthGroup = segments[0] === "auth";
 
     if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/auth/login');
+      router.replace("/auth/login");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
+      router.replace("/(tabs)");
     }
   }, [isAuthenticated, isHydrated, segments]);
 
   return null;
 }
 
-function LoadingScreen() {
-  return (
-    <View style={styles.loading}>
-      <ActivityIndicator size="large" color={colors.accent} />
-    </View>
-  );
-}
-
-export default function RootLayout() {
+function ThemedApp() {
+  const { colors, resolvedScheme } = useTheme();
   const isHydrated = useAuthStore((s) => s.isHydrated);
 
   useEffect(() => {
@@ -56,34 +49,50 @@ export default function RootLayout() {
     }
   }, [isHydrated]);
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        root: {
+          flex: 1,
+        },
+        loading: {
+          flex: 1,
+          backgroundColor: colors.bg,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+      }),
+    [colors],
+  );
+
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <>
       <AuthGuard />
       <ToastProvider />
       {!isHydrated ? (
-        <LoadingScreen />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
       ) : (
         <Stack
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: colors.bg },
-            animation: 'slide_from_right',
+            animation: "slide_from_right",
             animationDuration: 250,
           }}
         />
       )}
-    </GestureHandlerRootView>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  loading: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
+    </GestureHandlerRootView>
+  );
+}

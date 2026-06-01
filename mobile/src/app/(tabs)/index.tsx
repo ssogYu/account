@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,12 +18,14 @@ import { useBillStore } from '@/stores/bill';
 import { useCategoryStore } from '@/stores/category';
 import { useAccountStore } from '@/stores/account';
 import { AddBillModal } from '@/components/AddBillModal';
-import { colors, spacing, radius, typography } from '@/theme';
+import { useTheme } from '@/theme';
+import { spacing, radius, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ChatBubble, TypingIndicator, WELCOME_MESSAGES, QUICK_INPUTS } from '@/components/chat';
 import type { ConfirmBillEdits } from '@/components/chat/ConfirmCard';
 
 function TodayTicker({ expense, income }: { expense: number; income: number }) {
+  const { colors } = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -55,6 +57,47 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
 
   const current = items[currentIndex] ?? items[0];
 
+  const tStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          overflow: 'hidden',
+          height: 28,
+        },
+        badge: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        dot: {
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+        },
+        textWrap: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+        },
+        label: {
+          ...typography.caption1,
+          color: colors.textTertiary,
+          fontSize: 12,
+        },
+        value: {
+          ...typography.footnote,
+          fontWeight: '700',
+          fontSize: 15,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <View style={tStyles.container}>
       <View style={tStyles.badge}>
@@ -82,43 +125,6 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
   );
 }
 
-const tStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    overflow: 'hidden',
-    height: 28,
-  },
-  badge: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  textWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  label: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-    fontSize: 12,
-  },
-  value: {
-    ...typography.footnote,
-    fontWeight: '700',
-    fontSize: 15,
-  },
-});
-
 export default function HomeScreen() {
   const messages = useChatStore((s) => s.messages);
   const isSending = useChatStore((s) => s.isSending);
@@ -136,6 +142,7 @@ export default function HomeScreen() {
   const createBill = useBillStore((s) => s.createBill);
   const fetchCategories = useCategoryStore((s) => s.fetchCategories);
   const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
+  const { colors, resolvedScheme } = useTheme();
 
   const [inputText, setInputText] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -226,15 +233,108 @@ export default function HomeScreen() {
   const totalExpense = todaySummary?.totalExpense ?? 0;
   const totalIncome = todaySummary?.totalIncome ?? 0;
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.bg,
+        },
+        header: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.sm,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator,
+        },
+        chatContent: {
+          paddingVertical: spacing.md,
+          paddingBottom: spacing.xl,
+        },
+        inputArea: {
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
+          backgroundColor: colors.bg,
+        },
+        quickRow: {
+          flexDirection: 'row',
+          gap: spacing.sm,
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.xs,
+        },
+        quickBtn: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs + 1,
+          borderRadius: radius.full,
+          backgroundColor: colors.bgElevated,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        quickBtnText: {
+          ...typography.caption1,
+          color: colors.textSecondary,
+          fontWeight: '500',
+        },
+        inputRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        inputContainer: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.xl,
+          paddingLeft: spacing.md + 4,
+          paddingRight: spacing.xs + 2,
+          paddingVertical: spacing.xs,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        textInput: {
+          flex: 1,
+          ...typography.body,
+          fontSize: 16,
+          color: colors.text,
+          paddingVertical: spacing.sm + 2,
+          maxHeight: 100,
+        },
+        sendBtn: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: colors.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: spacing.xs,
+        },
+        sendBtnDisabled: {
+          backgroundColor: colors.textQuaternary,
+        },
+        cancelSendBtn: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: colors.fillSecondary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: spacing.xs,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} />
 
       <View style={styles.header}>
         <TodayTicker expense={totalExpense} income={totalIncome} />
       </View>
 
-      {/* 对话区域 */}
       <FlatList
         ref={flatListRef}
         data={displayMessages}
@@ -263,12 +363,10 @@ export default function HomeScreen() {
         initialNumToRender={15}
       />
 
-      {/* 底部输入区域 */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.inputArea}
       >
-        {/* 快捷输入 */}
         <View style={styles.quickRow}>
           {QUICK_INPUTS.map((q) => (
             <TouchableOpacity
@@ -283,7 +381,6 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* 输入框 */}
         <View style={styles.inputRow}>
           <View style={styles.inputContainer}>
             <TextInput
@@ -330,93 +427,3 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  chatContent: {
-    paddingVertical: spacing.md,
-    paddingBottom: spacing.xl,
-  },
-  inputArea: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.bg,
-  },
-  quickRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
-  },
-  quickBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 1,
-    borderRadius: radius.full,
-    backgroundColor: colors.bgElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-  quickBtnText: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  inputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.xl,
-    paddingLeft: spacing.md + 4,
-    paddingRight: spacing.xs + 2,
-    paddingVertical: spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-  textInput: {
-    flex: 1,
-    ...typography.body,
-    fontSize: 16,
-    color: colors.text,
-    paddingVertical: spacing.sm + 2,
-    maxHeight: 100,
-  },
-  sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.xs,
-  },
-  sendBtnDisabled: {
-    backgroundColor: colors.textQuaternary,
-  },
-  cancelSendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.fillSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.xs,
-  },
-});

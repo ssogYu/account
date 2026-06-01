@@ -1,21 +1,30 @@
+import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
-import { colors, spacing, typography } from '@/theme';
+import { useTheme } from '@/theme';
+import { spacing, typography } from '@/theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function TabLayout() {
+  const { colors, resolvedScheme } = useTheme();
+
+  const tabBarStyle = useMemo(
+    () => ({
+      backgroundColor: colors.bgSecondary,
+      borderTopColor: colors.separator,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      height: 80,
+      paddingBottom: spacing.sm,
+      paddingTop: spacing.xs,
+    }),
+    [colors],
+  );
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.bgSecondary,
-          borderTopColor: colors.separator,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          height: 80,
-          paddingBottom: spacing.sm,
-          paddingTop: spacing.xs,
-        },
+        tabBarStyle,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {

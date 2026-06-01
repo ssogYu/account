@@ -64,24 +64,39 @@ MINIO_TEMP_DIR="${BACKUP_DIR}/.minio_temp_${TIMESTAMP}"
 if ! docker compose -f "${COMPOSE_FILE}" ps minio | grep -q "Up\|running"; then
     log_warn "MinIO 容器未运行，跳过文件备份"
 else
-    mkdir -p "${MINIO_TEMP_DIR}"
+    mkdir -p "${MINIO_TEMP_DIR}/account"
 
     log_info "正在复制 MinIO 数据到临时目录..."
-    docker compose -f "${COMPOSE_FILE}" cp minio:/data/account "${MINIO_TEMP_DIR}/" 2>&1 || {
-        EXIT_CODE=$?
-        log_error "MinIO 数据复制失败，docker cp 返回码: ${EXIT_CODE}"
-        rm -rf "${MINIO_TEMP_DIR}"
-        MINIO_BACKUP_FILE=""
-    }
-
-    if [ -d "${MINIO_TEMP_DIR}/account" ]; then
-        log_info "正在打包 MinIO 数据..."
-        tar czf "${MINIO_BACKUP_FILE}" -C "${MINIO_TEMP_DIR}" account 2>&1 || {
+    if docker compose -f "${COMPOSE_FILE}" exec -T minio ls /data/account >/dev/null 2>&1; then
+        docker compose -f "${COMPOSE_FILE}" cp minio:/data/account/. "${MINIO_TEMP_DIR}/account/" 2>&1 || {
             EXIT_CODE=$?
-            log_error "MinIO 打包失败，tar 返回码: ${EXIT_CODE}"
-            rm -f "${MINIO_BACKUP_FILE}"
+            log_error "MinIO 数据复制失败，docker cp 返回码: ${EXIT_CODE}"
+            rm -rf "${MINIO_TEMP_DIR}"
             MINIO_BACKUP_FILE=""
         }
+    else
+        log_info "MinIO 数据目录为空或不存在，跳过"
+        rm -rf "${MINIO_TEMP_DIR}"
+        MINIO_BACKUP_FILE=""
+    fi
+
+    if [ -n "${MINIO_BACKUP_FILE}" ] && [ -d "${MINIO_TEMP_DIR}/account" ]; then
+        FILE_COUNT=$(find "${MINIO_TEMP_DIR}/account" -type f 2>/dev/null | wc -l | tr -d ' ')
+        log_info "检测到 ${FILE_COUNT} 个文件，准备打包..."
+
+        if [ "${FILE_COUNT}" -gt 0 ]; then
+            log_info "正在打包 MinIO 数据..."
+            tar czf "${MINIO_BACKUP_FILE}" -C "${MINIO_TEMP_DIR}" account 2>&1 || {
+                EXIT_CODE=$?
+                log_error "MinIO 打包失败，tar 返回码: ${EXIT_CODE}"
+                rm -f "${MINIO_BACKUP_FILE}"
+                MINIO_BACKUP_FILE=""
+            }
+        else
+            log_warn "MinIO 数据目录为空，跳过打包"
+            rm -f "${MINIO_BACKUP_FILE}"
+            MINIO_BACKUP_FILE=""
+        fi
         rm -rf "${MINIO_TEMP_DIR}"
     fi
 fi

@@ -373,9 +373,14 @@ gunzip -c backups/postgres_20250101_020000.sql.gz | \
     psql -U accountAdmin -d account
 
 # 2. 恢复 MinIO（如需恢复文件存储）
-gunzip -c backups/minio_20250101_020000.tar.gz | \
-    docker compose -f deploy/docker-compose.prod.yml exec -T minio \
-    tar xzf - -C /data
+# 停止 MinIO 容器确保数据一致性
+docker compose -f deploy/docker-compose.prod.yml stop minio
+
+# 解压备份到 MinIO 数据目录
+gunzip -c backups/minio_20250101_020000.tar.gz | tar xzf - -C ./data
+
+# 重启 MinIO 容器
+docker compose -f deploy/docker-compose.prod.yml start minio
 ```
 
 ### SSL 证书续期

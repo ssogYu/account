@@ -1,35 +1,87 @@
 {
   "expo": {
     "name": "记账啦！宝儿",
-    "icon": "./assets/logo.png",
     "slug": "ai-account-book",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "aiaccount",
     "userInterfaceStyle": "automatic",
+
     "splash": {
-      "image": "./assets/logo.png",
+     "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./assets/splash.png",
+        "backgroundColor": "#1C1C1E"
+      }
     },
+
     "ios": {
       "bundleIdentifier": "com.aiaccount.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "拍照识别账单",
+        "NSPhotoLibraryUsageDescription": "从相册选择图片识别账单",
+        "NSFaceIDUsageDescription": "使用 Face ID 安全登录"
+      },
+      "icon": {
+        "backgroundColor": "#ffffff"
+      },
+      "buildNumber": "1"
     },
+
     "android": {
-      "package": "com.aiaccount.app"
+      "package": "com.aiaccount.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+      "foregroundImage": "./assets/splash.png",
+        "backgroundImage": "./assets/splash.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ]
     },
+
     "plugins": [
       "expo-router",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],
+
     "extra": {
-      "apiBaseUrl": "https://account.tankswift.top/api/v1"
+      "apiBaseUrl": "https://account.tankswift.top/api/v1",
+      "router": {},
+      "eas": {
+        "projectId": "f528165d-103b-4d3b-9368-f954df111b46"
+      }
     },
+
     "experiments": {
       "typedRoutes": true
+    },
+
+    "locales": {
+      "zh-Hans": {
+        "infoPlist": {
+          "CFBundleDisplayName": "记账啦"
+        }
+      }
     }
   }
 }

@@ -1,12 +1,13 @@
-import { useEffect, useRef, useMemo } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
-import { useTheme } from '@/theme';
-import { typography } from '@/theme';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { CategoryIcon } from '@/components/icons';
-import { ConfirmCard } from './ConfirmCard';
-import type { ChatMessage } from '../../services/chat/types';
-import type { ConfirmBillEdits } from './ConfirmCard';
+import { useEffect, useRef, useMemo } from "react";
+import { View, Text, Animated, StyleSheet } from "react-native";
+import { useTheme } from "@/theme";
+import { Image } from "expo-image";
+import { typography } from "@/theme";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { CategoryIcon } from "@/components/icons";
+import { ConfirmCard } from "./ConfirmCard";
+import type { ChatMessage } from "../../services/chat/types";
+import type { ConfirmBillEdits } from "./ConfirmCard";
 
 export function ChatBubble({
   message,
@@ -15,19 +16,28 @@ export function ChatBubble({
   onReject,
 }: {
   message: ChatMessage;
-  onConfirm: (messageId: string, billIndex: number, edits?: ConfirmBillEdits) => void;
-  onConfirmAll: (messageId: string, edits: Record<number, ConfirmBillEdits>) => void;
+  onConfirm: (
+    messageId: string,
+    billIndex: number,
+    edits?: ConfirmBillEdits,
+  ) => void;
+  onConfirmAll: (
+    messageId: string,
+    edits: Record<number, ConfirmBillEdits>,
+  ) => void;
   onReject: (messageId: string) => void;
 }) {
   const { colors } = useTheme();
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
   const meta = !isUser ? message.metadata : null;
 
-  const isConfirmCard = meta?.type === 'confirm_card';
-  const isConfirmed = meta?.type === 'confirmed' && !!message.billId;
-  const isRejected = meta?.type === 'rejected';
+  const isConfirmCard = meta?.type === "confirm_card";
+  const isConfirmed = meta?.type === "confirmed" && !!message.billId;
+  const isRejected = meta?.type === "rejected";
   const showConfirmCard =
-    (isConfirmCard || isConfirmed) && meta?.parseResults && meta.parseResults.length > 0;
+    (isConfirmCard || isConfirmed) &&
+    meta?.parseResults &&
+    meta.parseResults.length > 0;
 
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -53,27 +63,27 @@ export function ChatBubble({
     () =>
       StyleSheet.create({
         row: {
-          flexDirection: 'row',
-          alignItems: 'flex-start',
+          flexDirection: "row",
+          alignItems: "flex-start",
           marginBottom: 12,
           paddingHorizontal: 16,
         },
         rowUser: {
-          justifyContent: 'flex-end',
+          justifyContent: "flex-end",
         },
         avatar: {
           width: 28,
           height: 28,
           borderRadius: 14,
           backgroundColor: colors.accentSubtle,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           marginRight: 8,
           marginTop: 2,
-          position: 'relative',
+          position: "relative",
         },
         avatarGlow: {
-          position: 'absolute',
+          position: "absolute",
           top: -2,
           left: -2,
           right: -2,
@@ -83,7 +93,7 @@ export function ChatBubble({
           opacity: 0.08,
         },
         bubble: {
-          maxWidth: '80%',
+          maxWidth: "80%",
           borderRadius: 16,
           paddingHorizontal: 14,
           paddingVertical: 10,
@@ -104,17 +114,17 @@ export function ChatBubble({
           lineHeight: 20,
         },
         textUser: {
-          color: '#FFFFFF',
+          color: "#FFFFFF",
         },
         rejectedRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
           gap: 6,
         },
         rejectedItem: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 4,
         },
         rejectedText: {
@@ -131,15 +141,25 @@ export function ChatBubble({
 
   return (
     <Animated.View
-      style={[styles.row, isUser && styles.rowUser, { transform: [{ translateY }], opacity }]}
+      style={[
+        styles.row,
+        isUser && styles.rowUser,
+        { transform: [{ translateY }], opacity },
+      ]}
     >
       {!isUser && (
-        <View style={styles.avatar}>
-          <View style={styles.avatarGlow} />
-          <MaterialCommunityIcons name="robot-happy-outline" size={16} color={colors.accent} />
-        </View>
+        <Image
+          source={require("@/icon/icon.png")}
+          style={styles.avatar}
+          contentFit="contain"
+        />
       )}
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
+      <View
+        style={[
+          styles.bubble,
+          isUser ? styles.bubbleUser : styles.bubbleAssistant,
+        ]}
+      >
         {showConfirmCard ? (
           <ConfirmCard
             parseResults={meta!.parseResults!}
@@ -153,7 +173,11 @@ export function ChatBubble({
           <View style={styles.rejectedRow}>
             {meta.parseResults.map((pr, i) => (
               <View key={i} style={styles.rejectedItem}>
-                <CategoryIcon iconKey={pr.categoryIcon} size={12} color={colors.textTertiary} />
+                <CategoryIcon
+                  iconKey={pr.categoryIcon}
+                  size={12}
+                  color={colors.textTertiary}
+                />
                 <Text style={styles.rejectedText}>
                   {pr.categoryName} ¥{pr.amount.toFixed(2)}
                 </Text>
@@ -162,7 +186,9 @@ export function ChatBubble({
             <Text style={styles.rejectedLabel}>（已取消）</Text>
           </View>
         ) : (
-          <Text style={[styles.text, isUser && styles.textUser]}>{message.content}</Text>
+          <Text style={[styles.text, isUser && styles.textUser]}>
+            {message.content}
+          </Text>
         )}
       </View>
     </Animated.View>

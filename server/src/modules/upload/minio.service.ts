@@ -73,11 +73,6 @@ export class MinioService implements OnModuleInit {
 
   /** 生成可直接访问的 URL */
   getPublicUrl(objectName: string): string {
-    const protocol = this.config.useSSL ? 'https' : 'http';
-    const port =
-      this.config.port === 80 || this.config.port === 443
-        ? ''
-        : `:${this.config.port}`;
-    return `${protocol}://${this.config.endPoint}${port}/${this.bucket}/${objectName}`;
+    return `${this.config.publicUrlPrefix}/${this.bucket}/${objectName}`;
   }
 }

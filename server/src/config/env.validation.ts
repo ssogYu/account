@@ -33,8 +33,8 @@ const jwtConfigSchema = {
 const minioConfigSchema = {
   MINIO_ENDPOINT: Joi.string().trim().default('localhost'),
   MINIO_PORT: Joi.number().port().default(9000),
-  MINIO_ACCESS_KEY: Joi.string().trim().default('minioadmin'),
-  MINIO_SECRET_KEY: Joi.string().trim().default('minioadmin'),
+  MINIO_ROOT_USER: Joi.string().trim().default('minioadmin'),
+  MINIO_ROOT_PASSWORD: Joi.string().trim().default('minioadmin'),
   MINIO_USE_SSL: Joi.string().valid('true', 'false').default('false'),
   MINIO_BUCKET: Joi.string().trim().default('account'),
 };

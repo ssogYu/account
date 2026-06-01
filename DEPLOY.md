@@ -132,7 +132,7 @@ vim .env.production
 | `POSTGRES_PASSWORD`  | 数据库密码   | 自行设置强密码         |
 | `JWT_ACCESS_SECRET`  | JWT 签名密钥 | `openssl rand -hex 32` |
 | `JWT_REFRESH_SECRET` | JWT 刷新密钥 | `openssl rand -hex 32` |
-| `MINIO_SECRET_KEY`   | MinIO 密码   | 自行设置强密码         |
+| `MINIO_ROOT_PASSWORD` | MinIO 密码   | 自行设置强密码         |
 | `DEEPSEEK_API_KEY`   | LLM API Key  | 从 DeepSeek 平台获取   |
 
 > `APP_ORIGIN` 和域名已预填为 `https://account.tankswift.top`，无需修改。  

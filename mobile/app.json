@@ -26,7 +26,7 @@
       "expo-web-browser"
     ],
     "extra": {
-      "apiBaseUrl": "http://192.168.18.196:3000"
+      "apiBaseUrl": "https://account.tankswift.top/api/v1"
     },
     "experiments": {
       "typedRoutes": true

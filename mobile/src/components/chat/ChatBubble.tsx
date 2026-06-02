@@ -6,6 +6,7 @@ import { typography } from "@/theme";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { CategoryIcon } from "@/components/icons";
 import { ConfirmCard } from "./ConfirmCard";
+import { useAuthStore } from "@/stores/auth";
 import type { ChatMessage } from "../../services/chat/types";
 import type { ConfirmBillEdits } from "./ConfirmCard";
 
@@ -28,6 +29,7 @@ export function ChatBubble({
   onReject: (messageId: string) => void;
 }) {
   const { colors } = useTheme();
+  const userAvatar = useAuthStore((s) => s.user?.avatar);
   const isUser = message.role === "user";
   const meta = !isUser ? message.metadata : null;
 
@@ -101,6 +103,7 @@ export function ChatBubble({
         bubbleUser: {
           backgroundColor: colors.accent,
           borderBottomRightRadius: 4,
+          marginRight: 8,
         },
         bubbleAssistant: {
           backgroundColor: colors.bgElevated,
@@ -191,6 +194,20 @@ export function ChatBubble({
           </Text>
         )}
       </View>
+      {isUser &&
+        (userAvatar ? (
+          <Image
+            source={{ uri: userAvatar }}
+            style={styles.avatar}
+            contentFit="cover"
+          />
+        ) : (
+          <MaterialCommunityIcons
+            name="account-circle"
+            size={28}
+            color={colors.textSecondary}
+          />
+        ))}
     </Animated.View>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,20 +13,24 @@ import {
   Platform,
   ScrollView,
   Alert,
-} from 'react-native';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
-import { useCategoryStore } from '@/stores/category';
-import { CategoryIcon, ICON_OPTIONS } from '@/components/icons';
-import type { Category } from '@/services/category/types';
+} from "react-native";
+import { useTheme } from "@/theme";
+import { spacing, radius, typography, shadows } from "@/theme";
+import { useCategoryStore } from "@/stores/category";
+import { CategoryIcon, ICON_OPTIONS } from "@/components/icons";
+import type { Category } from "@/services/category/types";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface CategoryManageModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-export function CategoryManageModal({ visible, onClose }: CategoryManageModalProps) {
+export function CategoryManageModal({
+  visible,
+  onClose,
+}: CategoryManageModalProps) {
   const categories = useCategoryStore((s) => s.categories);
   const isLoading = useCategoryStore((s) => s.isLoading);
   const storeError = useCategoryStore((s) => s.error);
@@ -35,14 +39,15 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
   const updateCategory = useCategoryStore((s) => s.updateCategory);
   const deleteCategory = useCategoryStore((s) => s.deleteCategory);
   const clearError = useCategoryStore((s) => s.clearError);
+  const { colors } = useTheme();
 
-  const [tab, setTab] = useState<'expense' | 'income'>('expense');
+  const [tab, setTab] = useState<"expense" | "income">("expense");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // 新建/编辑表单
-  const [formName, setFormName] = useState('');
-  const [formIcon, setFormIcon] = useState('other_exp');
+  const [formName, setFormName] = useState("");
+  const [formIcon, setFormIcon] = useState("other_exp");
 
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(SCREEN_HEIGHT * 0.6)).current;
@@ -54,11 +59,20 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
   useEffect(() => {
     if (visible) {
       fetchCategories();
-      setTab('expense');
+      setTab("expense");
       resetForm();
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.spring(slideY, { toValue: 0, tension: 68, friction: 12, useNativeDriver: true }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideY, {
+          toValue: 0,
+          tension: 68,
+          friction: 12,
+          useNativeDriver: true,
+        }),
       ]).start();
     } else {
       opacity.setValue(0);
@@ -70,7 +84,11 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
     setShowAddForm(false);
     resetForm();
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
       Animated.timing(slideY, {
         toValue: SCREEN_HEIGHT * 0.6,
         duration: 180,
@@ -80,8 +98,8 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
   };
 
   const resetForm = () => {
-    setFormName('');
-    setFormIcon('other_exp');
+    setFormName("");
+    setFormIcon("other_exp");
     setEditingId(null);
     setShowAddForm(false);
     clearError();
@@ -89,8 +107,8 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
 
   const handleAdd = () => {
     setEditingId(null);
-    setFormName('');
-    setFormIcon('other_exp');
+    setFormName("");
+    setFormIcon("other_exp");
     setShowAddForm(true);
   };
 
@@ -102,11 +120,11 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
   };
 
   const handleDelete = (cat: Category) => {
-    Alert.alert('删除分类', `确定删除"${cat.name}"吗？删除后不可恢复。`, [
-      { text: '取消', style: 'cancel' },
+    Alert.alert("删除分类", `确定删除"${cat.name}"吗？删除后不可恢复。`, [
+      { text: "取消", style: "cancel" },
       {
-        text: '删除',
-        style: 'destructive',
+        text: "删除",
+        style: "destructive",
         onPress: async () => {
           try {
             await deleteCategory(cat.id);
@@ -136,15 +154,271 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
 
   const isFormValid = formName.trim().length > 0;
 
+  const s = useMemo(
+    () =>
+      StyleSheet.create({
+        backdrop: {
+          flex: 1,
+          justifyContent: "flex-end",
+        },
+        backdropTouch: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        },
+        sheet: {
+          backgroundColor: colors.bgSecondary,
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
+          maxHeight: SCREEN_HEIGHT * 0.85,
+          ...shadows.elevated,
+        },
+        handleArea: {
+          alignItems: "center",
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.xs,
+        },
+        handle: {
+          width: 36,
+          height: 5,
+          borderRadius: 2.5,
+          backgroundColor: colors.textSecondary,
+        },
+        header: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        },
+        headerTitle: {
+          ...typography.headline,
+          color: colors.text,
+        },
+        headerClose: {
+          ...typography.body,
+          color: colors.accent,
+        },
+        tabSwitch: {
+          flexDirection: "row",
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.md,
+          padding: 3,
+          marginHorizontal: spacing.lg,
+          marginBottom: spacing.md,
+        },
+        tabBtn: {
+          flex: 1,
+          paddingVertical: spacing.sm + 2,
+          alignItems: "center",
+          borderRadius: radius.sm,
+        },
+        tabBtnActive: {
+          backgroundColor: colors.accent,
+        },
+        tabBtnIncomeActive: {
+          backgroundColor: colors.success,
+        },
+        tabBtnText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+        },
+        tabBtnTextActive: {
+          color: "#FFFFFF",
+        },
+        tabBtnTextIncomeActive: {
+          color: "#FFFFFF",
+        },
+        content: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl + 20,
+        },
+        section: {
+          marginBottom: spacing.xl,
+        },
+        sectionHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: spacing.sm,
+        },
+        sectionTitle: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+          marginBottom: spacing.sm,
+        },
+        addBtn: {
+          paddingHorizontal: spacing.sm + 2,
+          paddingVertical: spacing.xs,
+          backgroundColor: colors.accentSubtle,
+          borderRadius: radius.xs,
+        },
+        addBtnText: {
+          ...typography.caption1,
+          color: colors.accent,
+          fontWeight: "600",
+        },
+        categoryGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: spacing.sm,
+        },
+        categoryItem: {
+          width: "30%",
+          alignItems: "center",
+          paddingVertical: spacing.sm + 2,
+          borderRadius: radius.md,
+          backgroundColor: colors.bgElevated,
+          position: "relative",
+        },
+        categoryIconWrap: {
+          marginBottom: 2,
+        },
+        categoryName: {
+          ...typography.caption1,
+          color: colors.text,
+          fontSize: 11,
+        },
+        systemBadge: {
+          position: "absolute",
+          top: 3,
+          right: 3,
+          paddingHorizontal: 4,
+          paddingVertical: 1,
+          backgroundColor: colors.fillTertiary,
+          borderRadius: 3,
+        },
+        systemBadgeText: {
+          fontSize: 8,
+          color: colors.textTertiary,
+          fontWeight: "600",
+        },
+        itemActions: {
+          flexDirection: "row",
+          gap: 2,
+          marginTop: 4,
+        },
+        editText: {
+          ...typography.caption2,
+          color: colors.accent,
+          fontWeight: "600",
+        },
+        deleteText: {
+          ...typography.caption2,
+          color: colors.error,
+          fontWeight: "600",
+        },
+        emptyText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+          textAlign: "center",
+          paddingVertical: spacing.lg,
+        },
+        form: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          padding: spacing.md,
+          marginTop: spacing.sm,
+        },
+        formTitle: {
+          ...typography.headline,
+          color: colors.text,
+          marginBottom: spacing.md,
+        },
+        formLabel: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+          marginBottom: spacing.sm,
+        },
+        iconGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: spacing.xs,
+          marginBottom: spacing.md,
+        },
+        iconOption: {
+          width: 36,
+          height: 36,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: radius.sm,
+          backgroundColor: colors.fillTertiary,
+        },
+        iconOptionActive: {
+          backgroundColor: colors.accentSubtle,
+          borderWidth: 1.5,
+          borderColor: colors.accent,
+        },
+        nameInput: {
+          ...typography.body,
+          color: colors.text,
+          backgroundColor: colors.fillTertiary,
+          borderRadius: radius.sm,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm + 2,
+          marginBottom: spacing.md,
+        },
+        formActions: {
+          flexDirection: "row",
+          gap: spacing.sm,
+        },
+        formCancelBtn: {
+          flex: 1,
+          paddingVertical: spacing.sm + 2,
+          alignItems: "center",
+          borderRadius: radius.sm,
+          backgroundColor: colors.fillTertiary,
+        },
+        formCancelText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+        },
+        formSaveBtn: {
+          flex: 2,
+          paddingVertical: spacing.sm + 2,
+          alignItems: "center",
+          borderRadius: radius.sm,
+          backgroundColor: colors.accent,
+        },
+        formSaveBtnDisabled: {
+          backgroundColor: colors.textQuaternary,
+        },
+        formSaveText: {
+          ...typography.footnote,
+          color: "#FFFFFF",
+          fontWeight: "600",
+        },
+        errorText: {
+          ...typography.footnote,
+          color: colors.error,
+          marginTop: spacing.sm,
+        },
+      }),
+    [colors],
+  );
+
   return (
-    <Modal visible={visible} animationType="none" transparent presentationStyle="overFullScreen">
+    <Modal
+      visible={visible}
+      animationType="none"
+      transparent
+      presentationStyle="overFullScreen"
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Animated.View style={[s.backdrop, { opacity }]}>
           <Pressable style={s.backdropTouch} onPress={handleClose} />
-          <Animated.View style={[s.sheet, { transform: [{ translateY: slideY }] }]}>
+          <Animated.View
+            style={[s.sheet, { transform: [{ translateY: slideY }] }]}
+          >
             <View style={s.handleArea}>
               <View style={s.handle} />
             </View>
@@ -163,24 +437,36 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
             {/* 类型切换 */}
             <View style={s.tabSwitch}>
               <TouchableOpacity
-                style={[s.tabBtn, tab === 'expense' && s.tabBtnActive]}
+                style={[s.tabBtn, tab === "expense" && s.tabBtnActive]}
                 onPress={() => {
-                  setTab('expense');
+                  setTab("expense");
                   resetForm();
                 }}
                 activeOpacity={0.6}
               >
-                <Text style={[s.tabBtnText, tab === 'expense' && s.tabBtnTextActive]}>支出</Text>
+                <Text
+                  style={[
+                    s.tabBtnText,
+                    tab === "expense" && s.tabBtnTextActive,
+                  ]}
+                >
+                  支出
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.tabBtn, tab === 'income' && s.tabBtnIncomeActive]}
+                style={[s.tabBtn, tab === "income" && s.tabBtnIncomeActive]}
                 onPress={() => {
-                  setTab('income');
+                  setTab("income");
                   resetForm();
                 }}
                 activeOpacity={0.6}
               >
-                <Text style={[s.tabBtnText, tab === 'income' && s.tabBtnTextIncomeActive]}>
+                <Text
+                  style={[
+                    s.tabBtnText,
+                    tab === "income" && s.tabBtnTextIncomeActive,
+                  ]}
+                >
                   收入
                 </Text>
               </TouchableOpacity>
@@ -198,7 +484,11 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
                   {systemCategories.map((cat) => (
                     <View key={cat.id} style={s.categoryItem}>
                       <View style={s.categoryIconWrap}>
-                        <CategoryIcon iconKey={cat.icon} size={22} color={colors.text} />
+                        <CategoryIcon
+                          iconKey={cat.icon}
+                          size={22}
+                          color={colors.text}
+                        />
                       </View>
                       <Text style={s.categoryName} numberOfLines={1}>
                         {cat.name}
@@ -215,7 +505,11 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
               <View style={s.section}>
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>自定义分类</Text>
-                  <TouchableOpacity style={s.addBtn} onPress={handleAdd} activeOpacity={0.6}>
+                  <TouchableOpacity
+                    style={s.addBtn}
+                    onPress={handleAdd}
+                    activeOpacity={0.6}
+                  >
                     <Text style={s.addBtnText}>+ 添加</Text>
                   </TouchableOpacity>
                 </View>
@@ -227,7 +521,11 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
                     {customCategories.map((cat) => (
                       <View key={cat.id} style={s.categoryItem}>
                         <View style={s.categoryIconWrap}>
-                          <CategoryIcon iconKey={cat.icon} size={22} color={colors.text} />
+                          <CategoryIcon
+                            iconKey={cat.icon}
+                            size={22}
+                            color={colors.text}
+                          />
                         </View>
                         <Text style={s.categoryName} numberOfLines={1}>
                           {cat.name}
@@ -254,7 +552,9 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
                 {/* 新建/编辑表单 */}
                 {showAddForm && (
                   <View style={s.form}>
-                    <Text style={s.formTitle}>{editingId ? '编辑分类' : '新建分类'}</Text>
+                    <Text style={s.formTitle}>
+                      {editingId ? "编辑分类" : "新建分类"}
+                    </Text>
 
                     {/* 图标选择 */}
                     <Text style={s.formLabel}>图标</Text>
@@ -262,14 +562,21 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
                       {ICON_OPTIONS.map((iconKey) => (
                         <TouchableOpacity
                           key={iconKey}
-                          style={[s.iconOption, formIcon === iconKey && s.iconOptionActive]}
+                          style={[
+                            s.iconOption,
+                            formIcon === iconKey && s.iconOptionActive,
+                          ]}
                           onPress={() => setFormIcon(iconKey)}
                           activeOpacity={0.6}
                         >
                           <CategoryIcon
                             iconKey={iconKey}
                             size={20}
-                            color={formIcon === iconKey ? colors.accent : colors.textSecondary}
+                            color={
+                              formIcon === iconKey
+                                ? colors.accent
+                                : colors.textSecondary
+                            }
                           />
                         </TouchableOpacity>
                       ))}
@@ -304,12 +611,16 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
                         disabled={!isFormValid || isLoading}
                         activeOpacity={0.6}
                       >
-                        <Text style={s.formSaveText}>{isLoading ? '保存中...' : '保存'}</Text>
+                        <Text style={s.formSaveText}>
+                          {isLoading ? "保存中..." : "保存"}
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
                     {/* 错误提示 */}
-                    {!!storeError && <Text style={s.errorText}>{storeError}</Text>}
+                    {!!storeError && (
+                      <Text style={s.errorText}>{storeError}</Text>
+                    )}
                   </View>
                 )}
               </View>
@@ -320,256 +631,3 @@ export function CategoryManageModal({ visible, onClose }: CategoryManageModalPro
     </Modal>
   );
 }
-
-const s = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdropTouch: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  sheet: {
-    backgroundColor: colors.bgSecondary,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    maxHeight: SCREEN_HEIGHT * 0.85,
-    ...shadows.elevated,
-  },
-  handleArea: {
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  handle: {
-    width: 36,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.textSecondary,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  headerTitle: {
-    ...typography.headline,
-    color: colors.text,
-  },
-  headerClose: {
-    ...typography.body,
-    color: colors.accent,
-  },
-
-  // ── Tab 切换 ──
-  tabSwitch: {
-    flexDirection: 'row',
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    padding: 3,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-  },
-  tabBtnActive: {
-    backgroundColor: colors.accent,
-  },
-  tabBtnIncomeActive: {
-    backgroundColor: colors.success,
-  },
-  tabBtnText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  tabBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  tabBtnTextIncomeActive: {
-    color: '#FFFFFF',
-  },
-
-  // ── 内容 ──
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl + 20,
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-  },
-  addBtn: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.accentSubtle,
-    borderRadius: radius.xs,
-  },
-  addBtnText: {
-    ...typography.caption1,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-
-  // ── 分类网格 ──
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  categoryItem: {
-    width: '30%',
-    alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-    position: 'relative',
-  },
-  categoryIconWrap: {
-    marginBottom: 2,
-  },
-  categoryName: {
-    ...typography.caption1,
-    color: colors.text,
-    fontSize: 11,
-  },
-  systemBadge: {
-    position: 'absolute',
-    top: 3,
-    right: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    backgroundColor: colors.fillTertiary,
-    borderRadius: 3,
-  },
-  systemBadgeText: {
-    fontSize: 8,
-    color: colors.textTertiary,
-    fontWeight: '600',
-  },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 2,
-    marginTop: 4,
-  },
-  editText: {
-    ...typography.caption2,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  deleteText: {
-    ...typography.caption2,
-    color: colors.error,
-    fontWeight: '600',
-  },
-  emptyText: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-  },
-
-  // ── 新建/编辑表单 ──
-  form: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  formTitle: {
-    ...typography.headline,
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  formLabel: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-  },
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  iconOption: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.fillTertiary,
-  },
-  iconOptionActive: {
-    backgroundColor: colors.accentSubtle,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-  },
-  nameInput: {
-    ...typography.body,
-    color: colors.text,
-    backgroundColor: colors.fillTertiary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    marginBottom: spacing.md,
-  },
-  formActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  formCancelBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.fillTertiary,
-  },
-  formCancelText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  formSaveBtn: {
-    flex: 2,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.accent,
-  },
-  formSaveBtnDisabled: {
-    backgroundColor: colors.textQuaternary,
-  },
-  formSaveText: {
-    ...typography.footnote,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  errorText: {
-    ...typography.footnote,
-    color: colors.error,
-    marginTop: spacing.sm,
-  },
-});

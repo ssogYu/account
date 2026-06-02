@@ -1,31 +1,39 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
-import { Link } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Input, Button } from '@/components/ui';
-import { useAuthStore } from '@/stores/auth';
-import { AppError } from '@/services/api';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  Image,
+} from "react-native";
+import { Link } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Input, Button } from "@/components/ui";
+import { useAuthStore } from "@/stores/auth";
+import { AppError } from "@/services/api";
+import { colors, spacing, radius, typography, shadows } from "@/theme";
 
 export default function LoginScreen() {
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [serverError, setServerError] = useState('');
+  const [serverError, setServerError] = useState("");
   const { login, isLoading } = useAuthStore();
 
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!phone.trim()) errors.phone = '请输入手机号';
-    if (!password) errors.password = '请输入密码';
+    if (!phone.trim()) errors.phone = "请输入手机号";
+    if (!password) errors.password = "请输入密码";
 
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleLogin = async () => {
-    setServerError('');
+    setServerError("");
     if (!validate()) return;
 
     try {
@@ -34,7 +42,8 @@ export default function LoginScreen() {
         password,
       });
     } catch (err) {
-      const message = err instanceof AppError ? err.message : '登录失败，请稍后重试';
+      const message =
+        err instanceof AppError ? err.message : "登录失败，请稍后重试";
       setServerError(message);
     }
   };
@@ -43,13 +52,16 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.inner}
       >
         {/* 品牌区域 - 大量留白，Apple式呼吸感 */}
         <View style={styles.brand}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoGlyph}>A</Text>
+            <Image
+              source={require("@/icon/icon.png")}
+              style={styles.logoImage}
+            />
           </View>
           <Text style={styles.appName}>AI 记账</Text>
           <Text style={styles.tagline}>智能记账，轻松生活</Text>
@@ -109,7 +121,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   brand: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: spacing.xxxl,
     paddingBottom: spacing.xxl,
   },
@@ -118,17 +130,16 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: radius.xl,
     backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.xl,
     ...shadows.elevated,
   },
 
-  logoGlyph: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: -1,
+  logoImage: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
   },
   appName: {
     ...typography.largeTitle,
@@ -146,7 +157,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   errorBanner: {
-    backgroundColor: 'rgba(255, 69, 58, 0.12)',
+    backgroundColor: "rgba(255, 69, 58, 0.12)",
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -154,12 +165,12 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.footnote,
     color: colors.error,
-    textAlign: 'center',
+    textAlign: "center",
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 'auto',
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: "auto",
     paddingBottom: spacing.lg,
     gap: spacing.xs,
   },
@@ -170,6 +181,6 @@ const styles = StyleSheet.create({
   footerLink: {
     ...typography.footnote,
     color: colors.accent,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

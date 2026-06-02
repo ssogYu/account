@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { useTheme } from '@/theme';
+import { spacing, radius, typography, shadows } from '@/theme';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCategoryStore } from '@/stores/category';
@@ -33,7 +34,6 @@ interface AddBillModalProps {
     account?: string;
     date?: string;
   }) => Promise<unknown>;
-  /** 传入已有账单进入编辑模式 */
   billToEdit?: {
     id: string;
     type: 'expense' | 'income';
@@ -46,6 +46,7 @@ interface AddBillModalProps {
 }
 
 export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBillModalProps) {
+  const { colors } = useTheme();
   const categories = useCategoryStore((s) => s.categories);
   const fetchCategories = useCategoryStore((s) => s.fetchCategories);
   const accounts = useAccountStore((s) => s.accounts);
@@ -68,7 +69,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
       fetchCategories();
       fetchAccounts();
       if (billToEdit) {
-        // 编辑模式：预填充数据
         setBillType(billToEdit.type);
         setAmount(String(billToEdit.amount));
         setSelectedCategoryId(billToEdit.categoryId);
@@ -132,6 +132,169 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
 
   const canSubmit = parseFloat(amount) > 0 && selectedCategoryId;
 
+  const s = useMemo(
+    () =>
+      StyleSheet.create({
+        backdrop: {
+          flex: 1,
+          justifyContent: 'flex-end',
+        },
+        backdropTouch: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        },
+        sheet: {
+          backgroundColor: colors.bgSecondary,
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
+          maxHeight: SCREEN_HEIGHT * 0.85,
+          ...shadows.elevated,
+        },
+        handleArea: {
+          alignItems: 'center',
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.xs,
+        },
+        handle: {
+          width: 36,
+          height: 5,
+          borderRadius: 2.5,
+          backgroundColor: colors.textSecondary,
+        },
+        header: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        },
+        headerTitle: {
+          ...typography.headline,
+          color: colors.text,
+        },
+        headerClose: {
+          ...typography.body,
+          color: colors.textSecondary,
+        },
+        content: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl + 20,
+        },
+        typeSwitch: {
+          flexDirection: 'row',
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.md,
+          padding: 3,
+          marginBottom: spacing.lg,
+        },
+        typeBtn: {
+          flex: 1,
+          paddingVertical: spacing.sm + 2,
+          alignItems: 'center',
+          borderRadius: radius.sm,
+        },
+        typeBtnActive: {
+          backgroundColor: colors.accent,
+        },
+        typeBtnIncomeActive: {
+          backgroundColor: colors.success,
+        },
+        typeBtnText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: '600',
+        },
+        typeBtnTextActive: {
+          color: '#FFFFFF',
+        },
+        typeBtnTextIncomeActive: {
+          color: '#FFFFFF',
+        },
+        amountSection: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.md,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          marginBottom: spacing.lg,
+        },
+        amountPrefix: {
+          ...typography.title1,
+          color: colors.textSecondary,
+          marginRight: spacing.sm,
+        },
+        amountInput: {
+          flex: 1,
+          ...typography.title1,
+          color: colors.text,
+          padding: 0,
+        },
+        fieldSection: {
+          marginBottom: spacing.lg,
+        },
+        fieldLabel: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          marginBottom: spacing.sm,
+          fontWeight: '600',
+        },
+        categoryGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: spacing.sm,
+        },
+        categoryItem: {
+          width: '23%',
+          alignItems: 'center',
+          paddingVertical: spacing.sm,
+          borderRadius: radius.md,
+          backgroundColor: colors.bgElevated,
+        },
+        categoryItemActive: {
+          backgroundColor: colors.accentSubtle,
+          borderWidth: 1,
+          borderColor: colors.accent,
+        },
+        categoryName: {
+          ...typography.caption1,
+          color: colors.textSecondary,
+        },
+        categoryNameActive: {
+          color: colors.accent,
+          fontWeight: '600',
+        },
+        accountRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: spacing.sm,
+        },
+        accountItem: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm - 2,
+          borderRadius: radius.xs,
+          backgroundColor: colors.bgElevated,
+        },
+        accountItemActive: {
+          backgroundColor: colors.accentSubtle,
+          borderWidth: 1,
+          borderColor: colors.accent,
+        },
+        accountText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+        },
+        accountTextActive: {
+          color: colors.accent,
+          fontWeight: '600',
+        },
+      }),
+    [colors],
+  );
+
   return (
     <Modal visible={visible} animationType="none" transparent presentationStyle="overFullScreen">
       <KeyboardAvoidingView
@@ -160,7 +323,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* 类型切换 */}
               <View style={s.typeSwitch}>
                 <TouchableOpacity
                   style={[s.typeBtn, billType === 'expense' && s.typeBtnActive]}
@@ -182,7 +344,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
                 </TouchableOpacity>
               </View>
 
-              {/* 金额 */}
               <View style={s.amountSection}>
                 <Text style={s.amountPrefix}>¥</Text>
                 <TextInput
@@ -196,7 +357,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
                 />
               </View>
 
-              {/* 分类 */}
               <View style={s.fieldSection}>
                 <Text style={s.fieldLabel}>分类</Text>
                 <View style={s.categoryGrid}>
@@ -228,7 +388,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
                 </View>
               </View>
 
-              {/* 账户 */}
               {billType === 'expense' && (
                 <View style={s.fieldSection}>
                   <Text style={s.fieldLabel}>账户</Text>
@@ -249,7 +408,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
                 </View>
               )}
 
-              {/* 备注 */}
               <View style={s.fieldSection}>
                 <Input
                   label="备注"
@@ -260,7 +418,6 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
                 />
               </View>
 
-              {/* 保存按钮 */}
               <Button
                 title={isSaving ? '保存中...' : '保存'}
                 onPress={handleSubmit}
@@ -275,166 +432,3 @@ export function AddBillModal({ visible, onClose, onSubmit, billToEdit }: AddBill
     </Modal>
   );
 }
-
-const s = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdropTouch: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  sheet: {
-    backgroundColor: colors.bgSecondary,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    maxHeight: SCREEN_HEIGHT * 0.85,
-    ...shadows.elevated,
-  },
-  handleArea: {
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  handle: {
-    width: 36,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.textSecondary,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  headerTitle: {
-    ...typography.headline,
-    color: colors.text,
-  },
-  headerClose: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl + 20,
-  },
-
-  typeSwitch: {
-    flexDirection: 'row',
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    padding: 3,
-    marginBottom: spacing.lg,
-  },
-  typeBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-  },
-  typeBtnActive: {
-    backgroundColor: colors.accent,
-  },
-  typeBtnIncomeActive: {
-    backgroundColor: colors.success,
-  },
-  typeBtnText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  typeBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  typeBtnTextIncomeActive: {
-    color: '#FFFFFF',
-  },
-
-  amountSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  amountPrefix: {
-    ...typography.title1,
-    color: colors.textSecondary,
-    marginRight: spacing.sm,
-  },
-  amountInput: {
-    flex: 1,
-    ...typography.title1,
-    color: colors.text,
-    padding: 0,
-  },
-
-  fieldSection: {
-    marginBottom: spacing.lg,
-  },
-  fieldLabel: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    fontWeight: '600',
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  categoryItem: {
-    width: '23%',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-  },
-  categoryItemActive: {
-    backgroundColor: colors.accentSubtle,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  categoryName: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-  },
-  categoryNameActive: {
-    color: colors.accent,
-    fontWeight: '600',
-  },
-
-  accountRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  accountItem: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-    borderRadius: radius.xs,
-    backgroundColor: colors.bgElevated,
-  },
-  accountItemActive: {
-    backgroundColor: colors.accentSubtle,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  accountText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-  },
-  accountTextActive: {
-    color: colors.accent,
-    fontWeight: '600',
-  },
-});

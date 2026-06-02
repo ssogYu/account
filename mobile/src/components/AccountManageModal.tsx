@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,20 +13,24 @@ import {
   Platform,
   ScrollView,
   Alert,
-} from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
-import { useAccountStore } from '@/stores/account';
-import type { Account } from '@/services/account/types';
+} from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useTheme } from "@/theme";
+import { spacing, radius, typography, shadows } from "@/theme";
+import { useAccountStore } from "@/stores/account";
+import type { Account } from "@/services/account/types";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface AccountManageModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-export function AccountManageModal({ visible, onClose }: AccountManageModalProps) {
+export function AccountManageModal({
+  visible,
+  onClose,
+}: AccountManageModalProps) {
   const accounts = useAccountStore((s) => s.accounts);
   const isLoading = useAccountStore((s) => s.isLoading);
   const storeError = useAccountStore((s) => s.error);
@@ -35,10 +39,11 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
   const updateAccount = useAccountStore((s) => s.updateAccount);
   const deleteAccount = useAccountStore((s) => s.deleteAccount);
   const clearError = useAccountStore((s) => s.clearError);
+  const { colors } = useTheme();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formName, setFormName] = useState('');
+  const [formName, setFormName] = useState("");
 
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(SCREEN_HEIGHT * 0.6)).current;
@@ -51,8 +56,17 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
       fetchAccounts();
       resetForm();
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.spring(slideY, { toValue: 0, tension: 68, friction: 12, useNativeDriver: true }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideY, {
+          toValue: 0,
+          tension: 68,
+          friction: 12,
+          useNativeDriver: true,
+        }),
       ]).start();
     } else {
       opacity.setValue(0);
@@ -64,7 +78,11 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
     setShowAddForm(false);
     resetForm();
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
       Animated.timing(slideY, {
         toValue: SCREEN_HEIGHT * 0.6,
         duration: 180,
@@ -74,7 +92,7 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
   };
 
   const resetForm = () => {
-    setFormName('');
+    setFormName("");
     setEditingId(null);
     setShowAddForm(false);
     clearError();
@@ -82,7 +100,7 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
 
   const handleAdd = () => {
     setEditingId(null);
-    setFormName('');
+    setFormName("");
     setShowAddForm(true);
   };
 
@@ -93,11 +111,11 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
   };
 
   const handleDelete = (acc: Account) => {
-    Alert.alert('删除账户', `确定删除"${acc.name}"吗？`, [
-      { text: '取消', style: 'cancel' },
+    Alert.alert("删除账户", `确定删除"${acc.name}"吗？`, [
+      { text: "取消", style: "cancel" },
       {
-        text: '删除',
-        style: 'destructive',
+        text: "删除",
+        style: "destructive",
         onPress: async () => {
           try {
             await deleteAccount(acc.id);
@@ -125,17 +143,255 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
     }
   };
 
+  const s = useMemo(
+    () =>
+      StyleSheet.create({
+        backdrop: {
+          flex: 1,
+          justifyContent: "flex-end",
+        },
+        backdropTouch: {
+          ...StyleSheet.absoluteFillObject,
+        },
+        sheet: {
+          backgroundColor: colors.bgSecondary,
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
+          maxHeight: SCREEN_HEIGHT * 0.85,
+          ...shadows.elevated,
+        },
+        handleArea: {
+          alignItems: "center",
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.xs,
+        },
+        handle: {
+          width: 36,
+          height: 5,
+          borderRadius: 2.5,
+          backgroundColor: colors.textSecondary,
+        },
+        header: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        },
+        headerTitle: {
+          ...typography.headline,
+          color: colors.text,
+        },
+        headerClose: {
+          ...typography.body,
+          color: colors.accent,
+        },
+        content: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl + 20,
+        },
+        section: {
+          marginBottom: spacing.xl,
+        },
+        sectionHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: spacing.sm,
+        },
+        sectionTitle: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+          marginBottom: spacing.sm,
+        },
+        addBtn: {
+          paddingHorizontal: spacing.sm + 2,
+          paddingVertical: spacing.xs,
+          backgroundColor: colors.accentSubtle,
+          borderRadius: radius.xs,
+        },
+        addBtnText: {
+          ...typography.caption1,
+          color: colors.accent,
+          fontWeight: "600",
+        },
+        accountList: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          overflow: "hidden",
+        },
+        accountRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+        },
+        accountRowBorder: {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator,
+        },
+        accountIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: radius.sm,
+          backgroundColor: colors.fillSecondary,
+          alignItems: "center",
+          justifyContent: "center",
+          marginRight: spacing.md,
+        },
+        accountIconChar: {
+          ...typography.headline,
+          color: colors.text,
+          fontSize: 14,
+        },
+        accountName: {
+          ...typography.body,
+          color: colors.text,
+          flex: 1,
+        },
+        systemBadge: {
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 2,
+          backgroundColor: colors.fillTertiary,
+          borderRadius: radius.xs,
+          marginRight: spacing.sm,
+        },
+        systemBadgeText: {
+          ...typography.caption2,
+          color: colors.textTertiary,
+        },
+        itemActions: {
+          flexDirection: "row",
+          gap: spacing.sm,
+        },
+        editText: {
+          ...typography.footnote,
+          color: colors.accent,
+          fontWeight: "600",
+        },
+        deleteText: {
+          ...typography.footnote,
+          color: colors.error,
+          fontWeight: "600",
+        },
+        emptyText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+          textAlign: "center",
+          paddingVertical: spacing.xl,
+        },
+        tagList: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: spacing.sm,
+        },
+        tag: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm - 2,
+          borderRadius: radius.md,
+          backgroundColor: colors.fillTertiary,
+        },
+        tagEditable: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.xs,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm - 2,
+          borderRadius: radius.md,
+          backgroundColor: colors.bgElevated,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        tagText: {
+          ...typography.footnote,
+          color: colors.text,
+          fontWeight: "500",
+        },
+        form: {
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          padding: spacing.md,
+          marginTop: spacing.sm,
+        },
+        formTitle: {
+          ...typography.headline,
+          color: colors.text,
+          marginBottom: spacing.md,
+        },
+        formLabel: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+          marginBottom: spacing.sm,
+        },
+        nameInput: {
+          ...typography.body,
+          color: colors.text,
+          backgroundColor: colors.fillTertiary,
+          borderRadius: radius.sm,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm + 2,
+          marginBottom: spacing.md,
+        },
+        formActions: {
+          flexDirection: "row",
+          gap: spacing.sm,
+        },
+        formCancelBtn: {
+          flex: 1,
+          paddingVertical: spacing.sm + 2,
+          alignItems: "center",
+          borderRadius: radius.sm,
+          backgroundColor: colors.fillTertiary,
+        },
+        formCancelText: {
+          ...typography.footnote,
+          color: colors.textSecondary,
+          fontWeight: "600",
+        },
+        formSaveBtn: {
+          flex: 2,
+          paddingVertical: spacing.sm + 2,
+          alignItems: "center",
+          borderRadius: radius.sm,
+          backgroundColor: colors.accent,
+        },
+        formSaveBtnDisabled: {
+          backgroundColor: colors.textQuaternary,
+        },
+        formSaveText: {
+          ...typography.footnote,
+          color: "#FFFFFF",
+          fontWeight: "600",
+        },
+        errorText: {
+          ...typography.footnote,
+          color: colors.error,
+          marginTop: spacing.sm,
+        },
+      }),
+    [colors],
+  );
+
   const isFormValid = formName.trim().length > 0;
 
   return (
-    <Modal visible={visible} animationType="none" transparent presentationStyle="overFullScreen">
+    <Modal
+      visible={visible}
+      animationType="none"
+      transparent
+      presentationStyle="overFullScreen"
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Animated.View style={[s.backdrop, { opacity }]}>
           <Pressable style={s.backdropTouch} onPress={handleClose} />
-          <Animated.View style={[s.sheet, { transform: [{ translateY: slideY }] }]}>
+          <Animated.View
+            style={[s.sheet, { transform: [{ translateY: slideY }] }]}
+          >
             <View style={s.handleArea}>
               <View style={s.handle} />
             </View>
@@ -169,7 +425,11 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
               <View style={s.section}>
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>自定义账户</Text>
-                  <TouchableOpacity style={s.addBtn} onPress={handleAdd} activeOpacity={0.6}>
+                  <TouchableOpacity
+                    style={s.addBtn}
+                    onPress={handleAdd}
+                    activeOpacity={0.6}
+                  >
                     <Text style={s.addBtnText}>+ 添加</Text>
                   </TouchableOpacity>
                 </View>
@@ -208,7 +468,9 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
 
                 {showAddForm && (
                   <View style={s.form}>
-                    <Text style={s.formTitle}>{editingId ? '编辑账户' : '新建账户'}</Text>
+                    <Text style={s.formTitle}>
+                      {editingId ? "编辑账户" : "新建账户"}
+                    </Text>
 
                     <Text style={s.formLabel}>名称</Text>
                     <TextInput
@@ -237,11 +499,15 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
                         disabled={!isFormValid || isLoading}
                         activeOpacity={0.6}
                       >
-                        <Text style={s.formSaveText}>{isLoading ? '保存中...' : '保存'}</Text>
+                        <Text style={s.formSaveText}>
+                          {isLoading ? "保存中..." : "保存"}
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
-                    {!!storeError && <Text style={s.errorText}>{storeError}</Text>}
+                    {!!storeError && (
+                      <Text style={s.errorText}>{storeError}</Text>
+                    )}
                   </View>
                 )}
               </View>
@@ -252,178 +518,3 @@ export function AccountManageModal({ visible, onClose }: AccountManageModalProps
     </Modal>
   );
 }
-
-const s = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdropTouch: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  sheet: {
-    backgroundColor: colors.bgSecondary,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    maxHeight: SCREEN_HEIGHT * 0.75,
-    ...shadows.elevated,
-  },
-  handleArea: {
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  handle: {
-    width: 36,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.textSecondary,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  headerTitle: {
-    ...typography.headline,
-    color: colors.text,
-  },
-  headerClose: {
-    ...typography.body,
-    color: colors.accent,
-  },
-
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl + 40,
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-  },
-  addBtn: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.accentSubtle,
-    borderRadius: radius.xs,
-  },
-  addBtnText: {
-    ...typography.caption1,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-
-  tagList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  tag: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-    borderRadius: radius.md,
-    backgroundColor: colors.fillTertiary,
-  },
-  tagEditable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-  tagText: {
-    ...typography.footnote,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  emptyText: {
-    ...typography.footnote,
-    color: colors.textTertiary,
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-  },
-
-  form: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  formTitle: {
-    ...typography.headline,
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  formLabel: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-  },
-  nameInput: {
-    ...typography.body,
-    color: colors.text,
-    backgroundColor: colors.fillTertiary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    marginBottom: spacing.md,
-  },
-  formActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  formCancelBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.fillTertiary,
-  },
-  formCancelText: {
-    ...typography.footnote,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  formSaveBtn: {
-    flex: 2,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.accent,
-  },
-  formSaveBtnDisabled: {
-    backgroundColor: colors.textQuaternary,
-  },
-  formSaveText: {
-    ...typography.footnote,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  errorText: {
-    ...typography.footnote,
-    color: colors.error,
-    marginTop: spacing.sm,
-  },
-});

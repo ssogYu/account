@@ -125,12 +125,28 @@ export class BillService {
     return { success: true };
   }
 
-  /** 获取月度收支汇总 */
-  async getSummary(userId: string, month?: string, filterUserId?: string) {
-    const targetMonth = month ?? this.getCurrentMonth();
-    const [year, m] = targetMonth.split('-').map(Number);
-    const start = new Date(year, m - 1, 1);
-    const end = new Date(year, m, 1);
+  /** 获取收支汇总（支持按月或按日） */
+  async getSummary(
+    userId: string,
+    month?: string,
+    date?: string,
+    filterUserId?: string,
+  ) {
+    let start: Date;
+    let end: Date;
+
+    if (date) {
+      // 按日查询
+      start = this.parseLocalDate(date);
+      end = new Date(start);
+      end.setDate(end.getDate() + 1);
+    } else {
+      // 按月查询
+      const targetMonth = month ?? this.getCurrentMonth();
+      const [year, m] = targetMonth.split('-').map(Number);
+      start = new Date(year, m - 1, 1);
+      end = new Date(year, m, 1);
+    }
 
     const { totalExpense, totalIncome, balance } = await this.aggregateSummary(
       userId,
@@ -139,7 +155,12 @@ export class BillService {
       filterUserId,
     );
 
-    return { month: targetMonth, totalExpense, totalIncome, balance };
+    return {
+      month: date ?? month ?? this.getCurrentMonth(),
+      totalExpense,
+      totalIncome,
+      balance,
+    };
   }
 
   /** 获取今日收支汇总 */
@@ -152,17 +173,32 @@ export class BillService {
     return this.aggregateSummary(userId, start, end);
   }
 
-  /** 获取分类汇总统计 */
+  /** 获取分类汇总统计（支持按月或按日） */
   async getCategoryStats(
     userId: string,
     month?: string,
+    date?: string,
     type?: string,
     filterUserId?: string,
   ) {
-    const targetMonth = month ?? this.getCurrentMonth();
-    const [year, m] = targetMonth.split('-').map(Number);
-    const start = new Date(year, m - 1, 1);
-    const end = new Date(year, m, 1);
+    let start: Date;
+    let end: Date;
+    let label: string;
+
+    if (date) {
+      // 按日查询
+      start = this.parseLocalDate(date);
+      end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      label = date;
+    } else {
+      // 按月查询
+      const targetMonth = month ?? this.getCurrentMonth();
+      const [year, m] = targetMonth.split('-').map(Number);
+      start = new Date(year, m - 1, 1);
+      end = new Date(year, m, 1);
+      label = targetMonth;
+    }
 
     const membership = await this.prisma.familyMember.findFirst({
       where: { userId },
@@ -219,7 +255,7 @@ export class BillService {
     const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 
     return {
-      month: targetMonth,
+      month: label,
       type: type ?? 'all',
       totalAmount,
       items: items.map((item) => ({

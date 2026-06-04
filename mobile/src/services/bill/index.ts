@@ -1,5 +1,5 @@
-import api from '../api';
-import type { ApiResponse } from '../../shared';
+import api from "../api";
+import type { ApiResponse } from "../../shared";
 import type {
   Bill,
   BillListResult,
@@ -8,17 +8,23 @@ import type {
   CreateBillParams,
   UpdateBillParams,
   QueryBillParams,
-} from './types';
-import type { CategoryStats, DailyStats, MonthlyComparison } from './stats.types';
+} from "./types";
+import type {
+  CategoryStats,
+  DailyStats,
+  MonthlyComparison,
+} from "./stats.types";
 
 export const billService = {
   async create(params: CreateBillParams): Promise<Bill> {
-    const { data } = await api.post<ApiResponse<Bill>>('/bill', params);
+    const { data } = await api.post<ApiResponse<Bill>>("/bill", params);
     return data.data;
   },
 
   async findMany(params?: QueryBillParams): Promise<BillListResult> {
-    const { data } = await api.get<ApiResponse<BillListResult>>('/bill', { params });
+    const { data } = await api.get<ApiResponse<BillListResult>>("/bill", {
+      params,
+    });
     return data.data;
   },
 
@@ -36,40 +42,66 @@ export const billService = {
     await api.delete(`/bill/${id}`);
   },
 
-  async getSummary(month?: string, userId?: string): Promise<BillSummary> {
-    const { data } = await api.get<ApiResponse<BillSummary>>('/bill/summary', {
-      params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
-    });
-    return data.data;
-  },
-
-  async getTodaySummary(): Promise<TodaySummary> {
-    const { data } = await api.get<ApiResponse<TodaySummary>>('/bill/today');
-    return data.data;
-  },
-
-  async getCategoryStats(month?: string, type?: string, userId?: string): Promise<CategoryStats> {
-    const { data } = await api.get<ApiResponse<CategoryStats>>('/bill/stats/category', {
+  async getSummary(
+    month?: string,
+    date?: string,
+    userId?: string,
+  ): Promise<BillSummary> {
+    const { data } = await api.get<ApiResponse<BillSummary>>("/bill/summary", {
       params: {
         ...(month ? { month } : {}),
-        ...(type ? { type } : {}),
+        ...(date ? { date } : {}),
         ...(userId ? { userId } : {}),
       },
     });
     return data.data;
   },
 
-  async getDailyStats(month?: string, userId?: string): Promise<DailyStats> {
-    const { data } = await api.get<ApiResponse<DailyStats>>('/bill/stats/daily', {
-      params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
-    });
+  async getTodaySummary(): Promise<TodaySummary> {
+    const { data } = await api.get<ApiResponse<TodaySummary>>("/bill/today");
     return data.data;
   },
 
-  async getMonthlyComparison(month?: string, userId?: string): Promise<MonthlyComparison> {
-    const { data } = await api.get<ApiResponse<MonthlyComparison>>('/bill/stats/comparison', {
-      params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
-    });
+  async getCategoryStats(
+    month?: string,
+    date?: string,
+    type?: string,
+    userId?: string,
+  ): Promise<CategoryStats> {
+    const { data } = await api.get<ApiResponse<CategoryStats>>(
+      "/bill/stats/category",
+      {
+        params: {
+          ...(month ? { month } : {}),
+          ...(date ? { date } : {}),
+          ...(type ? { type } : {}),
+          ...(userId ? { userId } : {}),
+        },
+      },
+    );
+    return data.data;
+  },
+
+  async getDailyStats(month?: string, userId?: string): Promise<DailyStats> {
+    const { data } = await api.get<ApiResponse<DailyStats>>(
+      "/bill/stats/daily",
+      {
+        params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
+      },
+    );
+    return data.data;
+  },
+
+  async getMonthlyComparison(
+    month?: string,
+    userId?: string,
+  ): Promise<MonthlyComparison> {
+    const { data } = await api.get<ApiResponse<MonthlyComparison>>(
+      "/bill/stats/comparison",
+      {
+        params: { ...(month ? { month } : {}), ...(userId ? { userId } : {}) },
+      },
+    );
     return data.data;
   },
 };

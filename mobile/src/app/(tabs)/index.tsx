@@ -182,10 +182,11 @@ export default function HomeScreen() {
     const msgs = messages.length > 0 ? messages : WELCOME_MESSAGES;
     let lastDate = "";
     for (const msg of msgs) {
-      const msgDate = new Date(msg.createdAt).toDateString();
-      if (msgDate !== lastDate) {
+      // 直接解析 ISO 字符串避免 UTC 时区偏移
+      const datePart = msg.createdAt.split("T")[0]!;
+      if (datePart !== lastDate) {
         list.push({ type: "date", date: msg.createdAt });
-        lastDate = msgDate;
+        lastDate = datePart;
       }
       list.push({ type: "message", data: msg });
     }
@@ -288,7 +289,7 @@ export default function HomeScreen() {
         header: {
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.sm,
           borderBottomWidth: StyleSheet.hairlineWidth,
@@ -380,6 +381,13 @@ export default function HomeScreen() {
 
       <View style={styles.header}>
         <TodayTicker expense={totalExpense} income={totalIncome} />
+        <TouchableOpacity onPress={() => setAddModalVisible(true)}>
+          <MaterialCommunityIcons
+            name="account-edit-outline"
+            size={24}
+            color={colors.accent}
+          />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -406,8 +414,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         inverted
-        ListHeaderComponent={isSending ? <TypingIndicator /> : null}
-        ListFooterComponent={
+        ListHeaderComponent={
           hasMore ? (
             <View style={s.loadMoreWrap}>
               <Text style={[s.loadMoreText, { color: colors.textTertiary }]}>
@@ -416,6 +423,7 @@ export default function HomeScreen() {
             </View>
           ) : null
         }
+        ListFooterComponent={isSending ? <TypingIndicator /> : null}
         onEndReached={() => {
           if (hasMore && !isLoading) loadMore();
         }}

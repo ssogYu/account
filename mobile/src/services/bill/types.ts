@@ -71,5 +71,6 @@ export interface QueryBillParams {
   startDate?: string;
   endDate?: string;
   month?: string;
+  date?: string;
   userId?: string;
 }

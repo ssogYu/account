@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,10 +16,13 @@ import { useStatsStore } from "@/stores/stats";
 import { useAuthStore } from "@/stores/auth";
 import { BillFlowView } from "@/components/stats/BillFlowView";
 import { ChartView } from "@/components/stats/ChartView";
+import { CalendarPicker } from "@/components/stats/CalendarPicker";
 
 export default function StatsScreen() {
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const {
     selectedMonth,
+    selectedDate,
     selectedType,
     isLoading,
     activeTab,
@@ -28,6 +31,7 @@ export default function StatsScreen() {
     selectedMemberId,
     fetchAll,
     setSelectedMonth,
+    setSelectedDate,
     setSelectedType,
     setActiveTab,
     setSelectedMemberId,
@@ -60,9 +64,25 @@ export default function StatsScreen() {
     setSelectedMonth(newMonth);
   };
 
+  const handleMonthArrow = (direction: "prev" | "next") => {
+    // 切月份时清除日期选择，回到月模式
+    if (selectedDate) {
+      setSelectedDate(null);
+    }
+    if (direction === "prev") handlePrevMonth();
+    else handleNextMonth();
+  };
+
   const formatMonthLabel = (month: string) => {
     const [year, m] = month.split("-");
     return `${year}年${parseInt(m!)}月`;
+  };
+
+  const formatDateLabel = (date: string) => {
+    const [y, m, d] = date.split("-").map(Number);
+    const dt = new Date(y, m - 1, d, 12, 0, 0);
+    const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    return `${m}月${d}日 ${weekdays[dt.getDay()]}`;
   };
 
   const isExpense = selectedType === "expense";
@@ -104,8 +124,15 @@ export default function StatsScreen() {
           ...typography.headline,
           color: colors.text,
           fontSize: 16,
-          minWidth: 90,
           textAlign: "center",
+        },
+        monthLabelBtn: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 2,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xs,
+          borderRadius: radius.md,
         },
 
         typeSwitch: {
@@ -253,7 +280,7 @@ export default function StatsScreen() {
         <View style={styles.headerTop}>
           <View style={styles.monthSelector}>
             <TouchableOpacity
-              onPress={handlePrevMonth}
+              onPress={() => handleMonthArrow("prev")}
               activeOpacity={0.6}
               style={styles.monthArrow}
             >
@@ -263,11 +290,24 @@ export default function StatsScreen() {
                 color={colors.textSecondary}
               />
             </TouchableOpacity>
-            <Text style={styles.monthLabel}>
-              {formatMonthLabel(selectedMonth)}
-            </Text>
             <TouchableOpacity
-              onPress={handleNextMonth}
+              onPress={() => setCalendarVisible(true)}
+              activeOpacity={0.6}
+              style={styles.monthLabelBtn}
+            >
+              <Text style={styles.monthLabel}>
+                {selectedDate
+                  ? formatDateLabel(selectedDate)
+                  : formatMonthLabel(selectedMonth)}
+              </Text>
+              <MaterialCommunityIcons
+                name="chevron-down"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleMonthArrow("next")}
               activeOpacity={0.6}
               style={styles.monthArrow}
             >
@@ -293,7 +333,7 @@ export default function StatsScreen() {
             </Text>
             {isExpense && (
               <Text style={[styles.typeBtnAmount, { color: colors.error }]}>
-                ¥{expense.toFixed(0)}
+                ¥{expense.toFixed(2)}
               </Text>
             )}
           </TouchableOpacity>
@@ -312,7 +352,7 @@ export default function StatsScreen() {
             </Text>
             {!isExpense && (
               <Text style={[styles.typeBtnAmount, { color: colors.success }]}>
-                ¥{income.toFixed(0)}
+                ¥{income.toFixed(2)}
               </Text>
             )}
           </TouchableOpacity>
@@ -437,6 +477,14 @@ export default function StatsScreen() {
           </View>
         </View>
       )}
+
+      <CalendarPicker
+        visible={calendarVisible}
+        selectedDate={selectedDate}
+        currentMonth={selectedMonth}
+        onSelectDate={setSelectedDate}
+        onClose={() => setCalendarVisible(false)}
+      />
     </SafeAreaView>
   );
 }

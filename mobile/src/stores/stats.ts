@@ -1,14 +1,23 @@
-import { create } from 'zustand';
-import { billService } from '@/services/bill';
-import type { Bill, BillListResult, BillSummary, QueryBillParams } from '@/services/bill/types';
-import type { CategoryStats, DailyStats, MonthlyComparison } from '@/services/bill/stats.types';
-import { familyService } from '@/services/family';
-import type { FamilyInfo } from '@/services/family/types';
+import { create } from "zustand";
+import { billService } from "@/services/bill";
+import type {
+  Bill,
+  BillListResult,
+  BillSummary,
+  QueryBillParams,
+} from "@/services/bill/types";
+import type {
+  CategoryStats,
+  DailyStats,
+  MonthlyComparison,
+} from "@/services/bill/stats.types";
+import { familyService } from "@/services/family";
+import type { FamilyInfo } from "@/services/family/types";
 
 // ── 筛选状态 ──
 export interface FlowFilter {
   keyword?: string;
-  type?: 'expense' | 'income';
+  type?: "expense" | "income";
   categoryId?: string;
   month?: string;
   userId?: string;
@@ -25,27 +34,27 @@ export interface DayGroup {
 
 function getCurrentMonth(): string {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** 将日期字符串/Date 转为本地日期 YYYY-MM-DD（避免 toISOString 的 UTC 偏移） */
 function toLocalDateKey(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = typeof date === "string" ? new Date(date) : date;
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
 function formatDateLabel(dateStr: string): string {
   // dateStr 是 YYYY-MM-DD 格式，直接解析避免 new Date() 的 UTC 偏移
-  const [yStr, mStr, dStr] = dateStr.split('-');
+  const [yStr, mStr, dStr] = dateStr.split("-");
   const year = parseInt(yStr!);
   const month = parseInt(mStr!);
   const day = parseInt(dStr!);
   // 用本地中午时间构造 Date 来获取星期几
   const d = new Date(year, month - 1, day, 12, 0, 0);
-  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   return `${month}月${day}日 ${weekdays[d.getDay()]}`;
 }
 
@@ -61,10 +70,10 @@ function groupBillsByDay(bills: Bill[]): DayGroup[] {
     .sort(([a], [b]) => b.localeCompare(a)) // 日期降序
     .map(([date, items]) => {
       const dayExpense = items
-        .filter((b) => b.type === 'expense')
+        .filter((b) => b.type === "expense")
         .reduce((s, b) => s + Number(b.amount), 0);
       const dayIncome = items
-        .filter((b) => b.type === 'income')
+        .filter((b) => b.type === "income")
         .reduce((s, b) => s + Number(b.amount), 0);
       return {
         date,
@@ -79,7 +88,8 @@ function groupBillsByDay(bills: Bill[]): DayGroup[] {
 interface StatsState {
   // ── 公共状态 ──
   selectedMonth: string;
-  selectedType: 'expense' | 'income';
+  selectedDate: string | null; // YYYY-MM-DD, null = 月模式
+  selectedType: "expense" | "income";
   isLoading: boolean;
 
   // ── 流水视图 ──
@@ -98,7 +108,7 @@ interface StatsState {
   // ── 下钻联动 ──
   drillCategoryId: string | null;
   drillCategoryName: string | null;
-  activeTab: 'flow' | 'chart';
+  activeTab: "flow" | "chart";
 
   // ── 家庭成员 ──
   familyInfo: FamilyInfo | null;
@@ -106,8 +116,9 @@ interface StatsState {
 
   // ── Actions ──
   setSelectedMonth: (month: string) => void;
-  setSelectedType: (type: 'expense' | 'income') => void;
-  setActiveTab: (tab: 'flow' | 'chart') => void;
+  setSelectedDate: (date: string | null) => void;
+  setSelectedType: (type: "expense" | "income") => void;
+  setActiveTab: (tab: "flow" | "chart") => void;
   setFlowFilter: (filter: Partial<FlowFilter>) => void;
   resetFlowFilter: () => void;
   setSelectedMemberId: (userId: string | null) => void;
@@ -126,10 +137,11 @@ const PAGE_SIZE = 20;
 
 export const useStatsStore = create<StatsState>((set, get) => ({
   selectedMonth: getCurrentMonth(),
-  selectedType: 'expense',
+  selectedDate: null,
+  selectedType: "expense",
   isLoading: false,
 
-  flowFilter: { type: 'expense' },
+  flowFilter: { type: "expense" },
   flowGroups: [],
   flowTotal: 0,
   flowPage: 1,
@@ -142,7 +154,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
 
   drillCategoryId: null,
   drillCategoryName: null,
-  activeTab: 'flow',
+  activeTab: "flow",
 
   familyInfo: null,
   selectedMemberId: null,
@@ -150,6 +162,24 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   setSelectedMonth(month: string) {
     const { selectedType } = get();
     set({
+      selectedMonth: month,
+      selectedDate: null,
+      flowFilter: { type: selectedType },
+      flowPage: 1,
+      flowGroups: [],
+      flowHasMore: true,
+      drillCategoryId: null,
+      drillCategoryName: null,
+    });
+    get().fetchAll(month);
+  },
+
+  setSelectedDate(date: string | null) {
+    const { selectedType } = get();
+    // 如果选了日期，同步 selectedMonth
+    const month = date ? date.slice(0, 7) : get().selectedMonth;
+    set({
+      selectedDate: date,
       selectedMonth: month,
       flowFilter: { type: selectedType },
       flowPage: 1,
@@ -161,7 +191,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     get().fetchAll(month);
   },
 
-  setSelectedType(type: 'expense' | 'income') {
+  setSelectedType(type: "expense" | "income") {
     set({
       selectedType: type,
       flowFilter: { ...get().flowFilter, type },
@@ -176,7 +206,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     get().fetchFlowList();
   },
 
-  setActiveTab(tab: 'flow' | 'chart') {
+  setActiveTab(tab: "flow" | "chart") {
     set({ activeTab: tab });
   },
 
@@ -188,7 +218,12 @@ export const useStatsStore = create<StatsState>((set, get) => ({
         delete newFilter[key as keyof FlowFilter];
       }
     }
-    set({ flowFilter: newFilter, flowPage: 1, flowGroups: [], flowHasMore: true });
+    set({
+      flowFilter: newFilter,
+      flowPage: 1,
+      flowGroups: [],
+      flowHasMore: true,
+    });
     get().fetchFlowList();
   },
 
@@ -222,13 +257,29 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchFlowList(append = false) {
-    const { selectedMonth, flowFilter, flowPage, flowGroups, drillCategoryId, selectedMemberId } =
-      get();
+    const {
+      selectedMonth,
+      selectedDate,
+      flowFilter,
+      flowPage,
+      flowGroups,
+      drillCategoryId,
+      selectedMemberId,
+    } = get();
     const params: QueryBillParams = {
       page: flowPage,
       pageSize: PAGE_SIZE,
-      month: selectedMonth,
     };
+    // 日期筛选：优先使用 selectedDate，否则使用 selectedMonth
+    if (selectedDate) {
+      params.startDate = selectedDate;
+      // endDate 是 lt 上界，需要设为下一天才能包含当天
+      const [y, m, d] = selectedDate.split("-").map(Number);
+      const next = new Date(y, m - 1, d + 1);
+      params.endDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+    } else {
+      params.month = selectedMonth;
+    }
     if (flowFilter.type) params.type = flowFilter.type;
     if (flowFilter.categoryId || drillCategoryId) {
       params.categoryId = flowFilter.categoryId ?? drillCategoryId ?? undefined;
@@ -272,9 +323,13 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchMonthSummary(month?: string) {
-    const { selectedMemberId } = get();
+    const { selectedMemberId, selectedDate } = get();
     try {
-      const monthSummary = await billService.getSummary(month, selectedMemberId ?? undefined);
+      const monthSummary = await billService.getSummary(
+        month,
+        selectedDate ?? undefined,
+        selectedMemberId ?? undefined,
+      );
       set({ monthSummary });
     } catch {
       // 静默
@@ -282,10 +337,11 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
 
   async fetchCategoryStats(month?: string, type?: string) {
-    const { selectedMemberId } = get();
+    const { selectedMemberId, selectedDate } = get();
     try {
       const categoryStats = await billService.getCategoryStats(
         month,
+        selectedDate ?? undefined,
         type,
         selectedMemberId ?? undefined,
       );
@@ -298,7 +354,10 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   async fetchDailyStats(month?: string) {
     const { selectedMemberId } = get();
     try {
-      const dailyStats = await billService.getDailyStats(month, selectedMemberId ?? undefined);
+      const dailyStats = await billService.getDailyStats(
+        month,
+        selectedMemberId ?? undefined,
+      );
       set({ dailyStats });
     } catch {
       // 静默
@@ -331,15 +390,23 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     const m = month ?? get().selectedMonth;
     const type = get().selectedType;
     const memberFilter = get().selectedMemberId ?? undefined;
+    const dateFilter = get().selectedDate ?? undefined;
     set({ isLoading: true });
     try {
-      const [monthSummary, categoryStats, dailyStats, monthlyComparison] = await Promise.all([
-        billService.getSummary(m, memberFilter),
-        billService.getCategoryStats(m, type, memberFilter),
-        billService.getDailyStats(m, memberFilter),
-        billService.getMonthlyComparison(m, memberFilter),
-      ]);
-      set({ monthSummary, categoryStats, dailyStats, monthlyComparison, isLoading: false });
+      const [monthSummary, categoryStats, dailyStats, monthlyComparison] =
+        await Promise.all([
+          billService.getSummary(m, dateFilter, memberFilter),
+          billService.getCategoryStats(m, dateFilter, type, memberFilter),
+          billService.getDailyStats(m, memberFilter),
+          billService.getMonthlyComparison(m, memberFilter),
+        ]);
+      set({
+        monthSummary,
+        categoryStats,
+        dailyStats,
+        monthlyComparison,
+        isLoading: false,
+      });
     } catch {
       set({ isLoading: false });
     }
@@ -350,7 +417,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   /** 图表下钻：点击饼图分类 → 切换流水视图 + 自动筛选该分类 */
   drillToFlow(categoryId: string, categoryName: string) {
     set({
-      activeTab: 'flow',
+      activeTab: "flow",
       drillCategoryId: categoryId,
       drillCategoryName: categoryName,
       flowFilter: { ...get().flowFilter, categoryId },

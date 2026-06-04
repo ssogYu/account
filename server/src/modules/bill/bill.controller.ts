@@ -38,14 +38,15 @@ export class BillController {
   }
 
   @Get('summary')
-  @SwaggerApiResponse({ status: 200, description: '获取月度收支汇总' })
+  @SwaggerApiResponse({ status: 200, description: '获取收支汇总' })
   @ResponseMessage('获取成功')
   getSummary(
     @CurrentUser() user: { id: string },
     @Query('month') month?: string,
+    @Query('date') date?: string,
     @Query('userId') filterUserId?: string,
   ) {
-    return this.billService.getSummary(user.id, month, filterUserId);
+    return this.billService.getSummary(user.id, month, date, filterUserId);
   }
 
   @Get('today')
@@ -61,12 +62,14 @@ export class BillController {
   getCategoryStats(
     @CurrentUser() user: { id: string },
     @Query('month') month?: string,
+    @Query('date') date?: string,
     @Query('type') type?: string,
     @Query('userId') filterUserId?: string,
   ) {
     return this.billService.getCategoryStats(
       user.id,
       month,
+      date,
       type,
       filterUserId,
     );

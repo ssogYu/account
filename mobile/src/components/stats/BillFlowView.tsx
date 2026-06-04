@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,23 +7,23 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   type WithSpringConfig,
-} from 'react-native-reanimated';
-import { useTheme } from '@/theme';
-import { spacing, radius, typography } from '@/theme';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { CategoryIcon } from '@/components/icons';
-import { AddBillModal } from '@/components/AddBillModal';
-import { useStatsStore, type DayGroup } from '@/stores/stats';
-import { useAuthStore } from '@/stores/auth';
-import { billService } from '@/services/bill';
-import type { Bill } from '@/services/bill/types';
+} from "react-native-reanimated";
+import { useTheme } from "@/theme";
+import { spacing, radius, typography } from "@/theme";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { CategoryIcon } from "@/components/icons";
+import { AddBillModal } from "@/components/AddBillModal";
+import { useStatsStore, type DayGroup } from "@/stores/stats";
+import { useAuthStore } from "@/stores/auth";
+import { billService } from "@/services/bill";
+import type { Bill } from "@/services/bill/types";
 
 const SWIPE_THRESHOLD = -60;
 const ACTION_WIDTH = 140;
@@ -47,9 +47,9 @@ function useBillFlowStyles() {
           gap: spacing.sm,
         },
         flowHeaderTop: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
         },
         balanceWrap: { gap: 2 },
         balanceLabel: {
@@ -58,16 +58,16 @@ function useBillFlowStyles() {
         },
         balanceValue: {
           ...typography.title3,
-          fontWeight: '800',
+          fontWeight: "800",
         },
         filterActions: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: spacing.xs,
         },
         filterBtn: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           backgroundColor: colors.fillTertiary,
           borderRadius: radius.sm,
           paddingHorizontal: spacing.sm,
@@ -85,18 +85,18 @@ function useBillFlowStyles() {
         },
         filterBtnTextActive: {
           color: colors.accent,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         resetBtn: {
           width: 32,
           height: 32,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
         },
         drillTag: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          alignSelf: 'flex-start',
+          flexDirection: "row",
+          alignItems: "center",
+          alignSelf: "flex-start",
           backgroundColor: colors.accentSubtle,
           borderRadius: radius.xs,
           paddingHorizontal: spacing.sm,
@@ -107,7 +107,7 @@ function useBillFlowStyles() {
         drillTagText: {
           ...typography.caption1,
           color: colors.accent,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         filterExpanded: {
           marginTop: spacing.sm,
@@ -116,16 +116,16 @@ function useBillFlowStyles() {
         filterSectionLabel: {
           ...typography.caption1,
           color: colors.textTertiary,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         categoryScroll: { maxHeight: 120 },
         filterChips: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.sm,
         },
         chip: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 3,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.xs + 2,
@@ -139,12 +139,12 @@ function useBillFlowStyles() {
         },
         chipTextActive: {
           color: colors.accent,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         daySection: { marginBottom: spacing.sm },
         dateHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           paddingHorizontal: spacing.lg + spacing.xs,
           paddingVertical: spacing.sm,
           gap: spacing.sm,
@@ -152,37 +152,37 @@ function useBillFlowStyles() {
         dateHeaderText: {
           ...typography.footnote,
           color: colors.textSecondary,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         dateHeaderSub: {
           ...typography.caption1,
           color: colors.textTertiary,
         },
         billItemOuter: {
-          position: 'relative',
-          overflow: 'hidden',
+          position: "relative",
+          overflow: "hidden",
           marginHorizontal: spacing.lg,
           marginBottom: spacing.xs,
           borderRadius: radius.md,
         },
         swipeActions: {
-          position: 'absolute',
+          position: "absolute",
           right: 0,
           top: 0,
           bottom: 0,
-          flexDirection: 'row',
+          flexDirection: "row",
         },
         swipeEdit: {
           width: 70,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           backgroundColor: colors.fillSecondary,
           gap: 2,
         },
         swipeDelete: {
           width: 70,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           backgroundColor: colors.error,
           borderTopRightRadius: radius.md,
           borderBottomRightRadius: radius.md,
@@ -190,12 +190,12 @@ function useBillFlowStyles() {
         },
         swipeText: {
           ...typography.caption2,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         billItemWrap: { backgroundColor: colors.bgElevated },
         billItem: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           padding: spacing.md,
           gap: spacing.sm,
           borderWidth: StyleSheet.hairlineWidth,
@@ -207,13 +207,13 @@ function useBillFlowStyles() {
           width: 36,
           height: 36,
           borderRadius: 10,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
         },
         billInfo: { flex: 1, gap: 2 },
         billTitleRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 4,
         },
         accountTag: {
@@ -226,7 +226,7 @@ function useBillFlowStyles() {
           ...typography.caption2,
           fontSize: 10,
           color: colors.accent,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         memberTag: {
           backgroundColor: colors.fillSecondary,
@@ -238,12 +238,12 @@ function useBillFlowStyles() {
           ...typography.caption2,
           fontSize: 10,
           color: colors.textSecondary,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         billNote: {
           ...typography.footnote,
           color: colors.text,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         billSub: {
           ...typography.caption2,
@@ -251,13 +251,13 @@ function useBillFlowStyles() {
         },
         billAmount: {
           ...typography.footnote,
-          fontWeight: '700',
+          fontWeight: "700",
         },
         listContent: { paddingBottom: 120 },
         emptyWrap: { flex: 1 },
         emptyState: {
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           paddingVertical: spacing.xxl * 2,
           gap: spacing.md,
         },
@@ -298,8 +298,13 @@ function FlowHeader() {
       <View style={s.flowHeaderTop}>
         <View style={s.balanceWrap}>
           <Text style={s.balanceLabel}>结余</Text>
-          <Text style={[s.balanceValue, { color: balance >= 0 ? colors.success : colors.error }]}>
-            {balance >= 0 ? '+' : ''}¥{balance.toFixed(2)}
+          <Text
+            style={[
+              s.balanceValue,
+              { color: balance >= 0 ? colors.success : colors.error },
+            ]}
+          >
+            {balance >= 0 ? "+" : ""}¥{balance.toFixed(2)}
           </Text>
         </View>
         <View style={s.filterActions}>
@@ -314,12 +319,20 @@ function FlowHeader() {
               color={hasFilter ? colors.accent : colors.textTertiary}
             />
             <Text style={[s.filterBtnText, hasFilter && s.filterBtnTextActive]}>
-              {activeCategory ? activeCategory.categoryName : '筛选'}
+              {activeCategory ? activeCategory.categoryName : "筛选"}
             </Text>
           </TouchableOpacity>
           {hasFilter && (
-            <TouchableOpacity style={s.resetBtn} onPress={resetFlowFilter} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="close-circle" size={18} color={colors.textTertiary} />
+            <TouchableOpacity
+              style={s.resetBtn}
+              onPress={resetFlowFilter}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={18}
+                color={colors.textTertiary}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -329,7 +342,11 @@ function FlowHeader() {
         <View style={s.drillTag}>
           <Text style={s.drillTagText}>{drillCategoryName}</Text>
           <TouchableOpacity onPress={resetFlowFilter} activeOpacity={0.6}>
-            <MaterialCommunityIcons name="close" size={14} color={colors.accent} />
+            <MaterialCommunityIcons
+              name="close"
+              size={14}
+              color={colors.accent}
+            />
           </TouchableOpacity>
         </View>
       )}
@@ -346,11 +363,16 @@ function FlowHeader() {
               {billCategories.map((cat) => (
                 <TouchableOpacity
                   key={cat.categoryId}
-                  style={[s.chip, flowFilter.categoryId === cat.categoryId && s.chipActive]}
+                  style={[
+                    s.chip,
+                    flowFilter.categoryId === cat.categoryId && s.chipActive,
+                  ]}
                   onPress={() =>
                     setFlowFilter({
                       categoryId:
-                        flowFilter.categoryId === cat.categoryId ? undefined : cat.categoryId,
+                        flowFilter.categoryId === cat.categoryId
+                          ? undefined
+                          : cat.categoryId,
                     })
                   }
                   activeOpacity={0.7}
@@ -359,13 +381,16 @@ function FlowHeader() {
                     iconKey={cat.categoryIcon}
                     size={12}
                     color={
-                      flowFilter.categoryId === cat.categoryId ? colors.accent : colors.textTertiary
+                      flowFilter.categoryId === cat.categoryId
+                        ? colors.accent
+                        : colors.textTertiary
                     }
                   />
                   <Text
                     style={[
                       s.chipText,
-                      flowFilter.categoryId === cat.categoryId && s.chipTextActive,
+                      flowFilter.categoryId === cat.categoryId &&
+                        s.chipTextActive,
                     ]}
                   >
                     {cat.categoryName}
@@ -397,10 +422,11 @@ function BillItem({
   const currentUserId = useAuthStore((s) => s.user?.id);
   const translateX = useSharedValue(0);
   const isSwipedOpen = useSharedValue(false);
-  const isExpense = bill.type === 'expense';
+  const isExpense = bill.type === "expense";
   const amount = Number(bill.amount);
-  const displayName = bill.note || bill.category?.name || '未分类';
-  const truncatedName = displayName.length > 10 ? displayName.slice(0, 5) + '…' : displayName;
+  const displayName = bill.note || bill.category?.name || "未分类";
+  const truncatedName =
+    displayName.length > 10 ? displayName.slice(0, 5) + "…" : displayName;
 
   const animateTo = useCallback(
     (toValue: number) => {
@@ -444,15 +470,15 @@ function BillItem({
   }));
 
   const showDelete = useCallback(() => {
-    Alert.alert('确认删除', '删除后不可恢复，确定要删除这笔账单吗？', [
+    Alert.alert("确认删除", "删除后不可恢复，确定要删除这笔账单吗？", [
       {
-        text: '取消',
-        style: 'cancel',
+        text: "取消",
+        style: "cancel",
         onPress: () => animateTo(0),
       },
       {
-        text: '删除',
-        style: 'destructive',
+        text: "删除",
+        style: "destructive",
         onPress: () => {
           animateTo(0);
           onDelete(bill.id);
@@ -469,13 +495,29 @@ function BillItem({
   return (
     <View style={s.billItemOuter}>
       <View style={s.swipeActions}>
-        <TouchableOpacity style={s.swipeEdit} activeOpacity={0.7} onPress={handleEdit}>
-          <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.text} />
-          <Text style={[s.swipeText, { color: '#fff' }]}>编辑</Text>
+        <TouchableOpacity
+          style={s.swipeEdit}
+          activeOpacity={0.7}
+          onPress={handleEdit}
+        >
+          <MaterialCommunityIcons
+            name="pencil-outline"
+            size={18}
+            color={colors.text}
+          />
+          <Text style={[s.swipeText, { color: "#fff" }]}>编辑</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.swipeDelete} activeOpacity={0.7} onPress={showDelete}>
-          <MaterialCommunityIcons name="delete-outline" size={18} color="#fff" />
-          <Text style={[s.swipeText, { color: '#fff' }]}>删除</Text>
+        <TouchableOpacity
+          style={s.swipeDelete}
+          activeOpacity={0.7}
+          onPress={showDelete}
+        >
+          <MaterialCommunityIcons
+            name="delete-outline"
+            size={18}
+            color="#fff"
+          />
+          <Text style={[s.swipeText, { color: "#fff" }]}>删除</Text>
         </TouchableOpacity>
       </View>
 
@@ -485,11 +527,15 @@ function BillItem({
             <View
               style={[
                 s.billIconBg,
-                { backgroundColor: isExpense ? `${colors.error}1F` : `${colors.success}1F` },
+                {
+                  backgroundColor: isExpense
+                    ? `${colors.error}1F`
+                    : `${colors.success}1F`,
+                },
               ]}
             >
               <CategoryIcon
-                iconKey={bill.category?.icon ?? 'other_exp'}
+                iconKey={bill.category?.icon ?? "other_exp"}
                 size={18}
                 color={isExpense ? colors.error : colors.success}
               />
@@ -499,15 +545,17 @@ function BillItem({
                 <Text style={s.billNote} numberOfLines={1}>
                   {truncatedName}
                 </Text>
-                {showMemberTag && bill.user && bill.userId !== currentUserId && (
-                  <View style={s.memberTag}>
-                    <Text style={s.memberTagText}>
-                      {(bill.user.nickname && bill.user.nickname.length > 5
-                        ? bill.user.nickname.slice(0, 5) + '…'
-                        : bill.user.nickname) || '?'}
-                    </Text>
-                  </View>
-                )}
+                {showMemberTag &&
+                  bill.user &&
+                  bill.userId !== currentUserId && (
+                    <View style={s.memberTag}>
+                      <Text style={s.memberTagText}>
+                        {(bill.user.nickname && bill.user.nickname.length > 5
+                          ? bill.user.nickname.slice(0, 5) + "…"
+                          : bill.user.nickname) || "?"}
+                      </Text>
+                    </View>
+                  )}
                 {bill.account ? (
                   <View style={s.accountTag}>
                     <Text style={s.accountTagText}>{bill.account}</Text>
@@ -515,11 +563,16 @@ function BillItem({
                 ) : null}
               </View>
               <Text style={s.billSub} numberOfLines={1}>
-                {bill.category?.name ?? '未分类'}
+                {bill.category?.name ?? "未分类"}
               </Text>
             </View>
-            <Text style={[s.billAmount, { color: isExpense ? colors.error : colors.success }]}>
-              {isExpense ? '-' : '+'}¥{amount.toFixed(2)}
+            <Text
+              style={[
+                s.billAmount,
+                { color: isExpense ? colors.error : colors.success },
+              ]}
+            >
+              {isExpense ? "-" : "+"}¥{amount.toFixed(2)}
             </Text>
           </View>
         </Animated.View>
@@ -537,13 +590,13 @@ function DateHeader({ group }: { group: DayGroup }) {
       <Text style={s.dateHeaderText}>{group.label}</Text>
       {group.dayExpense > 0 && (
         <Text style={[s.dateHeaderSub, { color: colors.error }]}>
-          支出 ¥{group.dayExpense.toFixed(0)}
+          支出 ¥{group.dayExpense.toFixed(2)}
         </Text>
       )}
       {group.dayIncome > 0 && (
         <Text style={[s.dateHeaderSub, { color: colors.success }]}>
-          {' '}
-          收入 ¥{group.dayIncome.toFixed(0)}
+          {" "}
+          收入 ¥{group.dayIncome.toFixed(2)}
         </Text>
       )}
     </View>
@@ -554,8 +607,14 @@ function DateHeader({ group }: { group: DayGroup }) {
 export function BillFlowView() {
   const s = useBillFlowStyles();
   const { colors } = useTheme();
-  const { flowGroups, flowHasMore, deleteBill, fetchFlowList, flowPage, familyInfo } =
-    useStatsStore();
+  const {
+    flowGroups,
+    flowHasMore,
+    deleteBill,
+    fetchFlowList,
+    flowPage,
+    familyInfo,
+  } = useStatsStore();
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
   const showMemberTag = !!familyInfo && familyInfo.members.length > 1;
@@ -567,7 +626,7 @@ export function BillFlowView() {
 
   const handleEditSubmit = useCallback(
     async (data: {
-      type: 'expense' | 'income';
+      type: "expense" | "income";
       amount: number;
       categoryId: string;
       note?: string;
@@ -578,7 +637,11 @@ export function BillFlowView() {
       await billService.update(billToEdit.id, data);
       setEditModalVisible(false);
       setBillToEdit(null);
-      useStatsStore.setState({ flowPage: 1, flowGroups: [], flowHasMore: true });
+      useStatsStore.setState({
+        flowPage: 1,
+        flowGroups: [],
+        flowHasMore: true,
+      });
       fetchFlowList();
       const { selectedMonth, selectedType } = useStatsStore.getState();
       useStatsStore.getState().fetchMonthSummary(selectedMonth);
@@ -641,7 +704,7 @@ export function BillFlowView() {
             billToEdit
               ? {
                   id: billToEdit.id,
-                  type: billToEdit.type as 'expense' | 'income',
+                  type: billToEdit.type as "expense" | "income",
                   amount: Number(billToEdit.amount),
                   categoryId: billToEdit.categoryId,
                   note: billToEdit.note ?? undefined,
@@ -678,7 +741,7 @@ export function BillFlowView() {
           billToEdit
             ? {
                 id: billToEdit.id,
-                type: billToEdit.type as 'expense' | 'income',
+                type: billToEdit.type as "expense" | "income",
                 amount: Number(billToEdit.amount),
                 categoryId: billToEdit.categoryId,
                 note: billToEdit.note ?? undefined,

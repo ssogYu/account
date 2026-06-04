@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,19 +10,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useIsFocused } from 'expo-router';
-import { useChatStore } from '@/stores/chat';
-import { useBillStore } from '@/stores/bill';
-import { useCategoryStore } from '@/stores/category';
-import { useAccountStore } from '@/stores/account';
-import { AddBillModal } from '@/components/AddBillModal';
-import { useTheme } from '@/theme';
-import { spacing, radius, typography } from '@/theme';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { ChatBubble, TypingIndicator, WELCOME_MESSAGES, QUICK_INPUTS } from '@/components/chat';
-import type { ConfirmBillEdits } from '@/components/chat/ConfirmCard';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useIsFocused } from "expo-router";
+import { useChatStore } from "@/stores/chat";
+import { useBillStore } from "@/stores/bill";
+import { useCategoryStore } from "@/stores/category";
+import { useAccountStore } from "@/stores/account";
+import { AddBillModal } from "@/components/AddBillModal";
+import { useTheme } from "@/theme";
+import { spacing, radius, typography } from "@/theme";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import {
+  ChatBubble,
+  TypingIndicator,
+  DateSeparator,
+  WELCOME_MESSAGES,
+  QUICK_INPUTS,
+} from "@/components/chat";
+import type { ChatMessage } from "@/services/chat/types";
+import type { ConfirmBillEdits } from "@/components/chat/ConfirmCard";
 
 function TodayTicker({ expense, income }: { expense: number; income: number }) {
   const { colors } = useTheme();
@@ -30,8 +37,12 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const items = [
-    { label: '今日支出', value: `¥${expense.toFixed(2)}`, color: colors.error },
-    { label: '今日收入', value: `¥${income.toFixed(2)}`, color: colors.success },
+    { label: "今日支出", value: `¥${expense.toFixed(2)}`, color: colors.error },
+    {
+      label: "今日收入",
+      value: `¥${income.toFixed(2)}`,
+      color: colors.success,
+    },
   ];
 
   useEffect(() => {
@@ -61,18 +72,18 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
     () =>
       StyleSheet.create({
         container: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: spacing.sm,
-          overflow: 'hidden',
+          overflow: "hidden",
           height: 28,
         },
         badge: {
           width: 8,
           height: 8,
           borderRadius: 4,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
         },
         dot: {
           width: 6,
@@ -80,8 +91,8 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
           borderRadius: 3,
         },
         textWrap: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 6,
         },
         label: {
@@ -91,7 +102,7 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
         },
         value: {
           ...typography.footnote,
-          fontWeight: '700',
+          fontWeight: "700",
           fontSize: 15,
         },
       }),
@@ -119,7 +130,9 @@ function TodayTicker({ expense, income }: { expense: number; income: number }) {
         ]}
       >
         <Text style={tStyles.label}>{current.label}</Text>
-        <Text style={[tStyles.value, { color: current.color }]}>{current.value}</Text>
+        <Text style={[tStyles.value, { color: current.color }]}>
+          {current.value}
+        </Text>
       </Animated.View>
     </View>
   );
@@ -129,6 +142,7 @@ export default function HomeScreen() {
   const messages = useChatStore((s) => s.messages);
   const isSending = useChatStore((s) => s.isSending);
   const hasMore = useChatStore((s) => s.hasMore);
+  const isLoading = useChatStore((s) => s.isLoading);
   const fetchHistory = useChatStore((s) => s.fetchHistory);
   const loadMore = useChatStore((s) => s.loadMore);
   const sendMessage = useChatStore((s) => s.sendMessage);
@@ -144,7 +158,7 @@ export default function HomeScreen() {
   const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
   const { colors, resolvedScheme } = useTheme();
 
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [addModalVisible, setAddModalVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -159,12 +173,29 @@ export default function HomeScreen() {
     }
   }, [isFocused]);
 
-  const displayMessages = messages.length > 0 ? messages : WELCOME_MESSAGES;
+  // 将消息列表转换为带日期分隔线的渲染列表（倒序用于 inverted FlatList）
+  type RenderItem =
+    | { type: "message"; data: ChatMessage }
+    | { type: "date"; date: string };
+  const renderList = useMemo(() => {
+    const list: RenderItem[] = [];
+    const msgs = messages.length > 0 ? messages : WELCOME_MESSAGES;
+    let lastDate = "";
+    for (const msg of msgs) {
+      const msgDate = new Date(msg.createdAt).toDateString();
+      if (msgDate !== lastDate) {
+        list.push({ type: "date", date: msg.createdAt });
+        lastDate = msgDate;
+      }
+      list.push({ type: "message", data: msg });
+    }
+    return list.reverse();
+  }, [messages]);
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
     if (!text || isSending) return;
-    setInputText('');
+    setInputText("");
     await sendMessage(text);
   }, [inputText, isSending, sendMessage]);
 
@@ -191,7 +222,10 @@ export default function HomeScreen() {
           : undefined,
       });
       if (ok) {
-        await Promise.all([fetchBills({ page: 1, pageSize: 20 }), fetchTodaySummary()]);
+        await Promise.all([
+          fetchBills({ page: 1, pageSize: 20 }),
+          fetchTodaySummary(),
+        ]);
       }
     },
     [confirmBill, fetchBills, fetchTodaySummary],
@@ -201,7 +235,12 @@ export default function HomeScreen() {
     async (messageId: string, edits: Record<number, ConfirmBillEdits>) => {
       const editsForApi: Record<
         number,
-        { categoryId?: string; amount?: number; note?: string; accountName?: string }
+        {
+          categoryId?: string;
+          amount?: number;
+          note?: string;
+          accountName?: string;
+        }
       > = {};
       for (const [key, val] of Object.entries(edits)) {
         editsForApi[Number(key)] = {
@@ -213,7 +252,10 @@ export default function HomeScreen() {
       }
       const ok = await confirmAllBills({ messageId, edits: editsForApi });
       if (ok) {
-        await Promise.all([fetchBills({ page: 1, pageSize: 20 }), fetchTodaySummary()]);
+        await Promise.all([
+          fetchBills({ page: 1, pageSize: 20 }),
+          fetchTodaySummary(),
+        ]);
       }
     },
     [confirmAllBills, fetchBills, fetchTodaySummary],
@@ -227,7 +269,10 @@ export default function HomeScreen() {
   );
 
   const scrollToBottom = () => {
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(
+      () => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }),
+      100,
+    );
   };
 
   const totalExpense = todaySummary?.totalExpense ?? 0;
@@ -241,9 +286,9 @@ export default function HomeScreen() {
           backgroundColor: colors.bg,
         },
         header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.sm,
           borderBottomWidth: StyleSheet.hairlineWidth,
@@ -260,7 +305,7 @@ export default function HomeScreen() {
           backgroundColor: colors.bg,
         },
         quickRow: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.sm,
           marginBottom: spacing.sm,
           paddingHorizontal: spacing.xs,
@@ -276,16 +321,16 @@ export default function HomeScreen() {
         quickBtnText: {
           ...typography.caption1,
           color: colors.textSecondary,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         inputRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
         },
         inputContainer: {
           flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           backgroundColor: colors.bgElevated,
           borderRadius: radius.xl,
           paddingLeft: spacing.md + 4,
@@ -307,8 +352,8 @@ export default function HomeScreen() {
           height: 34,
           borderRadius: 17,
           backgroundColor: colors.accent,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           marginLeft: spacing.xs,
         },
         sendBtnDisabled: {
@@ -319,8 +364,8 @@ export default function HomeScreen() {
           height: 34,
           borderRadius: 17,
           backgroundColor: colors.fillSecondary,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           marginLeft: spacing.xs,
         },
       }),
@@ -328,8 +373,10 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} />
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <StatusBar
+        barStyle={resolvedScheme === "dark" ? "light-content" : "dark-content"}
+      />
 
       <View style={styles.header}>
         <TodayTicker expense={totalExpense} income={totalIncome} />
@@ -337,24 +384,40 @@ export default function HomeScreen() {
 
       <FlatList
         ref={flatListRef}
-        data={displayMessages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ChatBubble
-            message={item}
-            onConfirm={handleConfirm}
-            onConfirmAll={handleConfirmAll}
-            onReject={handleReject}
-          />
-        )}
+        data={renderList}
+        keyExtractor={(item, index) =>
+          item.type === "date" ? `date-${item.date}-${index}` : item.data.id
+        }
+        renderItem={({ item }) =>
+          item.type === "date" ? (
+            <DateSeparator date={item.date} />
+          ) : (
+            <ChatBubble
+              message={item.data}
+              onConfirm={handleConfirm}
+              onConfirmAll={handleConfirmAll}
+              onReject={handleReject}
+            />
+          )
+        }
         contentContainerStyle={styles.chatContent}
         onContentSizeChange={scrollToBottom}
         onLayout={scrollToBottom}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        ListFooterComponent={isSending ? <TypingIndicator /> : null}
+        inverted
+        ListHeaderComponent={isSending ? <TypingIndicator /> : null}
+        ListFooterComponent={
+          hasMore ? (
+            <View style={s.loadMoreWrap}>
+              <Text style={[s.loadMoreText, { color: colors.textTertiary }]}>
+                {isLoading ? "加载中..." : "上拉加载更多"}
+              </Text>
+            </View>
+          ) : null
+        }
         onEndReached={() => {
-          if (hasMore) loadMore();
+          if (hasMore && !isLoading) loadMore();
         }}
         onEndReachedThreshold={0.3}
         maxToRenderPerBatch={10}
@@ -364,7 +427,7 @@ export default function HomeScreen() {
       />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.inputArea}
       >
         <View style={styles.quickRow}>
@@ -402,17 +465,28 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
                 accessibilityLabel="取消发送"
               >
-                <MaterialCommunityIcons name="close" size={16} color={colors.textSecondary} />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={16}
+                  color={colors.textSecondary}
+                />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+                style={[
+                  styles.sendBtn,
+                  !inputText.trim() && styles.sendBtnDisabled,
+                ]}
                 onPress={handleSend}
                 disabled={!inputText.trim()}
                 activeOpacity={0.7}
                 accessibilityLabel="发送消息"
               >
-                <MaterialCommunityIcons name="arrow-up" size={18} color="#FFFFFF" />
+                <MaterialCommunityIcons
+                  name="arrow-up"
+                  size={18}
+                  color="#FFFFFF"
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -427,3 +501,13 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
+const s = StyleSheet.create({
+  loadMoreWrap: {
+    alignItems: "center",
+    paddingVertical: spacing.md,
+  },
+  loadMoreText: {
+    ...typography.caption1,
+  },
+});

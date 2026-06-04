@@ -11,10 +11,10 @@
     "splash": {
      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#f8efdf",
       "dark": {
         "image": "./assets/splash.png",
-        "backgroundColor": "#1C1C1E"
+        "backgroundColor": "#f8efdf"
       }
     },
 
@@ -27,7 +27,7 @@
         "NSFaceIDUsageDescription": "使用 Face ID 安全登录"
       },
       "icon": {
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#f8efdf"
       },
       "buildNumber": "1"
     },
@@ -38,7 +38,7 @@
       "adaptiveIcon": {
       "foregroundImage": "./assets/splash.png",
         "backgroundImage": "./assets/splash.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#f8efdf"
       },
       "permissions": [
         "CAMERA",
@@ -57,7 +57,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#f8efdf"
         }
       ],
       "expo-font",

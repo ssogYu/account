@@ -49,16 +49,7 @@ function useBillFlowStyles() {
         flowHeaderTop: {
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "space-between",
-        },
-        balanceWrap: { gap: 2 },
-        balanceLabel: {
-          ...typography.caption1,
-          color: colors.textTertiary,
-        },
-        balanceValue: {
-          ...typography.title3,
-          fontWeight: "800",
+          justifyContent: "flex-end",
         },
         filterActions: {
           flexDirection: "row",
@@ -121,6 +112,7 @@ function useBillFlowStyles() {
         categoryScroll: { maxHeight: 120 },
         filterChips: {
           flexDirection: "row",
+          flexWrap: "wrap",
           gap: spacing.sm,
         },
         chip: {
@@ -270,12 +262,11 @@ function useBillFlowStyles() {
   );
 }
 
-// ── 流水头部（结余 + 筛选） ──
+// ── 流水头部（筛选） ──
 function FlowHeader() {
   const s = useBillFlowStyles();
   const { colors } = useTheme();
   const {
-    monthSummary,
     flowFilter,
     drillCategoryName,
     setFlowFilter,
@@ -284,7 +275,6 @@ function FlowHeader() {
   } = useStatsStore();
   const [expanded, setExpanded] = useState(false);
 
-  const balance = monthSummary?.balance ?? 0;
   const hasFilter = !!flowFilter.categoryId || !!drillCategoryName;
 
   const activeCategory = flowFilter.categoryId
@@ -296,17 +286,6 @@ function FlowHeader() {
   return (
     <View style={s.flowHeader}>
       <View style={s.flowHeaderTop}>
-        <View style={s.balanceWrap}>
-          <Text style={s.balanceLabel}>结余</Text>
-          <Text
-            style={[
-              s.balanceValue,
-              { color: balance >= 0 ? colors.success : colors.error },
-            ]}
-          >
-            {balance >= 0 ? "+" : ""}¥{balance.toFixed(2)}
-          </Text>
-        </View>
         <View style={s.filterActions}>
           <TouchableOpacity
             style={[s.filterBtn, hasFilter && s.filterBtnActive]}
@@ -321,6 +300,11 @@ function FlowHeader() {
             <Text style={[s.filterBtnText, hasFilter && s.filterBtnTextActive]}>
               {activeCategory ? activeCategory.categoryName : "筛选"}
             </Text>
+            <MaterialCommunityIcons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={hasFilter ? colors.accent : colors.textTertiary}
+            />
           </TouchableOpacity>
           {hasFilter && (
             <TouchableOpacity
@@ -360,6 +344,27 @@ function FlowHeader() {
             showsVerticalScrollIndicator={false}
           >
             <View style={s.filterChips}>
+              <TouchableOpacity
+                style={[s.chip, !flowFilter.categoryId && s.chipActive]}
+                onPress={() => setFlowFilter({ categoryId: undefined })}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name="view-grid-outline"
+                  size={12}
+                  color={
+                    !flowFilter.categoryId ? colors.accent : colors.textTertiary
+                  }
+                />
+                <Text
+                  style={[
+                    s.chipText,
+                    !flowFilter.categoryId && s.chipTextActive,
+                  ]}
+                >
+                  全部
+                </Text>
+              </TouchableOpacity>
               {billCategories.map((cat) => (
                 <TouchableOpacity
                   key={cat.categoryId}

@@ -88,6 +88,7 @@ export default function StatsScreen() {
   const isExpense = selectedType === "expense";
   const expense = monthSummary?.totalExpense ?? 0;
   const income = monthSummary?.totalIncome ?? 0;
+  const balance = monthSummary?.balance ?? 0;
 
   const styles = useMemo(
     () =>
@@ -135,33 +136,103 @@ export default function StatsScreen() {
           borderRadius: radius.md,
         },
 
-        typeSwitch: {
-          flexDirection: "row",
-          backgroundColor: colors.fillTertiary,
-          borderRadius: radius.md,
-          padding: 3,
-        },
-        typeBtn: {
-          flex: 1,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: spacing.xs,
-          paddingVertical: spacing.sm,
-          borderRadius: radius.sm,
-        },
-        typeBtnActive: {
+        summaryCard: {
           backgroundColor: colors.bgElevated,
+          borderRadius: radius.lg,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
           ...shadows.subtle,
         },
-        typeBtnText: {
+        summaryTopRow: {
+          flexDirection: "row",
+        },
+        summaryItem: {
+          flex: 1,
+          alignItems: "center",
+        },
+        summaryItemDivider: {
+          width: StyleSheet.hairlineWidth,
+          backgroundColor: colors.separator,
+        },
+        summaryItemLabel: {
+          ...typography.caption2,
+          color: colors.textTertiary,
+          marginBottom: 2,
+        },
+        summaryItemAmount: {
           ...typography.footnote,
-          fontWeight: "600",
+          fontWeight: "700",
+        },
+        summaryDivider: {
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: colors.separator,
+          marginTop: spacing.sm,
+          marginBottom: spacing.xs,
+        },
+        balanceWrap: {
+          alignItems: "center",
+        },
+        balanceLabel: {
+          ...typography.caption2,
           color: colors.textTertiary,
         },
-        typeBtnAmount: {
-          ...typography.caption1,
+        balanceAmount: {
+          ...typography.title3,
           fontWeight: "700",
+          marginTop: 2,
+        },
+
+        tabBarRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: spacing.lg,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.separator,
+        },
+        tabsWrap: {
+          flexDirection: "row",
+          gap: spacing.lg,
+        },
+        tab: {
+          paddingVertical: spacing.sm,
+          position: "relative",
+        },
+        tabText: {
+          ...typography.footnote,
+          color: colors.textTertiary,
+          fontWeight: "500",
+        },
+        tabTextActive: {
+          color: colors.text,
+          fontWeight: "700",
+        },
+        tabIndicator: {
+          position: "absolute",
+          bottom: 0,
+          left: "20%",
+          right: "20%",
+          height: 2,
+          borderRadius: 1,
+          backgroundColor: colors.accent,
+        },
+        typePills: {
+          flexDirection: "row",
+          gap: spacing.xs,
+        },
+        typePill: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs + 1,
+          borderRadius: radius.lg,
+          backgroundColor: colors.fillTertiary,
+        },
+        typePillActive: {
+          ...shadows.subtle,
+        },
+        typePillText: {
+          ...typography.caption1,
+          fontWeight: "600",
+          color: colors.textTertiary,
         },
 
         floatingMemberBar: {
@@ -230,37 +301,6 @@ export default function StatsScreen() {
           color: "#fff",
         },
 
-        tabBar: {
-          flexDirection: "row",
-          paddingHorizontal: spacing.lg,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.separator,
-        },
-        tab: {
-          flex: 1,
-          alignItems: "center",
-          paddingVertical: spacing.sm,
-          position: "relative",
-        },
-        tabText: {
-          ...typography.footnote,
-          color: colors.textTertiary,
-          fontWeight: "500",
-        },
-        tabTextActive: {
-          color: colors.text,
-          fontWeight: "700",
-        },
-        tabIndicator: {
-          position: "absolute",
-          bottom: 0,
-          left: "30%",
-          right: "30%",
-          height: 2,
-          borderRadius: 1,
-          backgroundColor: colors.accent,
-        },
-
         loadingWrap: {
           flex: 1,
           alignItems: "center",
@@ -320,76 +360,110 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        <View style={styles.typeSwitch}>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTopRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryItemLabel}>支出</Text>
+              <Text style={[styles.summaryItemAmount, { color: colors.error }]}>
+                ¥{expense.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.summaryItemDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryItemLabel}>收入</Text>
+              <Text
+                style={[styles.summaryItemAmount, { color: colors.success }]}
+              >
+                ¥{income.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.balanceWrap}>
+            <Text style={styles.balanceLabel}>结余</Text>
+            <Text
+              style={[
+                styles.balanceAmount,
+                { color: balance >= 0 ? colors.success : colors.error },
+              ]}
+            >
+              ¥{balance.toFixed(2)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.tabBarRow}>
+        <View style={styles.tabsWrap}>
           <TouchableOpacity
-            style={[styles.typeBtn, isExpense && styles.typeBtnActive]}
+            style={styles.tab}
+            onPress={() => setActiveTab("flow")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "flow" && styles.tabTextActive,
+              ]}
+            >
+              流水
+            </Text>
+            {activeTab === "flow" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => setActiveTab("chart")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "chart" && styles.tabTextActive,
+              ]}
+            >
+              图表
+            </Text>
+            {activeTab === "chart" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+        </View>
+        <View style={styles.typePills}>
+          <TouchableOpacity
+            style={[
+              styles.typePill,
+              isExpense && styles.typePillActive,
+              isExpense && { backgroundColor: `${colors.error}1A` },
+            ]}
             onPress={() => setSelectedType("expense")}
             activeOpacity={0.7}
           >
             <Text
-              style={[styles.typeBtnText, isExpense && { color: colors.error }]}
+              style={[
+                styles.typePillText,
+                isExpense && { color: colors.error },
+              ]}
             >
               支出
             </Text>
-            {isExpense && (
-              <Text style={[styles.typeBtnAmount, { color: colors.error }]}>
-                ¥{expense.toFixed(2)}
-              </Text>
-            )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.typeBtn, !isExpense && styles.typeBtnActive]}
+            style={[
+              styles.typePill,
+              !isExpense && styles.typePillActive,
+              !isExpense && { backgroundColor: `${colors.success}1A` },
+            ]}
             onPress={() => setSelectedType("income")}
             activeOpacity={0.7}
           >
             <Text
               style={[
-                styles.typeBtnText,
+                styles.typePillText,
                 !isExpense && { color: colors.success },
               ]}
             >
               收入
             </Text>
-            {!isExpense && (
-              <Text style={[styles.typeBtnAmount, { color: colors.success }]}>
-                ¥{income.toFixed(2)}
-              </Text>
-            )}
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => setActiveTab("flow")}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "flow" && styles.tabTextActive,
-            ]}
-          >
-            流水
-          </Text>
-          {activeTab === "flow" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => setActiveTab("chart")}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "chart" && styles.tabTextActive,
-            ]}
-          >
-            图表
-          </Text>
-          {activeTab === "chart" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
       </View>
 
       {isLoading ? (

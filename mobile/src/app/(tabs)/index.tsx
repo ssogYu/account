@@ -161,6 +161,8 @@ export default function HomeScreen() {
   const [inputText, setInputText] = useState("");
   const [addModalVisible, setAddModalVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const shouldScrollToBottomRef = useRef(false);
+  const isInitialScrollRef = useRef(true);
 
   const isFocused = useIsFocused();
 
@@ -197,6 +199,7 @@ export default function HomeScreen() {
     const text = inputText.trim();
     if (!text || isSending) return;
     setInputText("");
+    shouldScrollToBottomRef.current = true;
     await sendMessage(text);
   }, [inputText, isSending, sendMessage]);
 
@@ -210,6 +213,7 @@ export default function HomeScreen() {
 
   const handleConfirm = useCallback(
     async (messageId: string, billIndex: number, edits?: ConfirmBillEdits) => {
+      shouldScrollToBottomRef.current = true;
       const ok = await confirmBill({
         messageId,
         billIndex,
@@ -264,17 +268,34 @@ export default function HomeScreen() {
 
   const handleReject = useCallback(
     async (messageId: string) => {
+      shouldScrollToBottomRef.current = true;
       await rejectBill(messageId);
     },
     [rejectBill],
   );
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     setTimeout(
       () => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }),
       100,
     );
-  };
+  }, []);
+
+  // 首次加载完成后滚动到底部
+  const handleLayout = useCallback(() => {
+    if (isInitialScrollRef.current) {
+      isInitialScrollRef.current = false;
+      scrollToBottom();
+    }
+  }, [scrollToBottom]);
+
+  // 内容变化时，仅在新消息（shouldScrollToBottom）时自动滚动
+  const handleContentSizeChange = useCallback(() => {
+    if (shouldScrollToBottomRef.current) {
+      shouldScrollToBottomRef.current = false;
+      scrollToBottom();
+    }
+  }, [scrollToBottom]);
 
   const totalExpense = todaySummary?.totalExpense ?? 0;
   const totalIncome = todaySummary?.totalIncome ?? 0;
@@ -409,8 +430,8 @@ export default function HomeScreen() {
           )
         }
         contentContainerStyle={styles.chatContent}
-        onContentSizeChange={scrollToBottom}
-        onLayout={scrollToBottom}
+        onContentSizeChange={handleContentSizeChange}
+        onLayout={handleLayout}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         inverted

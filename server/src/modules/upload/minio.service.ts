@@ -87,11 +87,25 @@ export class MinioService implements OnModuleInit {
     objectName: string,
     options?: { bucket?: string; expiresIn?: number },
   ): Promise<string> {
-    return this.client.presignedGetObject(
-      options?.bucket ?? this.config.privateBucket,
+    const bucket = options?.bucket ?? this.config.privateBucket;
+    const internalUrl = await this.client.presignedGetObject(
+      bucket,
       objectName,
       options?.expiresIn ?? this.config.signedUrlExpiresIn,
     );
+
+    // 将内部 MinIO 地址替换为公共可访问的地址
+    // 例如: http://minio:9000/account-private/xxx?X-Amz-... → https://account.tankswift.top/minio/account-private/xxx?X-Amz-...
+    const internal = new URL(internalUrl);
+    const publicUrl = `${this.config.publicUrlPrefix}${internal.pathname}${internal.search}`;
+
+    if (publicUrl === internalUrl) {
+      this.logger.warn(
+        `Signed URL still uses internal address, check MINIO_PUBLIC_URL_PREFIX config`,
+      );
+    }
+
+    return publicUrl;
   }
 
   async getObjectBuffer(

@@ -38,6 +38,7 @@ const minioConfigSchema = {
   MINIO_USE_SSL: Joi.string().valid('true', 'false').default('false'),
   MINIO_BUCKET: Joi.string().trim().default('account'),
   MINIO_PRIVATE_BUCKET: Joi.string().trim().default('account-private'),
+  MINIO_PUBLIC_URL_PREFIX: Joi.string().allow('').default(''),
   MINIO_SIGNED_URL_EXPIRES_IN: Joi.number().integer().min(60).default(3600),
 };
 

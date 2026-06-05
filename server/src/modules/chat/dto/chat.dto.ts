@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsString,
   IsNotEmpty,
   IsOptional,
@@ -7,15 +9,72 @@ import {
   IsInt,
   ValidateNested,
   IsObject,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
-export class SendMessageDto {
-  @ApiProperty({ description: '用户消息内容', example: '午饭花了25' })
+export class ChatAttachmentDto {
+  @ApiProperty({ description: '附件类型', example: 'image' })
+  @IsString()
+  @IsIn(['image'])
+  type!: 'image';
+
+  @ApiProperty({ description: '存储桶标识', example: 'private' })
+  @IsString()
+  @IsIn(['private'])
+  bucket!: 'private';
+
+  @ApiProperty({ description: '对象存储 key' })
   @IsString()
   @IsNotEmpty()
-  content!: string;
+  objectKey!: string;
+
+  @ApiProperty({ description: '文件 MIME 类型', example: 'image/jpeg' })
+  @IsString()
+  @IsNotEmpty()
+  mimeType!: string;
+
+  @ApiPropertyOptional({ description: '原始文件名' })
+  @IsString()
+  @IsOptional()
+  fileName?: string;
+
+  @ApiPropertyOptional({ description: '文件大小（字节）' })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  fileSize?: number;
+
+  @ApiPropertyOptional({ description: '图片宽度' })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  width?: number;
+
+  @ApiPropertyOptional({ description: '图片高度' })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  height?: number;
+}
+
+export class SendMessageDto {
+  @ApiPropertyOptional({ description: '用户消息内容', example: '午饭花了25' })
+  @IsString()
+  @IsOptional()
+  content?: string;
+
+  @ApiPropertyOptional({
+    description: '聊天附件列表',
+    type: [ChatAttachmentDto],
+  })
+  @IsArray()
+  @ArrayMaxSize(4)
+  @ValidateNested({ each: true })
+  @Type(() => ChatAttachmentDto)
+  @IsOptional()
+  attachments?: ChatAttachmentDto[];
 }
 
 export class QueryChatDto {

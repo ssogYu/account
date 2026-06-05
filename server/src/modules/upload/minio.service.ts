@@ -6,7 +6,6 @@ import { minioConfig } from '../../config/configuration/minio.config';
 @Injectable()
 export class MinioService implements OnModuleInit {
   private client: Minio.Client;
-  private readonly bucket: string;
   private readonly config: ConfigType<typeof minioConfig>;
   private readonly logger = new Logger(MinioService.name);
 
@@ -15,7 +14,6 @@ export class MinioService implements OnModuleInit {
     config: ConfigType<typeof minioConfig>,
   ) {
     this.config = config;
-    this.bucket = config.bucket;
     this.client = new Minio.Client({
       endPoint: config.endPoint,
       port: config.port,
@@ -27,26 +25,8 @@ export class MinioService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      const exists = await this.client.bucketExists(this.bucket);
-      if (!exists) {
-        await this.client.makeBucket(this.bucket);
-        // 设置桶策略为公开只读，允许直接通过 URL 访问图片
-        const policy = {
-          Version: '2012-10-17',
-          Statement: [
-            {
-              Effect: 'Allow',
-              Principal: { AWS: ['*'] },
-              Action: ['s3:GetObject'],
-              Resource: [`arn:aws:s3:::${this.bucket}/*`],
-            },
-          ],
-        };
-        await this.client.setBucketPolicy(this.bucket, JSON.stringify(policy));
-        this.logger.log(
-          `MinIO bucket "${this.bucket}" created with public read policy`,
-        );
-      }
+      await this.ensureBucket(this.config.bucket, true);
+      await this.ensureBucket(this.config.privateBucket, false);
     } catch (error) {
       this.logger.error(
         `Failed to initialize MinIO bucket: ${error instanceof Error ? error.message : error}`,
@@ -60,9 +40,36 @@ export class MinioService implements OnModuleInit {
     buffer: Buffer,
     contentType: string,
   ): Promise<string> {
+    return this.uploadToBucket(
+      this.config.bucket,
+      objectName,
+      buffer,
+      contentType,
+    );
+  }
+
+  async uploadPrivate(
+    objectName: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
+    return this.uploadToBucket(
+      this.config.privateBucket,
+      objectName,
+      buffer,
+      contentType,
+    );
+  }
+
+  async uploadToBucket(
+    bucket: string,
+    objectName: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
     const metadata = { 'Content-Type': contentType };
     await this.client.putObject(
-      this.bucket,
+      bucket,
       objectName,
       buffer,
       undefined,
@@ -73,6 +80,64 @@ export class MinioService implements OnModuleInit {
 
   /** 生成可直接访问的 URL */
   getPublicUrl(objectName: string): string {
-    return `${this.config.publicUrlPrefix}/${this.bucket}/${objectName}`;
+    return `${this.config.publicUrlPrefix}/${this.config.bucket}/${objectName}`;
+  }
+
+  async getSignedUrl(
+    objectName: string,
+    options?: { bucket?: string; expiresIn?: number },
+  ): Promise<string> {
+    return this.client.presignedGetObject(
+      options?.bucket ?? this.config.privateBucket,
+      objectName,
+      options?.expiresIn ?? this.config.signedUrlExpiresIn,
+    );
+  }
+
+  async getObjectBuffer(
+    objectName: string,
+    options?: { bucket?: string },
+  ): Promise<Buffer> {
+    const stream = await this.client.getObject(
+      options?.bucket ?? this.config.privateBucket,
+      objectName,
+    );
+
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', (chunk) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      stream.on('end', () => resolve());
+      stream.on('error', reject);
+    });
+
+    return Buffer.concat(chunks);
+  }
+
+  private async ensureBucket(bucket: string, isPublic: boolean) {
+    const exists = await this.client.bucketExists(bucket);
+    if (!exists) {
+      await this.client.makeBucket(bucket);
+    }
+
+    if (isPublic) {
+      const policy = {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: { AWS: ['*'] },
+            Action: ['s3:GetObject'],
+            Resource: [`arn:aws:s3:::${bucket}/*`],
+          },
+        ],
+      };
+      await this.client.setBucketPolicy(bucket, JSON.stringify(policy));
+    }
+
+    this.logger.log(
+      `MinIO bucket "${bucket}" is ready${isPublic ? ' (public read)' : ' (private)'}`,
+    );
   }
 }

@@ -7,6 +7,7 @@ import { authConfig } from './configuration/auth.config';
 import { swaggerConfig } from './configuration/swagger.config';
 import { minioConfig } from './configuration/minio.config';
 import { llmConfig } from './configuration/llm.config';
+import { ocrConfig } from './configuration/ocr.config';
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 // 统一封装应用配置入口：
@@ -37,6 +38,7 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
         swaggerConfig,
         minioConfig,
         llmConfig,
+        ocrConfig,
       ],
       // 启动阶段统一做 Joi 校验，缺失或非法配置会直接阻止应用启动。
       validationSchema: envValidationSchema,

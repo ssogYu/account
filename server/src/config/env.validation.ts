@@ -37,6 +37,21 @@ const minioConfigSchema = {
   MINIO_ROOT_PASSWORD: Joi.string().trim().default('minioadmin'),
   MINIO_USE_SSL: Joi.string().valid('true', 'false').default('false'),
   MINIO_BUCKET: Joi.string().trim().default('account'),
+  MINIO_PRIVATE_BUCKET: Joi.string().trim().default('account-private'),
+  MINIO_SIGNED_URL_EXPIRES_IN: Joi.number().integer().min(60).default(3600),
+};
+
+const ocrConfigSchema = {
+  OCR_PROVIDER: Joi.string().valid('llm_vision', 'baidu').default('llm_vision'),
+  LLM_VISION_OCR_TIMEOUT_MS: Joi.number().integer().min(1000).default(15000),
+  LLM_VISION_OCR_MAX_IMAGES: Joi.number().integer().min(1).max(10).default(3),
+  LLM_VISION_OCR_MAX_IMAGE_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .default(5 * 1024 * 1024),
+  BAIDU_OCR_API_KEY: Joi.string().allow('').default(''),
+  BAIDU_OCR_SECRET_KEY: Joi.string().allow('').default(''),
+  BAIDU_OCR_TIMEOUT_MS: Joi.number().integer().min(1000).default(12000),
 };
 
 export const envValidationSchema = Joi.object({
@@ -44,4 +59,5 @@ export const envValidationSchema = Joi.object({
   ...loggerConfigSchema,
   ...jwtConfigSchema,
   ...minioConfigSchema,
+  ...ocrConfigSchema,
 });

@@ -13,13 +13,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useChatStore } from "@/stores/chat";
 import { useBillStore } from "@/stores/bill";
 import { useCategoryStore } from "@/stores/category";
 import { useAccountStore } from "@/stores/account";
 import { AddBillModal } from "@/components/AddBillModal";
 import { useTheme } from "@/theme";
-import { spacing, radius, typography } from "@/theme";
+import { spacing, radius, shadows, typography } from "@/theme";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   ChatBubble,
@@ -30,6 +31,17 @@ import {
 } from "@/components/chat";
 import type { ChatMessage } from "@/services/chat/types";
 import type { ConfirmBillEdits } from "@/components/chat/ConfirmCard";
+import { uploadService } from "@/services/upload";
+import { showToast } from "@/components/ui/Toast";
+import { Image } from "expo-image";
+
+type PendingImage = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  width?: number;
+  height?: number;
+};
 
 function TodayTicker({ expense, income }: { expense: number; income: number }) {
   const { colors } = useTheme();
@@ -159,6 +171,8 @@ export default function HomeScreen() {
   const { colors, resolvedScheme } = useTheme();
 
   const [inputText, setInputText] = useState("");
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [showMediaTray, setShowMediaTray] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const shouldScrollToBottomRef = useRef(false);
@@ -197,11 +211,75 @@ export default function HomeScreen() {
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
-    if (!text || isSending) return;
-    setInputText("");
+    if ((!text && !pendingImage) || isSending) return;
     shouldScrollToBottomRef.current = true;
-    await sendMessage(text);
-  }, [inputText, isSending, sendMessage]);
+    const nextPendingImage = pendingImage;
+
+    try {
+      let attachments = undefined;
+      if (nextPendingImage) {
+        const attachment =
+          await uploadService.uploadChatImage(nextPendingImage);
+        attachments = [attachment];
+      }
+
+      const result = await sendMessage({
+        content: text || undefined,
+        attachments,
+      });
+      if (result) {
+        setInputText("");
+        setPendingImage(null);
+        setShowMediaTray(false);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "上传图片失败，请稍后重试";
+      showToast(message);
+    }
+  }, [inputText, isSending, pendingImage, sendMessage]);
+
+  const handlePickImage = useCallback(async () => {
+    if (isSending) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+    setPendingImage({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+    });
+    setShowMediaTray(false);
+  }, [isSending]);
+
+  const handleTakePhoto = useCallback(async () => {
+    if (isSending) return;
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showToast("请先开启相机权限");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+    setPendingImage({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+    });
+    setShowMediaTray(false);
+  }, [isSending]);
 
   const handleQuickInput = useCallback(
     (text: string) => {
@@ -299,6 +377,11 @@ export default function HomeScreen() {
 
   const totalExpense = todaySummary?.totalExpense ?? 0;
   const totalIncome = todaySummary?.totalIncome ?? 0;
+  const pendingImageDescription = pendingImage?.fileName
+    ? pendingImage.fileName
+    : pendingImage?.width && pendingImage?.height
+      ? `${pendingImage.width}×${pendingImage.height}`
+      : "图片待发送";
 
   const styles = useMemo(
     () =>
@@ -348,43 +431,156 @@ export default function HomeScreen() {
         inputRow: {
           flexDirection: "row",
           alignItems: "center",
+          marginBottom: spacing.sm,
+        },
+        composerShell: {
+          flex: 1,
+          borderRadius: 24,
+          backgroundColor: colors.glass,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+          padding: spacing.sm,
+          ...shadows.elevated,
         },
         inputContainer: {
-          flex: 1,
-          flexDirection: "row",
-          alignItems: "center",
           backgroundColor: colors.bgElevated,
-          borderRadius: radius.xl,
-          paddingLeft: spacing.md + 4,
-          paddingRight: spacing.xs + 2,
+          borderRadius: 20,
+          paddingLeft: spacing.sm + 2,
+          paddingRight: spacing.xs,
           paddingVertical: spacing.xs,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.separator,
+        },
+        trayWrap: {
+          marginBottom: spacing.sm,
+        },
+        trayInner: {
+          flexDirection: "row",
+          gap: spacing.sm,
+        },
+        trayCard: {
+          flex: 1,
+          borderRadius: 18,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md - 2,
+          backgroundColor: colors.fillSecondary,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        trayCardPrimary: {
+          backgroundColor: colors.accentSubtle,
+          borderColor: "transparent",
+        },
+        trayIconWrap: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: spacing.sm,
+          backgroundColor: colors.bgElevated,
+        },
+        trayTitle: {
+          ...typography.subheadline,
+          color: colors.text,
+          fontWeight: "600",
+        },
+        trayDesc: {
+          ...typography.caption1,
+          color: colors.textSecondary,
+          marginTop: 2,
+        },
+        pendingImageInline: {
+          flexDirection: "row",
+          alignItems: "center",
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.sm,
+          gap: spacing.sm,
+          borderRadius: 18,
+          backgroundColor: colors.fillTertiary,
+        },
+        pendingImageCard: {
+          width: 58,
+          height: 58,
+          borderRadius: 14,
+          overflow: "hidden",
+          backgroundColor: colors.fillSecondary,
+        },
+        pendingImage: {
+          width: "100%",
+          height: "100%",
+        },
+        pendingImageMeta: {
+          flex: 1,
+          gap: 2,
+        },
+        pendingImageTitle: {
+          ...typography.subheadline,
+          color: colors.text,
+          fontWeight: "600",
+        },
+        pendingImageDesc: {
+          ...typography.caption1,
+          color: colors.textSecondary,
+        },
+        pendingRemove: {
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          backgroundColor: colors.bgElevated,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        composerRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          minHeight: 52,
+        },
+        mediaDock: {
+          marginRight: spacing.xs,
+        },
+        mediaIconBtn: {
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.fillSecondary,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+        },
+        mediaIconBtnActive: {
+          backgroundColor: colors.accent,
+          borderColor: colors.accent,
         },
         textInput: {
           flex: 1,
           ...typography.body,
           fontSize: 16,
           color: colors.text,
-          paddingVertical: spacing.sm + 2,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
+          paddingHorizontal: spacing.sm,
           maxHeight: 100,
         },
         sendBtn: {
-          width: 34,
-          height: 34,
-          borderRadius: 17,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
           backgroundColor: colors.accent,
           alignItems: "center",
           justifyContent: "center",
           marginLeft: spacing.xs,
+          ...shadows.subtle,
         },
         sendBtnDisabled: {
-          backgroundColor: colors.textQuaternary,
+          backgroundColor: colors.fillPrimary,
         },
         cancelSendBtn: {
-          width: 34,
-          height: 34,
-          borderRadius: 17,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
           backgroundColor: colors.fillSecondary,
           alignItems: "center",
           justifyContent: "center",
@@ -395,7 +591,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar
         barStyle={resolvedScheme === "dark" ? "light-content" : "dark-content"}
       />
@@ -474,50 +670,149 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.inputRow}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="告诉我你的消费..."
-              placeholderTextColor={colors.textTertiary}
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-              editable={!isSending}
-              maxLength={200}
-              accessibilityLabel="输入消费信息"
-            />
-            {isSending ? (
-              <TouchableOpacity
-                style={styles.cancelSendBtn}
-                onPress={cancelSend}
-                activeOpacity={0.7}
-                accessibilityLabel="取消发送"
-              >
-                <MaterialCommunityIcons
-                  name="close"
-                  size={16}
-                  color={colors.textSecondary}
+          <View style={styles.composerShell}>
+            {showMediaTray ? (
+              <View style={styles.trayWrap}>
+                <View style={styles.trayInner}>
+                  <TouchableOpacity
+                    style={[styles.trayCard, styles.trayCardPrimary]}
+                    onPress={handlePickImage}
+                    activeOpacity={0.8}
+                    accessibilityLabel="从相册选择图片"
+                  >
+                    <View style={styles.trayIconWrap}>
+                      <MaterialCommunityIcons
+                        name="image-multiple-outline"
+                        size={18}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <Text style={styles.trayTitle}>从相册选择</Text>
+                    <Text style={styles.trayDesc}>上传账单截图或订单图片</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.trayCard}
+                    onPress={handleTakePhoto}
+                    activeOpacity={0.8}
+                    accessibilityLabel="拍照上传图片"
+                  >
+                    <View style={styles.trayIconWrap}>
+                      <MaterialCommunityIcons
+                        name="camera-outline"
+                        size={18}
+                        color={colors.text}
+                      />
+                    </View>
+                    <Text style={styles.trayTitle}>直接拍照</Text>
+                    <Text style={styles.trayDesc}>适合纸质小票和收据</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.inputContainer}>
+              {pendingImage ? (
+                <View style={styles.pendingImageInline}>
+                  <View style={styles.pendingImageCard}>
+                    <Image
+                      source={{ uri: pendingImage.uri }}
+                      style={styles.pendingImage}
+                      contentFit="cover"
+                    />
+                  </View>
+                  <View style={styles.pendingImageMeta}>
+                    <Text style={styles.pendingImageTitle}>已添加图片账单</Text>
+                    <Text style={styles.pendingImageDesc} numberOfLines={1}>
+                      {pendingImageDescription}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.pendingRemove}
+                    onPress={() => setPendingImage(null)}
+                    activeOpacity={0.7}
+                    accessibilityLabel="移除图片"
+                  >
+                    <MaterialCommunityIcons
+                      name="close"
+                      size={16}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              <View style={styles.composerRow}>
+                <View style={styles.mediaDock}>
+                  <TouchableOpacity
+                    style={[
+                      styles.mediaIconBtn,
+                      (showMediaTray || pendingImage) &&
+                        styles.mediaIconBtnActive,
+                    ]}
+                    onPress={() => {
+                      if (isSending) return;
+                      setShowMediaTray((prev) => !prev);
+                    }}
+                    activeOpacity={0.7}
+                    accessibilityLabel="打开附件操作"
+                  >
+                    <MaterialCommunityIcons
+                      name={showMediaTray ? "close" : "plus"}
+                      size={20}
+                      color={
+                        showMediaTray || pendingImage
+                          ? "#FFFFFF"
+                          : colors.textSecondary
+                      }
+                    />
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.textInput}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="说一句，或者添加一张账单图片..."
+                  placeholderTextColor={colors.textTertiary}
+                  onFocus={() => setShowMediaTray(false)}
+                  onSubmitEditing={handleSend}
+                  returnKeyType="send"
+                  editable={!isSending}
+                  maxLength={200}
+                  accessibilityLabel="输入消费信息"
                 />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.sendBtn,
-                  !inputText.trim() && styles.sendBtnDisabled,
-                ]}
-                onPress={handleSend}
-                disabled={!inputText.trim()}
-                activeOpacity={0.7}
-                accessibilityLabel="发送消息"
-              >
-                <MaterialCommunityIcons
-                  name="arrow-up"
-                  size={18}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
-            )}
+                {isSending ? (
+                  <TouchableOpacity
+                    style={styles.cancelSendBtn}
+                    onPress={cancelSend}
+                    activeOpacity={0.7}
+                    accessibilityLabel="取消发送"
+                  >
+                    <MaterialCommunityIcons
+                      name="close"
+                      size={16}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.sendBtn,
+                      !inputText.trim() &&
+                        !pendingImage &&
+                        styles.sendBtnDisabled,
+                    ]}
+                    onPress={handleSend}
+                    disabled={!inputText.trim() && !pendingImage}
+                    activeOpacity={0.7}
+                    accessibilityLabel="发送消息"
+                  >
+                    <MaterialCommunityIcons
+                      name="arrow-up"
+                      size={18}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>

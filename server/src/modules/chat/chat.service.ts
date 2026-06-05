@@ -1,30 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma';
 import { LlmService } from '../llm';
 import { SendMessageDto, QueryChatDto } from './dto';
 import { createBillGraph } from './bill-graph';
 import type { BillItem } from './bill-graph';
 import type { Request } from 'express';
-
-export interface ParseResult {
-  type: 'expense' | 'income';
-  amount: number;
-  categoryName: string;
-  categoryIcon: string;
-  categoryId: string;
-  note: string;
-  date: string;
-  accountName: string;
-  accountId: string;
-  confidence: 'high' | 'medium' | 'low';
-  warning?: string;
-  needsConfirm?: boolean;
-}
-
-interface AssistantMetadata {
-  type: 'confirm_card' | 'guide' | 'confirmed' | 'rejected';
-  parseResults?: ParseResult[];
-}
+import { OcrService } from '../ocr';
+import { MinioService } from '../upload';
+import type {
+  AssistantMetadata,
+  ChatAttachment,
+  OcrEvidence,
+  ParseResult,
+} from './chat.types';
 
 @Injectable()
 export class ChatService {
@@ -33,6 +22,8 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly llmService: LlmService,
+    private readonly ocrService: OcrService,
+    private readonly minioService: MinioService,
   ) {}
 
   async sendMessage(userId: string, dto: SendMessageDto, req?: Request) {
@@ -43,10 +34,24 @@ export class ChatService {
     req?.on('close', onAbort);
 
     try {
-      const userMessage = await this.prisma.chatMessage.create({
-        data: { userId, role: 'user', content: dto.content },
-      });
+      const content = (dto.content ?? '').trim();
+      const attachments = this.normalizeAttachments(dto.attachments);
+      if (!content && attachments.length === 0) {
+        throw new BadRequestException('请输入消息内容或上传图片后再发送');
+      }
 
+      const userMetadata: { attachments: ChatAttachment[] } | undefined =
+        attachments.length > 0 ? { attachments } : undefined;
+
+      const userMessage = await this.prisma.chatMessage.create({
+        data: {
+          userId,
+          role: 'user',
+          content: content || '发送了一张账单图片',
+          metadata: userMetadata ? this.toJsonObject(userMetadata) : undefined,
+        },
+      });
+      // 从数据库中获取所有分类和账户
       const categories = await this.prisma.category.findMany({
         where: {
           OR: [{ isSystem: true }, { userId }],
@@ -76,19 +81,43 @@ export class ChatService {
         accounts.map((a) => ({ name: a.name, id: a.id })),
       );
 
+      // 处理用户取消请求 检查点 1
       if (aborted.value) {
-        return { userMessage, assistantMessage: null, parseResults: null };
+        return {
+          userMessage: await this.serializeMessage(userMessage),
+          assistantMessage: null,
+          parseResults: null,
+        };
       }
 
-      const parseResults = await this.runBillGraph(
-        userId,
-        dto.content,
-        categoriesJson,
-        accountsJson,
-      );
+      const parseResponse = attachments.length
+        ? await this.runOcrFlow({
+            userId,
+            content,
+            attachments,
+            categoriesJson,
+            accountsJson,
+          })
+        : {
+            parseResults: await this.runBillGraph(
+              userId,
+              content,
+              categoriesJson,
+              accountsJson,
+            ),
+            source: 'text' as const,
+            ocrEvidence: undefined,
+          };
 
+      const parseResults = parseResponse.parseResults;
+
+      // 处理用户取消请求 检查点 2
       if (aborted.value) {
-        return { userMessage, assistantMessage: null, parseResults: null };
+        return {
+          userMessage: await this.serializeMessage(userMessage),
+          assistantMessage: null,
+          parseResults: null,
+        };
       }
 
       let assistantContent: string;
@@ -107,40 +136,193 @@ export class ChatService {
 
         if (needsConfirm) {
           assistantContent = this.buildConfirmMessage(parseResults);
-          metadata = { type: 'confirm_card', parseResults };
+          metadata = {
+            type: 'confirm_card',
+            source: parseResponse.source,
+            parseResults,
+            attachments: attachments.length > 0 ? attachments : undefined,
+            ocrEvidence: parseResponse.ocrEvidence,
+          };
         } else {
           const created = await this.createBillsFromParse(userId, parseResults);
           billIds = created.map((b) => b.id);
           const summary = this.buildAutoConfirmedSummary(parseResults);
           assistantContent = summary;
-          metadata = { type: 'confirmed', parseResults };
+          metadata = {
+            type: 'confirmed',
+            source: parseResponse.source,
+            parseResults,
+            attachments: attachments.length > 0 ? attachments : undefined,
+            ocrEvidence: parseResponse.ocrEvidence,
+          };
         }
       } else {
-        assistantContent = this.buildGuideMessage(dto.content);
-        metadata = { type: 'guide' };
+        assistantContent = this.buildGuideMessage(
+          content,
+          attachments.length > 0,
+        );
+        metadata = {
+          type: 'guide',
+          source: attachments.length > 0 ? 'ocr' : 'text',
+          attachments: attachments.length > 0 ? attachments : undefined,
+          ocrEvidence: parseResponse.ocrEvidence,
+        };
       }
 
-      const assistantMessage = await this.prisma.chatMessage.create({
+      const assistantMessageRecord = await this.prisma.chatMessage.create({
         data: {
           userId,
           role: 'assistant',
           content: assistantContent,
-          metadata: metadata as any,
+          metadata: this.toJsonObject(metadata),
           ...(billIds.length > 0 ? { billId: billIds[0] } : {}),
         },
       });
 
-      return { userMessage, assistantMessage, parseResults };
+      return {
+        userMessage: await this.serializeMessage(userMessage),
+        assistantMessage: await this.serializeMessage(assistantMessageRecord),
+        parseResults,
+      };
     } finally {
       req?.off('close', onAbort);
     }
   }
 
+  private normalizeAttachments(
+    attachments?: SendMessageDto['attachments'],
+  ): ChatAttachment[] {
+    return (
+      attachments?.map((attachment) => ({
+        type: 'image',
+        bucket: 'private',
+        objectKey: attachment.objectKey,
+        mimeType: attachment.mimeType,
+        fileName: attachment.fileName,
+        fileSize: attachment.fileSize,
+        width: attachment.width,
+        height: attachment.height,
+      })) ?? []
+    );
+  }
+
+  // 运行OCR流程
+  private async runOcrFlow(input: {
+    userId: string;
+    content: string;
+    attachments: ChatAttachment[];
+    categoriesJson: string;
+    accountsJson: string;
+  }): Promise<{
+    parseResults: ParseResult[] | null;
+    source: 'ocr';
+    ocrEvidence?: OcrEvidence;
+  }> {
+    try {
+      const result = await this.ocrService.parseBillImages({
+        content: input.content,
+        attachments: input.attachments,
+      });
+      const graphInput = this.buildOcrGraphInput({
+        content: input.content,
+        extractedText: result.extractedText,
+        matchedFields: result.matchedFields,
+      });
+      const parseResults = await this.runBillGraph(
+        input.userId,
+        graphInput,
+        input.categoriesJson,
+        input.accountsJson,
+        { allowLocalFallback: false },
+      );
+
+      return {
+        parseResults,
+        source: 'ocr',
+        ocrEvidence: {
+          provider: result.provider,
+          sceneType: result.sceneType,
+          extractedText: result.extractedText,
+          matchedFields: result.matchedFields,
+        },
+      };
+    } catch (error) {
+      this.logger.warn(
+        `OCR 识别失败: ${error instanceof Error ? error.message : error}`,
+      );
+      return {
+        parseResults: null,
+        source: 'ocr',
+        ocrEvidence: {
+          provider: this.llmService.getProvider(),
+          sceneType: 'unknown',
+          extractedText: '',
+          matchedFields: {
+            error: error instanceof Error ? error.message : 'OCR 识别失败',
+          },
+        },
+      };
+    }
+  }
+
+  private buildOcrGraphInput(input: {
+    content: string;
+    extractedText: string;
+    matchedFields?: Record<string, string>;
+  }): string {
+    const sections = [
+      '以下内容来自账单图片 OCR 抽文，请基于这些信息完成记账解析。',
+      input.content ? `用户补充说明：${input.content}` : '',
+      input.matchedFields
+        ? `OCR 初步字段：${JSON.stringify(input.matchedFields, null, 2)}`
+        : '',
+      `OCR 全文：\n${input.extractedText}`,
+    ].filter(Boolean);
+
+    return sections.join('\n\n');
+  }
+
+  private async serializeMessage<
+    T extends {
+      metadata: unknown;
+    },
+  >(message: T): Promise<T> {
+    if (!message.metadata || typeof message.metadata !== 'object') {
+      return message;
+    }
+
+    const metadata = message.metadata as AssistantMetadata;
+    if (!metadata.attachments || metadata.attachments.length === 0) {
+      return message;
+    }
+
+    const attachments = await Promise.all(
+      metadata.attachments.map(async (attachment) => ({
+        ...attachment,
+        previewUrl: await this.minioService.getSignedUrl(attachment.objectKey),
+      })),
+    );
+
+    return {
+      ...message,
+      metadata: {
+        ...metadata,
+        attachments,
+      },
+    };
+  }
+
+  private toJsonObject(value: object): Prisma.InputJsonObject {
+    return value;
+  }
+
+  // 运行账单解析流程
   private async runBillGraph(
     userId: string,
     input: string,
     categoriesJson: string,
     accountsJson: string,
+    options?: { allowLocalFallback?: boolean },
   ): Promise<ParseResult[] | null> {
     try {
       const chatModel = this.llmService.getModel();
@@ -170,7 +352,7 @@ export class ChatService {
         categoryName: b.categoryName || '其他',
         categoryIcon: b.categoryIcon || '',
         categoryId: b.categoryId || '',
-        note: b.note || input,
+        note: b.note || this.getFallbackNote(input),
         date: b.date || today,
         accountName: b.accountName || '',
         accountId: b.accountId || '',
@@ -189,8 +371,31 @@ export class ChatService {
       this.logger.error(
         `LangGraph 执行失败: ${err instanceof Error ? err.message : err}`,
       );
+      if (options?.allowLocalFallback === false) {
+        return null;
+      }
       return this.localParse(userId, input);
     }
+  }
+
+  private getFallbackNote(input: string): string {
+    const merchantMatch = input.match(/"merchant"\s*:\s*"([^"]+)"/);
+    if (merchantMatch?.[1]) {
+      return merchantMatch[1];
+    }
+
+    const ocrTextMatch = input.match(/OCR 全文：\n([\s\S]+)/);
+    if (ocrTextMatch?.[1]) {
+      const firstMeaningfulLine = ocrTextMatch[1]
+        .split('\n')
+        .map((line) => line.trim())
+        .find(Boolean);
+      if (firstMeaningfulLine) {
+        return firstMeaningfulLine;
+      }
+    }
+
+    return input;
   }
 
   private async createBillsFromParse(
@@ -249,7 +454,12 @@ export class ChatService {
       nextCursor = nextItem.id;
     }
 
-    return { items: messages.reverse(), nextCursor };
+    return {
+      items: await Promise.all(
+        messages.reverse().map((message) => this.serializeMessage(message)),
+      ),
+      nextCursor,
+    };
   }
 
   async confirmBill(
@@ -344,10 +554,11 @@ export class ChatService {
         where: { id: messageId },
         data: {
           billId: bill.id,
-          metadata: {
+          metadata: this.toJsonObject({
+            ...this.toJsonObject(meta),
             type: newType,
             parseResults,
-          } as any,
+          }),
         },
       });
 
@@ -489,10 +700,11 @@ export class ChatService {
         where: { id: messageId },
         data: {
           billId: bills[0]?.id ?? null,
-          metadata: {
+          metadata: this.toJsonObject({
+            ...this.toJsonObject(meta),
             type: 'confirmed',
             parseResults: updatedParseResults,
-          } as any,
+          }),
         },
       });
 
@@ -529,7 +741,12 @@ export class ChatService {
 
       await tx.chatMessage.update({
         where: { id: messageId },
-        data: { metadata: { ...meta, type: 'rejected' } as any },
+        data: {
+          metadata: this.toJsonObject({
+            ...this.toJsonObject(meta),
+            type: 'rejected',
+          }),
+        },
       });
 
       await tx.chatMessage.create({
@@ -777,7 +994,10 @@ export class ChatService {
     return `已记录 ✓ ${lines.join('、')}，合计 ¥${total.toFixed(2)}`;
   }
 
-  private buildGuideMessage(_content: string): string {
+  private buildGuideMessage(_content: string, hasAttachments = false): string {
+    if (hasAttachments) {
+      return '这张图片我暂时没能稳定识别成账单。\n\n你可以试试：\n• 上传更清晰的支付截图或小票\n• 补一句说明，例如“这是昨天晚饭”\n• 直接手动补充金额、分类后再确认';
+    }
     return `我还没理解你的记账意图？\n\n你可以这样告诉我：\n• "午饭花了25"\n• "打车15元"\n• "午饭25，打车15，奶茶8"\n• "收到工资8000"\n\n直接描述你的消费，我会帮你自动识别。`;
   }
 

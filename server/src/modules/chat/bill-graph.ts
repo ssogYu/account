@@ -95,6 +95,26 @@ function findAccountInList(
   }
 }
 
+function getFallbackNote(input: string): string {
+  const merchantMatch = input.match(/"merchant"\s*:\s*"([^"]+)"/);
+  if (merchantMatch?.[1]) {
+    return merchantMatch[1];
+  }
+
+  const ocrTextMatch = input.match(/OCR 全文：\n([\s\S]+)/);
+  if (ocrTextMatch?.[1]) {
+    const firstMeaningfulLine = ocrTextMatch[1]
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean);
+    if (firstMeaningfulLine) {
+      return firstMeaningfulLine;
+    }
+  }
+
+  return input;
+}
+
 async function semanticParse(
   state: BillStateType,
   chatModel: BaseChatModel,
@@ -109,7 +129,7 @@ async function semanticParse(
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
 
-  const systemPrompt = `你是一个智能记账助手。用户会告诉你消费信息，你需要从中提取结构化数据。
+  const systemPrompt = `你是一个智能记账助手。输入可能来自用户直接输入，也可能来自账单图片 OCR 抽文，你需要从中提取结构化记账数据。
 
 规则：
 1. 如果用户输入不包含记账意图（如闲聊、提问等），设置 parsed=false，bills 为空数组
@@ -121,6 +141,8 @@ async function semanticParse(
 7. 用户可能一次输入多笔消费（如"午饭25，打车15，奶茶8"），必须将每笔消费拆分为 bills 数组中的独立项
 8. 如果用户只输入了一笔消费，bills 数组中只有一项
 9. 账单名称note不能直接使用用户输入，比如“买了奶茶”不能直接设置“买了奶茶”，而要提取“奶茶”，比如我今天在淘宝买了衣服，要提取“衣服”
+10. 如果输入中包含“OCR 全文”“OCR 初步字段”等段落，应将其视为图片提取结果，优先依据明确的金额、日期、商户、支付方式进行判断
+11. OCR 文本可能包含噪音、重复行或无关字段，你需要忽略噪音，只提取最可信的账单信息
 
 可用分类：
 ${state.categoriesJson}
@@ -149,7 +171,7 @@ ${state.accountsJson}
     const bills: BillItem[] = result.bills.map((b) => ({
       type: b.type,
       amount: b.amount,
-      note: b.note || state.input,
+      note: b.note || getFallbackNote(state.input),
       date: b.date || today,
       categoryName: b.categoryName,
       accountName: b.accountName || '',

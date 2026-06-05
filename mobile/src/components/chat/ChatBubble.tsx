@@ -31,15 +31,17 @@ export function ChatBubble({
   const { colors } = useTheme();
   const userAvatar = useAuthStore((s) => s.user?.avatar);
   const isUser = message.role === "user";
-  const meta = !isUser ? message.metadata : null;
+  const meta = message.metadata;
+  const assistantMeta = (!isUser ? meta : null) as any;
 
-  const isConfirmCard = meta?.type === "confirm_card";
-  const isConfirmed = meta?.type === "confirmed" && !!message.billId;
-  const isRejected = meta?.type === "rejected";
+  const isConfirmCard = assistantMeta?.type === "confirm_card";
+  const isConfirmed = assistantMeta?.type === "confirmed" && !!message.billId;
+  const isRejected = assistantMeta?.type === "rejected";
+  const attachments = meta?.attachments ?? [];
   const showConfirmCard =
     (isConfirmCard || isConfirmed) &&
-    meta?.parseResults &&
-    meta.parseResults.length > 0;
+    assistantMeta?.parseResults &&
+    assistantMeta.parseResults.length > 0;
 
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -138,6 +140,13 @@ export function ChatBubble({
           ...typography.footnote,
           color: colors.textQuaternary,
         },
+        attachmentImage: {
+          width: 180,
+          height: 180,
+          borderRadius: 12,
+          marginBottom: message.content ? 8 : 0,
+          backgroundColor: colors.fillSecondary,
+        },
       }),
     [colors],
   );
@@ -163,18 +172,36 @@ export function ChatBubble({
           isUser ? styles.bubbleUser : styles.bubbleAssistant,
         ]}
       >
-        {showConfirmCard ? (
+        {!showConfirmCard && attachments.length > 0 ? (
+          <View>
+            {attachments.map((attachment, index) =>
+              attachment.previewUrl ? (
+                <Image
+                  key={`${attachment.objectKey}-${index}`}
+                  source={{ uri: attachment.previewUrl }}
+                  style={styles.attachmentImage}
+                  contentFit="cover"
+                />
+              ) : null,
+            )}
+            {message.content ? (
+              <Text style={[styles.text, isUser && styles.textUser]}>
+                {message.content}
+              </Text>
+            ) : null}
+          </View>
+        ) : showConfirmCard ? (
           <ConfirmCard
-            parseResults={meta!.parseResults!}
+            parseResults={assistantMeta!.parseResults!}
             messageId={message.id}
             confirmed={isConfirmed}
             onConfirm={onConfirm}
             onConfirmAll={onConfirmAll}
             onReject={onReject}
           />
-        ) : isRejected && meta?.parseResults ? (
+        ) : isRejected && assistantMeta?.parseResults ? (
           <View style={styles.rejectedRow}>
-            {meta.parseResults.map((pr, i) => (
+            {assistantMeta.parseResults.map((pr: any, i: number) => (
               <View key={i} style={styles.rejectedItem}>
                 <CategoryIcon
                   iconKey={pr.categoryIcon}

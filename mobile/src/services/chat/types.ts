@@ -1,5 +1,24 @@
+export interface ChatAttachment {
+  type: "image";
+  bucket: "private";
+  objectKey: string;
+  mimeType: string;
+  fileName?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+  previewUrl?: string;
+}
+
+export interface OcrEvidence {
+  provider: string;
+  sceneType: string;
+  extractedText: string;
+  matchedFields?: Record<string, string>;
+}
+
 export interface ParseResult {
-  type: 'expense' | 'income';
+  type: "expense" | "income";
   amount: number;
   categoryName: string;
   categoryIcon: string;
@@ -8,28 +27,37 @@ export interface ParseResult {
   date: string;
   accountName: string;
   accountId: string;
-  confidence: 'high' | 'medium' | 'low';
+  confidence: "high" | "medium" | "low";
   needsConfirm?: boolean;
   warning?: string;
 }
 
-export interface AssistantMetadata {
-  type: 'confirm_card' | 'guide' | 'confirmed' | 'rejected';
-  parseResults?: ParseResult[];
+export interface BaseChatMetadata {
+  attachments?: ChatAttachment[];
 }
+
+export interface AssistantMetadata extends BaseChatMetadata {
+  type: "confirm_card" | "guide" | "confirmed" | "rejected";
+  source?: "text" | "ocr";
+  parseResults?: ParseResult[];
+  ocrEvidence?: OcrEvidence;
+}
+
+export type ChatMessageMetadata = BaseChatMetadata | AssistantMetadata;
 
 export interface ChatMessage {
   id: string;
   userId: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   billId: string | null;
-  metadata: AssistantMetadata | null;
+  metadata: ChatMessageMetadata | null;
   createdAt: string;
 }
 
 export interface SendMessageParams {
-  content: string;
+  content?: string;
+  attachments?: ChatAttachment[];
 }
 
 export interface SendMessageResult {

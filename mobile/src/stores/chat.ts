@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { chatService } from '@/services/chat';
 import type {
+  ChatAttachment,
   ChatMessage,
   SendMessageResult,
   ConfirmBillParams,
@@ -22,7 +23,10 @@ interface ChatState {
 
   fetchHistory: () => Promise<void>;
   loadMore: () => Promise<void>;
-  sendMessage: (content: string) => Promise<SendMessageResult | null>;
+  sendMessage: (params: {
+    content?: string;
+    attachments?: ChatAttachment[];
+  }) => Promise<SendMessageResult | null>;
   cancelSend: () => void;
   confirmBill: (params: ConfirmBillParams) => Promise<boolean>;
   confirmAllBills: (params: ConfirmAllBillsParams) => Promise<boolean>;
@@ -76,13 +80,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  async sendMessage(content: string) {
+  async sendMessage(params) {
     const controller = new AbortController();
     set({ isSending: true, error: null, abortController: controller });
     try {
-      const result = await chatService.sendMessage({ content }, controller.signal);
+      const result = await chatService.sendMessage(params, controller.signal);
+      const nextMessages = [result.userMessage];
+      if (result.assistantMessage) {
+        nextMessages.push(result.assistantMessage);
+      }
       set((state) => ({
-        messages: [...state.messages, result.userMessage, result.assistantMessage],
+        messages: [...state.messages, ...nextMessages],
         isSending: false,
         abortController: null,
       }));

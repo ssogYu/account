@@ -11,6 +11,11 @@ export const minioConfig = registerAs('minio', () => ({
     'minioadmin',
   useSSL: process.env.MINIO_USE_SSL === 'true',
   bucket: process.env.MINIO_BUCKET ?? 'account',
+  privateBucket: process.env.MINIO_PRIVATE_BUCKET ?? 'account-private',
+  signedUrlExpiresIn: parseInt(
+    process.env.MINIO_SIGNED_URL_EXPIRES_IN ?? '3600',
+    10,
+  ),
   publicUrlPrefix:
     process.env.MINIO_PUBLIC_URL_PREFIX ??
     `http://${process.env.MINIO_ENDPOINT ?? 'localhost'}:${process.env.MINIO_PORT ?? '9000'}`,

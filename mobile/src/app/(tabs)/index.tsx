@@ -769,7 +769,7 @@ export default function HomeScreen() {
                   style={styles.textInput}
                   value={inputText}
                   onChangeText={setInputText}
-                  placeholder="说一句，或者添加一张账单图片..."
+                  placeholder="说一句，或添加一张账单图片..."
                   placeholderTextColor={colors.textTertiary}
                   onFocus={() => setShowMediaTray(false)}
                   onSubmitEditing={handleSend}

@@ -13,7 +13,10 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiPropertyOptional,
 } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, Min } from 'class-validator';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { ResponseMessage } from '../../common/decorators';
@@ -26,7 +29,18 @@ const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const CHAT_IMAGE_MAX_SIZE = 8 * 1024 * 1024; // 8MB
 
 class UploadChatImageDto {
+  @ApiPropertyOptional({ description: '图片宽度', example: 1179 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   width?: number;
+
+  @ApiPropertyOptional({ description: '图片高度', example: 2556 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   height?: number;
 }
 

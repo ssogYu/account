@@ -1,16 +1,17 @@
-import { create } from 'zustand';
-import axios from 'axios';
-import { chatService } from '@/services/chat';
+import { create } from "zustand";
+import axios from "axios";
+import { chatService } from "@/services/chat";
 import type {
-  ChatAttachment,
+  AssistantMetadata,
+  ChatAttachmentPayload,
   ChatMessage,
   SendMessageResult,
   ConfirmBillParams,
   ConfirmAllBillsParams,
-} from '@/services/chat/types';
-import { AppError } from '@/services/api';
-import { showToast } from '@/components/ui/Toast';
-import { useBillStore } from '@/stores/bill';
+} from "@/services/chat/types";
+import { AppError } from "@/services/api";
+import { showToast } from "@/components/ui/Toast";
+import { useBillStore } from "@/stores/bill";
 
 interface ChatState {
   messages: ChatMessage[];
@@ -25,13 +26,24 @@ interface ChatState {
   loadMore: () => Promise<void>;
   sendMessage: (params: {
     content?: string;
-    attachments?: ChatAttachment[];
+    attachments?: ChatAttachmentPayload[];
   }) => Promise<SendMessageResult | null>;
   cancelSend: () => void;
   confirmBill: (params: ConfirmBillParams) => Promise<boolean>;
   confirmAllBills: (params: ConfirmAllBillsParams) => Promise<boolean>;
   rejectBill: (messageId: string) => Promise<boolean>;
   clearError: () => void;
+}
+
+function getAssistantMetadata(
+  message: ChatMessage | undefined,
+): AssistantMetadata | null {
+  const metadata = message?.metadata;
+  if (!metadata || !("type" in metadata)) {
+    return null;
+  }
+
+  return metadata;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -54,7 +66,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isLoading: false,
       });
     } catch (err) {
-      const message = err instanceof AppError ? err.message : '获取对话历史失败';
+      const message =
+        err instanceof AppError ? err.message : "获取对话历史失败";
       set({ error: message, isLoading: false });
       showToast(message);
     }
@@ -74,7 +87,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isLoading: false,
       }));
     } catch (err) {
-      const message = err instanceof AppError ? err.message : '加载更多失败';
+      const message = err instanceof AppError ? err.message : "加载更多失败";
       set({ error: message, isLoading: false });
       showToast(message);
     }
@@ -100,7 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ isSending: false, abortController: null });
         return null;
       }
-      const message = err instanceof AppError ? err.message : '发送消息失败';
+      const message = err instanceof AppError ? err.message : "发送消息失败";
       set({ error: message, isSending: false, abortController: null });
       showToast(message);
       return null;
@@ -119,25 +132,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await chatService.confirmBill(params);
       if (result.confirmed) {
-        const parseResults = get().messages.find((m) => m.id === params.messageId)?.metadata
-          ?.parseResults;
+        const parseResults = getAssistantMetadata(
+          get().messages.find((m) => m.id === params.messageId),
+        )?.parseResults;
         const isSingle = parseResults?.length === 1;
-        const confirmContent = isSingle ? '确认' : `确认第${params.billIndex + 1}笔`;
+        const confirmContent = isSingle
+          ? "确认"
+          : `确认第${params.billIndex + 1}笔`;
         set((state) => ({
           messages: [
             ...state.messages.map((msg) =>
-              msg.id === params.messageId
+              msg.id === params.messageId &&
+              getAssistantMetadata(msg)?.parseResults
                 ? {
                     ...msg,
                     billId: result.billId ?? null,
                     metadata: {
-                      ...msg.metadata!,
-                      type: msg.metadata!.parseResults!.every(
-                        (pr, i) => i === params.billIndex || pr.needsConfirm === false,
+                      ...getAssistantMetadata(msg)!,
+                      type: getAssistantMetadata(msg)!.parseResults!.every(
+                        (pr, i) =>
+                          i === params.billIndex || pr.needsConfirm === false,
                       )
-                        ? ('confirmed' as const)
-                        : ('confirm_card' as const),
-                      parseResults: msg.metadata!.parseResults!.map((pr, i) =>
+                        ? ("confirmed" as const)
+                        : ("confirm_card" as const),
+                      parseResults: getAssistantMetadata(
+                        msg,
+                      )!.parseResults!.map((pr, i) =>
                         i === params.billIndex
                           ? { ...pr, ...params.edits, needsConfirm: false }
                           : pr,
@@ -148,8 +168,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ),
             {
               id: `confirm-${params.messageId}-${params.billIndex}`,
-              userId: '',
-              role: 'user' as const,
+              userId: "",
+              role: "user" as const,
               content: confirmContent,
               billId: result.billId ?? null,
               metadata: null,
@@ -161,7 +181,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return result.confirmed;
     } catch (err) {
-      const message = err instanceof AppError ? err.message : '确认账单失败';
+      const message = err instanceof AppError ? err.message : "确认账单失败";
       set({ error: message });
       showToast(message);
       return false;
@@ -175,14 +195,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((state) => ({
           messages: [
             ...state.messages.map((msg) =>
-              msg.id === params.messageId
+              msg.id === params.messageId &&
+              getAssistantMetadata(msg)?.parseResults
                 ? {
                     ...msg,
                     billId: result.billIds?.[0] ?? null,
                     metadata: {
-                      ...msg.metadata!,
-                      type: 'confirmed' as const,
-                      parseResults: msg.metadata!.parseResults!.map((pr, i) => {
+                      ...getAssistantMetadata(msg)!,
+                      type: "confirmed" as const,
+                      parseResults: getAssistantMetadata(
+                        msg,
+                      )!.parseResults!.map((pr, i) => {
                         const billEdits = params.edits?.[i];
                         return {
                           ...pr,
@@ -196,9 +219,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ),
             {
               id: `confirm-all-${params.messageId}`,
-              userId: '',
-              role: 'user' as const,
-              content: '全部确认',
+              userId: "",
+              role: "user" as const,
+              content: "全部确认",
               billId: result.billIds?.[0] ?? null,
               metadata: null,
               createdAt: new Date().toISOString(),
@@ -209,7 +232,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return result.confirmed;
     } catch (err) {
-      const message = err instanceof AppError ? err.message : '确认账单失败';
+      const message = err instanceof AppError ? err.message : "确认账单失败";
       set({ error: message });
       showToast(message);
       return false;
@@ -223,7 +246,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((state) => {
           const updated = state.messages.map((msg) =>
             msg.id === messageId
-              ? { ...msg, metadata: { ...msg.metadata!, type: 'rejected' as const } }
+              ? {
+                  ...msg,
+                  metadata: { ...msg.metadata!, type: "rejected" as const },
+                }
               : msg,
           );
           return {
@@ -231,18 +257,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
               ...updated,
               {
                 id: `reject-${messageId}`,
-                userId: '',
-                role: 'user' as const,
-                content: '取消',
+                userId: "",
+                role: "user" as const,
+                content: "取消",
                 billId: null,
                 metadata: null,
                 createdAt: new Date().toISOString(),
               },
               {
                 id: `reject-reply-${messageId}`,
-                userId: '',
-                role: 'assistant' as const,
-                content: '好的，已取消这些记录。有需要随时告诉我。',
+                userId: "",
+                role: "assistant" as const,
+                content: "好的，已取消这些记录。有需要随时告诉我。",
                 billId: null,
                 metadata: null,
                 createdAt: new Date().toISOString(),
@@ -253,7 +279,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return result.rejected;
     } catch (err) {
-      const message = err instanceof AppError ? err.message : '取消失败';
+      const message = err instanceof AppError ? err.message : "取消失败";
       set({ error: message });
       showToast(message);
       return false;

@@ -1,4 +1,4 @@
-export interface ChatAttachment {
+export interface ChatAttachmentPayload {
   type: "image";
   bucket: "private";
   objectKey: string;
@@ -7,6 +7,9 @@ export interface ChatAttachment {
   fileSize?: number;
   width?: number;
   height?: number;
+}
+
+export interface ChatAttachment extends ChatAttachmentPayload {
   previewUrl?: string;
 }
 
@@ -57,7 +60,7 @@ export interface ChatMessage {
 
 export interface SendMessageParams {
   content?: string;
-  attachments?: ChatAttachment[];
+  attachments?: ChatAttachmentPayload[];
 }
 
 export interface SendMessageResult {

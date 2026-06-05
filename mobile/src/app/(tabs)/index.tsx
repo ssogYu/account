@@ -29,7 +29,11 @@ import {
   WELCOME_MESSAGES,
   QUICK_INPUTS,
 } from "@/components/chat";
-import type { ChatMessage } from "@/services/chat/types";
+import type {
+  ChatAttachment,
+  ChatAttachmentPayload,
+  ChatMessage,
+} from "@/services/chat/types";
 import type { ConfirmBillEdits } from "@/components/chat/ConfirmCard";
 import { uploadService } from "@/services/upload";
 import { showToast } from "@/components/ui/Toast";
@@ -42,6 +46,21 @@ type PendingImage = {
   width?: number;
   height?: number;
 };
+
+function toChatAttachmentPayload(
+  attachment: ChatAttachment,
+): ChatAttachmentPayload {
+  return {
+    type: attachment.type,
+    bucket: attachment.bucket,
+    objectKey: attachment.objectKey,
+    mimeType: attachment.mimeType,
+    fileName: attachment.fileName,
+    fileSize: attachment.fileSize,
+    width: attachment.width,
+    height: attachment.height,
+  };
+}
 
 function TodayTicker({ expense, income }: { expense: number; income: number }) {
   const { colors } = useTheme();
@@ -220,7 +239,7 @@ export default function HomeScreen() {
       if (nextPendingImage) {
         const attachment =
           await uploadService.uploadChatImage(nextPendingImage);
-        attachments = [attachment];
+        attachments = [toChatAttachmentPayload(attachment)];
       }
 
       const result = await sendMessage({

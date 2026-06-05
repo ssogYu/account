@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { ocrConfig } from '../../config/configuration/ocr.config';
 import { MinioService } from '../upload';
@@ -25,6 +30,7 @@ interface BaiduOcrResponse {
 @Injectable()
 export class BaiduOcrProvider extends OcrProvider {
   readonly name = 'baidu';
+  private readonly logger = new Logger(BaiduOcrProvider.name);
 
   private accessToken: string | null = null;
   private accessTokenExpiresAt = 0;
@@ -49,30 +55,29 @@ export class BaiduOcrProvider extends OcrProvider {
     }
 
     const accessToken = await this.getAccessToken();
-    const textBlocks: string[] = [];
+
+    // 并行处理多张图片：MinIO 读取 + 百度 OCR 同时进行
+    const results = await Promise.all(
+      input.attachments.map(async (attachment) => {
+        const buffer = await this.minioService.getObjectBuffer(
+          attachment.objectKey,
+        );
+        const ocrResponse = await this.callAccurateBasic(accessToken, buffer);
+        const words = (ocrResponse.words_result ?? [])
+          .map((item) => item.words?.trim())
+          .filter((item): item is string => !!item);
+        return words;
+      }),
+    );
+
+    const textBlocks = results.filter((words) => words.length > 0);
     const matchedFieldsCollection: Record<string, string> = {};
-
-    for (const attachment of input.attachments) {
-      const buffer = await this.minioService.getObjectBuffer(
-        attachment.objectKey,
-      );
-      const ocrResponse = await this.callAccurateBasic(accessToken, buffer);
-      const words = (ocrResponse.words_result ?? [])
-        .map((item) => item.words?.trim())
-        .filter((item): item is string => !!item);
-
-      if (words.length === 0) {
-        continue;
-      }
-
-      const rawText = words.join('\n');
-      textBlocks.push(rawText);
-
+    for (const words of textBlocks) {
       const matchedFields = this.extractMatchedFields(words);
       Object.assign(matchedFieldsCollection, matchedFields);
     }
 
-    const rawText = textBlocks.join('\n\n');
+    const rawText = textBlocks.map((words) => words.join('\n')).join('\n\n');
     if (!rawText.trim()) {
       throw new BadRequestException(
         '百度 OCR 未识别到可用文字，请尝试上传更清晰的图片',
@@ -115,12 +120,13 @@ export class BaiduOcrProvider extends OcrProvider {
     this.accessToken = result.access_token;
     this.accessTokenExpiresAt =
       now + Math.max((result.expires_in ?? 2592000) - 300, 300) * 1000;
-    return result.access_token;
+    return this.accessToken;
   }
 
   private async callAccurateBasic(
     accessToken: string,
     buffer: Buffer,
+    retries = 1,
   ): Promise<BaiduOcrResponse> {
     const url = new URL(
       'https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic',
@@ -132,36 +138,73 @@ export class BaiduOcrProvider extends OcrProvider {
     body.set('detect_direction', 'true');
     body.set('language_type', 'CHN_ENG');
 
-    const response = await this.fetchWithTimeout(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: body.toString(),
-    });
+    try {
+      const response = await this.fetchWithTimeout(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      });
 
-    const result = (await response.json()) as BaiduOcrResponse;
-    if (!response.ok || result.error_code) {
-      throw new BadRequestException(
-        `百度 OCR 识别失败: ${result.error_msg ?? response.statusText}`,
+      const result = (await response.json()) as BaiduOcrResponse;
+      if (!response.ok || result.error_code) {
+        throw new BadRequestException(
+          `百度 OCR 识别失败: ${result.error_msg ?? response.statusText}`,
+        );
+      }
+
+      return result;
+    } catch (error) {
+      if (retries > 0 && this.isRetryableError(error)) {
+        this.logger.warn(
+          `百度 OCR 请求失败，正在重试（剩余 ${retries} 次）: ${error instanceof Error ? error.message : error}`,
+        );
+        return this.callAccurateBasic(accessToken, buffer, retries - 1);
+      }
+      throw error;
+    }
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    if (error instanceof BadRequestException) {
+      return false;
+    }
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      return (
+        msg.includes('timeout') ||
+        msg.includes('abort') ||
+        msg.includes('econnreset') ||
+        msg.includes('econnrefused') ||
+        msg.includes('network')
       );
     }
-
-    return result;
+    return true;
   }
 
   private extractMatchedFields(lines: string[]): Record<string, string> {
     const joined = lines.join('\n');
     const matchedFields: Record<string, string> = {};
 
-    const amountLine =
-      lines.find((line) =>
-        /实付|支付金额|实际支付|合计|总计|金额/.test(line),
-      ) ?? lines.find((line) => /\d+\.\d{2}/.test(line));
-    if (amountLine) {
-      matchedFields.amount = amountLine;
+    // 金额：优先从明确关键词行提取数值
+    const amountMatch = joined.match(
+      /(?:实付|支付金额|实际支付|合计|总计|金额|应付)[^\d]*(\d+\.?\d*)/,
+    );
+    if (amountMatch) {
+      matchedFields.amount = amountMatch[1];
+    } else {
+      // 兜底：找第一个含小数的数字行
+      const fallbackAmountLine = lines.find((line) => /\d+\.\d{2}/.test(line));
+      if (fallbackAmountLine) {
+        const fallbackMatch = fallbackAmountLine.match(/(\d+\.\d{2})/);
+        if (fallbackMatch) {
+          matchedFields.amount = fallbackMatch[1];
+        }
+      }
     }
 
+    // 日期
     const dateLine = lines.find(
       (line) =>
         /\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/.test(line) ||
@@ -171,18 +214,23 @@ export class BaiduOcrProvider extends OcrProvider {
       matchedFields.date = dateLine;
     }
 
+    // 支付账户
     const accountLine = lines.find((line) =>
-      /微信|支付宝|银行卡|建行|农行|招行|工行|云闪付|现金/.test(line),
+      /微信|支付宝|银行卡|建行|农行|招行|工行|云闪付|现金|储蓄卡|信用卡/.test(
+        line,
+      ),
     );
     if (accountLine) {
       matchedFields.account = accountLine;
     }
 
+    // 商户：排除非商户行
+    const nonMerchantPattern =
+      /实付|支付金额|实际支付|合计|总计|金额|应付|订单号|交易单号|支付方式|付款方式|商品说明|收货地址|配送费|优惠|备注|退款|收货|配送|下单|付款时间|创建时间|编号/;
     const merchantLine = lines.find(
       (line) =>
-        !/实付|支付金额|合计|总计|订单号|交易单号|支付方式|付款方式/.test(
-          line,
-        ) && /[A-Za-z0-9\u4e00-\u9fa5]{2,}/.test(line),
+        !nonMerchantPattern.test(line) &&
+        /[A-Za-z0-9\u4e00-\u9fa5]{2,}/.test(line),
     );
     if (merchantLine) {
       matchedFields.merchant = merchantLine;
@@ -196,7 +244,15 @@ export class BaiduOcrProvider extends OcrProvider {
   }
 
   private detectSceneType(rawText: string): string {
-    if (/工资|奖金|退款|转入|收入|收款/.test(rawText)) {
+    // 支付截图优先（最常见场景）
+    if (/支付成功|付款成功|实付|微信支付|支付宝.*付款|云闪付/.test(rawText)) {
+      return 'payment_screenshot';
+    }
+
+    // 收入需要更严格的上下文判断，避免"退款政策"等误判
+    if (
+      /工资.*到账|奖金.*到账|退款成功|转入.*余额|收款到账|已到账/.test(rawText)
+    ) {
       return 'income_screenshot';
     }
 
@@ -206,10 +262,6 @@ export class BaiduOcrProvider extends OcrProvider {
 
     if (/订单|收货|配送|商品|下单/.test(rawText)) {
       return 'order_detail';
-    }
-
-    if (/支付|付款|微信支付|支付宝|云闪付|实付/.test(rawText)) {
-      return 'payment_screenshot';
     }
 
     return 'unknown';

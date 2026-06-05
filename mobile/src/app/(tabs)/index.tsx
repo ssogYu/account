@@ -193,6 +193,7 @@ export default function HomeScreen() {
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [showMediaTray, setShowMediaTray] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const shouldScrollToBottomRef = useRef(false);
   const isInitialScrollRef = useRef(true);
@@ -234,32 +235,35 @@ export default function HomeScreen() {
     shouldScrollToBottomRef.current = true;
     const nextPendingImage = pendingImage;
 
+    // 立即清空输入区并显示 loading
+    setInputText("");
+    setPendingImage(null);
+    setShowMediaTray(false);
+
     try {
       let attachments = undefined;
       if (nextPendingImage) {
+        setIsUploading(true);
         const attachment =
           await uploadService.uploadChatImage(nextPendingImage);
         attachments = [toChatAttachmentPayload(attachment)];
+        setIsUploading(false);
       }
 
-      const result = await sendMessage({
+      await sendMessage({
         content: text || undefined,
         attachments,
       });
-      if (result) {
-        setInputText("");
-        setPendingImage(null);
-        setShowMediaTray(false);
-      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "上传图片失败，请稍后重试";
       showToast(message);
+      setIsUploading(false);
     }
   }, [inputText, isSending, pendingImage, sendMessage]);
 
   const handlePickImage = useCallback(async () => {
-    if (isSending) return;
+    if (isSending || isUploading) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
@@ -277,7 +281,7 @@ export default function HomeScreen() {
   }, [isSending]);
 
   const handleTakePhoto = useCallback(async () => {
-    if (isSending) return;
+    if (isSending || isUploading) return;
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       showToast("请先开启相机权限");
@@ -302,10 +306,10 @@ export default function HomeScreen() {
 
   const handleQuickInput = useCallback(
     (text: string) => {
-      if (isSending) return;
+      if (isSending || isUploading) return;
       setInputText(text);
     },
-    [isSending],
+    [isSending, isUploading],
   );
 
   const handleConfirm = useCallback(
@@ -651,15 +655,18 @@ export default function HomeScreen() {
         keyboardShouldPersistTaps="handled"
         inverted
         ListHeaderComponent={
-          hasMore ? (
-            <View style={s.loadMoreWrap}>
-              <Text style={[s.loadMoreText, { color: colors.textTertiary }]}>
-                {isLoading ? "加载中..." : "上拉加载更多"}
-              </Text>
-            </View>
-          ) : null
+          <View>
+            {(isSending || isUploading) && <TypingIndicator />}
+            {hasMore ? (
+              <View style={s.loadMoreWrap}>
+                <Text style={[s.loadMoreText, { color: colors.textTertiary }]}>
+                  {isLoading ? "加载中..." : "上拉加载更多"}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         }
-        ListFooterComponent={isSending ? <TypingIndicator /> : null}
+        ListFooterComponent={null}
         onEndReached={() => {
           if (hasMore && !isLoading) loadMore();
         }}
@@ -793,7 +800,7 @@ export default function HomeScreen() {
                   onFocus={() => setShowMediaTray(false)}
                   onSubmitEditing={handleSend}
                   returnKeyType="send"
-                  editable={!isSending}
+                  editable={!isSending && !isUploading}
                   maxLength={200}
                   accessibilityLabel="输入消费信息"
                 />

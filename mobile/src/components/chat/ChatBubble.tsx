@@ -1,11 +1,18 @@
-import { useEffect, useRef, useMemo } from "react";
-import { View, Text, Animated, StyleSheet } from "react-native";
+import { useEffect, useRef, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  Animated,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
 import { useTheme } from "@/theme";
 import { Image } from "expo-image";
 import { typography } from "@/theme";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { CategoryIcon } from "@/components/icons";
 import { ConfirmCard } from "./ConfirmCard";
+import { ImageViewer } from "./ImageViewer";
 import { useAuthStore } from "@/stores/auth";
 import type { ChatMessage } from "../../services/chat/types";
 import type { ConfirmBillEdits } from "./ConfirmCard";
@@ -33,6 +40,8 @@ export function ChatBubble({
   const isUser = message.role === "user";
   const meta = message.metadata;
   const assistantMeta = (!isUser ? meta : null) as any;
+
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
 
   const isConfirmCard = assistantMeta?.type === "confirm_card";
   const isConfirmed = assistantMeta?.type === "confirmed" && !!message.billId;
@@ -176,12 +185,17 @@ export function ChatBubble({
           <View>
             {attachments.map((attachment, index) =>
               attachment.previewUrl ? (
-                <Image
+                <TouchableOpacity
                   key={`${attachment.objectKey}-${index}`}
-                  source={{ uri: attachment.previewUrl }}
-                  style={styles.attachmentImage}
-                  contentFit="cover"
-                />
+                  activeOpacity={0.85}
+                  onPress={() => setViewerUri(attachment.previewUrl!)}
+                >
+                  <Image
+                    source={{ uri: attachment.previewUrl }}
+                    style={styles.attachmentImage}
+                    contentFit="cover"
+                  />
+                </TouchableOpacity>
               ) : null,
             )}
             {message.content ? (
@@ -235,6 +249,11 @@ export function ChatBubble({
             color={colors.textSecondary}
           />
         ))}
+      <ImageViewer
+        visible={!!viewerUri}
+        uri={viewerUri ?? ""}
+        onClose={() => setViewerUri(null)}
+      />
     </Animated.View>
   );
 }

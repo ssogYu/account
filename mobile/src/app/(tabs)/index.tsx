@@ -528,34 +528,41 @@ export default function HomeScreen() {
           marginTop: 2,
         },
         pendingImageInline: {
-          flexDirection: "row",
-          alignItems: "center",
+          flexDirection: "column",
           marginBottom: spacing.sm,
           paddingHorizontal: spacing.sm,
           paddingVertical: spacing.sm,
-          gap: spacing.sm,
+          gap: spacing.xs,
           borderRadius: 18,
           backgroundColor: colors.fillTertiary,
         },
+        pendingImageRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.xs,
+        },
         pendingImageCard: {
-          width: 58,
-          height: 58,
-          borderRadius: 14,
+          width: 52,
+          height: 52,
+          borderRadius: 10,
           overflow: "hidden",
           backgroundColor: colors.fillSecondary,
+          marginRight: 6,
         },
         pendingImage: {
           width: "100%",
           height: "100%",
         },
         pendingImageMeta: {
-          flex: 1,
-          gap: 2,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
         },
         pendingImageTitle: {
-          ...typography.subheadline,
+          ...typography.caption1,
           color: colors.text,
           fontWeight: "600",
+          flex: 1,
         },
         pendingImageDesc: {
           ...typography.caption1,
@@ -563,12 +570,12 @@ export default function HomeScreen() {
         },
         pendingRemoveBadge: {
           position: "absolute",
-          top: -4,
-          right: -4,
-          width: 18,
-          height: 18,
-          borderRadius: 9,
-          backgroundColor: "rgba(0,0,0,0.6)",
+          top: 2,
+          right: 2,
+          width: 16,
+          height: 16,
+          borderRadius: 8,
+          backgroundColor: "rgba(0,0,0,0.5)",
           alignItems: "center",
           justifyContent: "center",
         },
@@ -763,35 +770,53 @@ export default function HomeScreen() {
             <View style={styles.inputContainer}>
               {pendingImages.length > 0 ? (
                 <View style={styles.pendingImageInline}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {pendingImages.map((img, idx) => (
-                      <View
-                        key={`pending-${idx}`}
-                        style={styles.pendingImageCard}
-                      >
-                        <Image
-                          source={{ uri: img.uri }}
-                          style={styles.pendingImage}
-                          contentFit="cover"
-                        />
-                        <TouchableOpacity
-                          style={styles.pendingRemoveBadge}
-                          onPress={() =>
-                            setPendingImages((prev) =>
-                              prev.filter((_, i) => i !== idx),
-                            )
-                          }
-                          activeOpacity={0.7}
+                  <View style={styles.pendingImageRow}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={{ flex: 1 }}
+                    >
+                      {pendingImages.map((img, idx) => (
+                        <View
+                          key={`pending-${idx}`}
+                          style={styles.pendingImageCard}
                         >
-                          <MaterialCommunityIcons
-                            name="close"
-                            size={12}
-                            color="#FFFFFF"
+                          <Image
+                            source={{ uri: img.uri }}
+                            style={styles.pendingImage}
+                            contentFit="cover"
                           />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </ScrollView>
+                          <TouchableOpacity
+                            style={styles.pendingRemoveBadge}
+                            onPress={() =>
+                              setPendingImages((prev) =>
+                                prev.filter((_, i) => i !== idx),
+                              )
+                            }
+                            activeOpacity={0.7}
+                          >
+                            <MaterialCommunityIcons
+                              name="close"
+                              size={12}
+                              color="#FFFFFF"
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                    <TouchableOpacity
+                      style={styles.pendingRemove}
+                      onPress={() => setPendingImages([])}
+                      activeOpacity={0.7}
+                      accessibilityLabel="移除全部图片"
+                    >
+                      <MaterialCommunityIcons
+                        name="close"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
                   <View style={styles.pendingImageMeta}>
                     <Text style={styles.pendingImageTitle}>
                       {pendingImages.length === 1
@@ -802,18 +827,6 @@ export default function HomeScreen() {
                       {pendingImageDescription}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.pendingRemove}
-                    onPress={() => setPendingImages([])}
-                    activeOpacity={0.7}
-                    accessibilityLabel="移除全部图片"
-                  >
-                    <MaterialCommunityIcons
-                      name="close"
-                      size={16}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
                 </View>
               ) : null}
               <View style={styles.composerRow}>

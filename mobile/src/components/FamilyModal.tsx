@@ -50,8 +50,8 @@ export function FamilyModal({ visible, onClose }: FamilyModalProps) {
   const slideY = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
 
   useEffect(() => {
+    fetchFamily();
     if (visible) {
-      fetchFamily();
       setStep("main");
       setFamilyName("");
       setInviteCode("");

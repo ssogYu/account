@@ -70,7 +70,7 @@ export class SendMessageDto {
     type: [ChatAttachmentDto],
   })
   @IsArray()
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(9)
   @ValidateNested({ each: true })
   @Type(() => ChatAttachmentDto)
   @IsOptional()

@@ -1,15 +1,24 @@
-import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTheme } from '@/theme';
-import { spacing, radius, typography, shadows } from '@/theme';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { CategoryIcon } from '@/components/icons';
-import { useStatsStore } from '@/stores/stats';
-import { CategoryRanking } from './CategoryRanking';
-import { DailyBarChart } from './DailyBarChart';
-import { ComparisonCard } from './ComparisonCard';
-import { CHART_COLORS } from './chartColors';
-import type { CategoryStatItem, DailyStatItem } from '@/services/bill/stats.types';
+import { useState, useMemo } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
+import { useTheme } from "@/theme";
+import { spacing, radius, typography, shadows } from "@/theme";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { CategoryIcon } from "@/components/icons";
+import { useStatsStore } from "@/stores/stats";
+import { CategoryRanking } from "./CategoryRanking";
+import { DailyBarChart } from "./DailyBarChart";
+import { ComparisonCard } from "./ComparisonCard";
+import { CHART_COLORS } from "./chartColors";
+import type {
+  CategoryStatItem,
+  DailyStatItem,
+} from "@/services/bill/stats.types";
 
 const PIE_SIZE = 180;
 
@@ -20,44 +29,44 @@ function usePieStyles() {
       StyleSheet.create({
         container: { gap: spacing.md },
         chartWrap: {
-          alignItems: 'center',
+          alignItems: "center",
           paddingVertical: spacing.md,
         },
         pieOuter: {
           width: PIE_SIZE,
           height: PIE_SIZE,
           borderRadius: PIE_SIZE / 2,
-          overflow: 'hidden',
-          position: 'relative',
+          overflow: "hidden",
+          position: "relative",
           backgroundColor: colors.fillTertiary,
         },
         slice: {
-          position: 'absolute',
+          position: "absolute",
           width: PIE_SIZE,
           height: PIE_SIZE / 2,
-          transformOrigin: '50% 100%',
-          overflow: 'hidden',
+          transformOrigin: "50% 100%",
+          overflow: "hidden",
         },
         sliceFill: {
           width: PIE_SIZE,
           height: PIE_SIZE / 2,
         },
         pieHole: {
-          position: 'absolute',
+          position: "absolute",
           top: (PIE_SIZE - 110) / 2,
           left: (PIE_SIZE - 110) / 2,
           width: 110,
           height: 110,
           borderRadius: 55,
           backgroundColor: colors.bgElevated,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.separator,
         },
         centerAmount: {
           ...typography.headline,
-          fontWeight: '800',
+          fontWeight: "800",
           fontSize: 16,
         },
         centerLabel: {
@@ -66,8 +75,8 @@ function usePieStyles() {
         },
         legend: { gap: spacing.sm },
         legendItem: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: spacing.xs,
           paddingVertical: spacing.xs,
         },
@@ -80,8 +89,8 @@ function usePieStyles() {
           width: 24,
           height: 24,
           borderRadius: 7,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
         },
         legendName: {
           ...typography.footnote,
@@ -90,9 +99,9 @@ function usePieStyles() {
         },
         legendPct: {
           ...typography.caption1,
-          fontWeight: '700',
+          fontWeight: "700",
           width: 48,
-          textAlign: 'right',
+          textAlign: "right",
         },
       }),
     [colors],
@@ -112,8 +121,8 @@ function useChartStyles() {
         },
         section: { gap: spacing.sm },
         sectionHeader: {
-          flexDirection: 'row',
-          alignItems: 'baseline',
+          flexDirection: "row",
+          alignItems: "baseline",
           gap: spacing.sm,
         },
         sectionTitle: {
@@ -135,11 +144,11 @@ function useChartStyles() {
         },
         trendWrap: { gap: spacing.md },
         periodBar: {
-          flexDirection: 'row',
+          flexDirection: "row",
           backgroundColor: colors.fillTertiary,
           borderRadius: radius.sm,
           padding: 2,
-          alignSelf: 'flex-start',
+          alignSelf: "flex-start",
         },
         periodBtn: {
           paddingHorizontal: spacing.md,
@@ -155,11 +164,11 @@ function useChartStyles() {
         },
         periodTextActive: {
           color: colors.text,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         emptySection: {
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           paddingVertical: spacing.xxl,
           gap: spacing.sm,
         },
@@ -180,12 +189,12 @@ function CategoryPieChart({
 }: {
   items: CategoryStatItem[];
   totalAmount: number;
-  onType: 'expense' | 'income';
+  onType: "expense" | "income";
   onSlicePress: (item: CategoryStatItem, index: number) => void;
 }) {
   const pieStyles = usePieStyles();
   const { colors } = useTheme();
-  const accentColor = onType === 'expense' ? colors.error : colors.success;
+  const accentColor = onType === "expense" ? colors.error : colors.success;
 
   let currentAngle = -90;
   const slices = items.map((item, i) => {
@@ -217,7 +226,12 @@ function CategoryPieChart({
                   },
                 ]}
               >
-                <View style={[pieStyles.sliceFill, { backgroundColor: slice.color }]} />
+                <View
+                  style={[
+                    pieStyles.sliceFill,
+                    { backgroundColor: slice.color },
+                  ]}
+                />
               </View>
             );
           })}
@@ -225,7 +239,9 @@ function CategoryPieChart({
             <Text style={[pieStyles.centerAmount, { color: accentColor }]}>
               ¥{totalAmount.toFixed(0)}
             </Text>
-            <Text style={pieStyles.centerLabel}>总{onType === 'expense' ? '支出' : '收入'}</Text>
+            <Text style={pieStyles.centerLabel}>
+              总{onType === "expense" ? "支出" : "收入"}
+            </Text>
           </View>
         </View>
       </View>
@@ -244,13 +260,27 @@ function CategoryPieChart({
                 { backgroundColor: CHART_COLORS[i % CHART_COLORS.length] },
               ]}
             />
-            <View style={[pieStyles.legendIconBg, { backgroundColor: `${accentColor}1F` }]}>
-              <CategoryIcon iconKey={item.categoryIcon} size={14} color={accentColor} />
+            <View
+              style={[
+                pieStyles.legendIconBg,
+                { backgroundColor: `${accentColor}1F` },
+              ]}
+            >
+              <CategoryIcon
+                iconKey={item.categoryIcon}
+                size={14}
+                color={accentColor}
+              />
             </View>
             <Text style={pieStyles.legendName} numberOfLines={1}>
               {item.categoryName}
             </Text>
-            <Text style={[pieStyles.legendPct, { color: CHART_COLORS[i % CHART_COLORS.length] }]}>
+            <Text
+              style={[
+                pieStyles.legendPct,
+                { color: CHART_COLORS[i % CHART_COLORS.length] },
+              ]}
+            >
               {item.percentage.toFixed(1)}%
             </Text>
           </TouchableOpacity>
@@ -260,18 +290,25 @@ function CategoryPieChart({
   );
 }
 
-type TrendPeriod = 'day' | 'week' | 'month' | 'year';
+type TrendPeriod = "day" | "week" | "month" | "year";
 
 function aggregateByWeek(items: DailyStatItem[]): DailyStatItem[] {
   const weeks: Map<string, { expense: number; income: number }> = new Map();
   for (const item of items) {
-    const [yStr, mStr, dStr] = item.date.split('-');
-    const d = new Date(parseInt(yStr!), parseInt(mStr!) - 1, parseInt(dStr!), 12, 0, 0);
+    const [yStr, mStr, dStr] = item.date.split("-");
+    const d = new Date(
+      parseInt(yStr!),
+      parseInt(mStr!) - 1,
+      parseInt(dStr!),
+      12,
+      0,
+      0,
+    );
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d);
     monday.setDate(diff);
-    const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
     if (!weeks.has(key)) weeks.set(key, { expense: 0, income: 0 });
     const w = weeks.get(key)!;
     w.expense += item.expense;
@@ -304,30 +341,35 @@ function TrendChart() {
   const chartStyles = useChartStyles();
   const { colors } = useTheme();
   const { dailyStats, selectedType } = useStatsStore();
-  const [period, setPeriod] = useState<TrendPeriod>('day');
+  const chartType = selectedType === "all" ? "expense" : selectedType;
+  const [period, setPeriod] = useState<TrendPeriod>("day");
 
   const periods: { key: TrendPeriod; label: string }[] = [
-    { key: 'day', label: '日' },
-    { key: 'week', label: '周' },
-    { key: 'month', label: '月' },
-    { key: 'year', label: '年' },
+    { key: "day", label: "日" },
+    { key: "week", label: "周" },
+    { key: "month", label: "月" },
+    { key: "year", label: "年" },
   ];
 
   if (!dailyStats || dailyStats.items.length === 0) {
     return (
       <View style={chartStyles.emptySection}>
-        <MaterialCommunityIcons name="chart-line" size={40} color={colors.textQuaternary} />
+        <MaterialCommunityIcons
+          name="chart-line"
+          size={40}
+          color={colors.textQuaternary}
+        />
         <Text style={chartStyles.emptyText}>暂无趋势数据</Text>
       </View>
     );
   }
 
   const displayItems =
-    period === 'day'
+    period === "day"
       ? dailyStats.items
-      : period === 'week'
+      : period === "week"
         ? aggregateByWeek(dailyStats.items)
-        : period === 'month'
+        : period === "month"
           ? aggregateByMonth(dailyStats.items)
           : aggregateByMonth(dailyStats.items);
 
@@ -337,12 +379,18 @@ function TrendChart() {
         {periods.map((p) => (
           <TouchableOpacity
             key={p.key}
-            style={[chartStyles.periodBtn, period === p.key && chartStyles.periodBtnActive]}
+            style={[
+              chartStyles.periodBtn,
+              period === p.key && chartStyles.periodBtnActive,
+            ]}
             onPress={() => setPeriod(p.key)}
             activeOpacity={0.7}
           >
             <Text
-              style={[chartStyles.periodText, period === p.key && chartStyles.periodTextActive]}
+              style={[
+                chartStyles.periodText,
+                period === p.key && chartStyles.periodTextActive,
+              ]}
             >
               {p.label}
             </Text>
@@ -350,14 +398,16 @@ function TrendChart() {
         ))}
       </View>
 
-      <DailyBarChart items={displayItems} displayType={selectedType} />
+      <DailyBarChart items={displayItems} displayType={chartType} />
     </View>
   );
 }
 
 export function ChartView() {
   const chartStyles = useChartStyles();
-  const { categoryStats, monthlyComparison, selectedType, drillToFlow } = useStatsStore();
+  const { categoryStats, monthlyComparison, selectedType, drillToFlow } =
+    useStatsStore();
+  const chartType = selectedType === "all" ? "expense" : selectedType;
 
   const handleSlicePress = (item: CategoryStatItem) => {
     drillToFlow(item.categoryId, item.categoryName);
@@ -372,7 +422,7 @@ export function ChartView() {
         <View style={chartStyles.section}>
           <View style={chartStyles.sectionHeader}>
             <Text style={chartStyles.sectionTitle}>
-              {selectedType === 'expense' ? '支出' : '收入'}分类
+              {chartType === "expense" ? "支出" : "收入"}分类
             </Text>
             <Text style={chartStyles.sectionSub}>
               共{categoryStats.items.length}个分类
@@ -382,7 +432,7 @@ export function ChartView() {
             <CategoryPieChart
               items={categoryStats.items}
               totalAmount={categoryStats.totalAmount}
-              onType={selectedType}
+              onType={chartType}
               onSlicePress={handleSlicePress}
             />
           </View>
@@ -399,10 +449,10 @@ export function ChartView() {
       {categoryStats && categoryStats.items.length > 0 && (
         <View style={chartStyles.section}>
           <Text style={chartStyles.sectionTitle}>
-            {selectedType === 'expense' ? '支出' : '收入'}排行
+            {chartType === "expense" ? "支出" : "收入"}排行
           </Text>
           <View style={chartStyles.card}>
-            <CategoryRanking items={categoryStats.items} onType={selectedType} />
+            <CategoryRanking items={categoryStats.items} onType={chartType} />
           </View>
         </View>
       )}

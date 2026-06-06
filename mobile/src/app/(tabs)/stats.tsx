@@ -85,7 +85,9 @@ export default function StatsScreen() {
     return `${m}月${d}日 ${weekdays[dt.getDay()]}`;
   };
 
+  const isAll = selectedType === "all";
   const isExpense = selectedType === "expense";
+  const isIncome = selectedType === "income";
   const expense = monthSummary?.totalExpense ?? 0;
   const income = monthSummary?.totalIncome ?? 0;
   const balance = monthSummary?.balance ?? 0;
@@ -427,6 +429,23 @@ export default function StatsScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.typePills}>
+          {activeTab === "flow" && (
+            <TouchableOpacity
+              style={[
+                styles.typePill,
+                isAll && styles.typePillActive,
+                isAll && { backgroundColor: `${colors.accent}1A` },
+              ]}
+              onPress={() => setSelectedType("all")}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[styles.typePillText, isAll && { color: colors.accent }]}
+              >
+                全部
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[
               styles.typePill,
@@ -448,8 +467,8 @@ export default function StatsScreen() {
           <TouchableOpacity
             style={[
               styles.typePill,
-              !isExpense && styles.typePillActive,
-              !isExpense && { backgroundColor: `${colors.success}1A` },
+              isIncome && styles.typePillActive,
+              isIncome && { backgroundColor: `${colors.success}1A` },
             ]}
             onPress={() => setSelectedType("income")}
             activeOpacity={0.7}
@@ -457,7 +476,7 @@ export default function StatsScreen() {
             <Text
               style={[
                 styles.typePillText,
-                !isExpense && { color: colors.success },
+                isIncome && { color: colors.success },
               ]}
             >
               收入

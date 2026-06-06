@@ -17,7 +17,7 @@ import type { FamilyInfo } from "@/services/family/types";
 // ── 筛选状态 ──
 export interface FlowFilter {
   keyword?: string;
-  type?: "expense" | "income";
+  type?: "expense" | "income" | "all";
   categoryId?: string;
   month?: string;
   userId?: string;
@@ -89,7 +89,7 @@ interface StatsState {
   // ── 公共状态 ──
   selectedMonth: string;
   selectedDate: string | null; // YYYY-MM-DD, null = 月模式
-  selectedType: "expense" | "income";
+  selectedType: "expense" | "income" | "all";
   isLoading: boolean;
 
   // ── 流水视图 ──
@@ -117,7 +117,7 @@ interface StatsState {
   // ── Actions ──
   setSelectedMonth: (month: string) => void;
   setSelectedDate: (date: string | null) => void;
-  setSelectedType: (type: "expense" | "income") => void;
+  setSelectedType: (type: "expense" | "income" | "all") => void;
   setActiveTab: (tab: "flow" | "chart") => void;
   setFlowFilter: (filter: Partial<FlowFilter>) => void;
   resetFlowFilter: () => void;
@@ -138,10 +138,10 @@ const PAGE_SIZE = 20;
 export const useStatsStore = create<StatsState>((set, get) => ({
   selectedMonth: getCurrentMonth(),
   selectedDate: null,
-  selectedType: "expense",
+  selectedType: "all" as "expense" | "income" | "all",
   isLoading: false,
 
-  flowFilter: { type: "expense" },
+  flowFilter: { type: "all" as "expense" | "income" | "all" },
   flowGroups: [],
   flowTotal: 0,
   flowPage: 1,
@@ -191,7 +191,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     get().fetchAll(month);
   },
 
-  setSelectedType(type: "expense" | "income") {
+  setSelectedType(type: "expense" | "income" | "all") {
     set({
       selectedType: type,
       flowFilter: { ...get().flowFilter, type },
@@ -202,12 +202,24 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       drillCategoryName: null,
     });
     const { selectedMonth } = get();
-    get().fetchCategoryStats(selectedMonth, type);
+    const statsType = type === "all" ? "expense" : type;
+    get().fetchCategoryStats(selectedMonth, statsType);
     get().fetchFlowList();
   },
 
   setActiveTab(tab: "flow" | "chart") {
-    set({ activeTab: tab });
+    // 切到图表时，如果当前是"全部"，自动切到"支出"
+    if (tab === "chart" && get().selectedType === "all") {
+      set({
+        activeTab: tab,
+        selectedType: "expense",
+        flowFilter: { ...get().flowFilter, type: "expense" },
+      });
+      const { selectedMonth } = get();
+      get().fetchCategoryStats(selectedMonth, "expense");
+    } else {
+      set({ activeTab: tab });
+    }
   },
 
   setFlowFilter(filter: Partial<FlowFilter>) {
@@ -280,7 +292,8 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     } else {
       params.month = selectedMonth;
     }
-    if (flowFilter.type) params.type = flowFilter.type;
+    if (flowFilter.type && flowFilter.type !== "all")
+      params.type = flowFilter.type;
     if (flowFilter.categoryId || drillCategoryId) {
       params.categoryId = flowFilter.categoryId ?? drillCategoryId ?? undefined;
     }
@@ -431,9 +444,21 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   async deleteBill(billId: string) {
     try {
       await billService.remove(billId);
-      // 重新加载所有数据
-      set({ flowPage: 1, flowGroups: [], flowHasMore: true });
-      get().fetchFlowList();
+      // 就地移除该账单，保持滚动位置
+      const oldGroups = get().flowGroups;
+      const newGroups = oldGroups
+        .map((g) => ({
+          ...g,
+          bills: g.bills.filter((b) => b.id !== billId),
+          dayExpense: g.bills
+            .filter((b) => b.id !== billId && b.type === "expense")
+            .reduce((s, b) => s + Number(b.amount), 0),
+          dayIncome: g.bills
+            .filter((b) => b.id !== billId && b.type === "income")
+            .reduce((s, b) => s + Number(b.amount), 0),
+        }))
+        .filter((g) => g.bills.length > 0);
+      set({ flowGroups: newGroups });
       const { selectedMonth, selectedType } = get();
       get().fetchMonthSummary(selectedMonth);
       get().fetchCategoryStats(selectedMonth, selectedType);

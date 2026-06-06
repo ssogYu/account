@@ -431,7 +431,7 @@ function BillItem({
   const amount = Number(bill.amount);
   const displayName = bill.note || bill.category?.name || "未分类";
   const truncatedName =
-    displayName.length > 10 ? displayName.slice(0, 5) + "…" : displayName;
+    displayName.length > 10 ? displayName.slice(0, 10) + "…" : displayName;
 
   const animateTo = useCallback(
     (toValue: number) => {
@@ -608,6 +608,22 @@ function DateHeader({ group }: { group: DayGroup }) {
   );
 }
 
+// ── 扁平化列表项 ──
+type FlatListItem =
+  | { type: "header"; key: string; group: DayGroup }
+  | { type: "bill"; key: string; bill: Bill };
+
+function flattenGroups(groups: DayGroup[]): FlatListItem[] {
+  const items: FlatListItem[] = [];
+  for (const group of groups) {
+    items.push({ type: "header", key: `header-${group.date}`, group });
+    for (const bill of group.bills) {
+      items.push({ type: "bill", key: bill.id, bill });
+    }
+  }
+  return items;
+}
+
 // ── 流水视图主体 ──
 export function BillFlowView() {
   const s = useBillFlowStyles();
@@ -641,20 +657,44 @@ export function BillFlowView() {
       if (!billToEdit) return;
       await billService.update(billToEdit.id, data);
       setEditModalVisible(false);
+      // 就地更新该账单，保持滚动位置
+      const { flowGroups } = useStatsStore.getState();
+      const updatedGroups: DayGroup[] = flowGroups.map((g) => ({
+        ...g,
+        bills: g.bills.map(
+          (b): Bill =>
+            b.id === billToEdit.id
+              ? {
+                  ...b,
+                  type: data.type,
+                  amount: String(data.amount),
+                  categoryId: data.categoryId,
+                  note: data.note ?? b.note,
+                  account: data.account ?? b.account,
+                  date: data.date ?? b.date,
+                }
+              : b,
+        ),
+      }));
+      // 重新计算每组的 dayExpense/dayIncome
+      const recalcedGroups: DayGroup[] = updatedGroups.map((g) => ({
+        ...g,
+        dayExpense: g.bills
+          .filter((b) => b.type === "expense")
+          .reduce((s, b) => s + Number(b.amount), 0),
+        dayIncome: g.bills
+          .filter((b) => b.type === "income")
+          .reduce((s, b) => s + Number(b.amount), 0),
+      }));
+      useStatsStore.setState({ flowGroups: recalcedGroups });
       setBillToEdit(null);
-      useStatsStore.setState({
-        flowPage: 1,
-        flowGroups: [],
-        flowHasMore: true,
-      });
-      fetchFlowList();
       const { selectedMonth, selectedType } = useStatsStore.getState();
       useStatsStore.getState().fetchMonthSummary(selectedMonth);
       useStatsStore.getState().fetchCategoryStats(selectedMonth, selectedType);
       useStatsStore.getState().fetchDailyStats(selectedMonth);
       useStatsStore.getState().fetchMonthlyComparison(selectedMonth);
     },
-    [billToEdit, fetchFlowList],
+    [billToEdit],
   );
 
   const handleEditClose = useCallback(() => {
@@ -669,22 +709,23 @@ export function BillFlowView() {
     }
   }, [flowHasMore, flowPage, fetchFlowList]);
 
+  const flatData = useMemo(() => flattenGroups(flowGroups), [flowGroups]);
+
   const renderItem = useCallback(
-    ({ item }: { item: DayGroup }) => (
-      <View style={s.daySection}>
-        <DateHeader group={item} />
-        {item.bills.map((bill) => (
-          <BillItem
-            key={bill.id}
-            bill={bill}
-            onDelete={deleteBill}
-            onEdit={handleEdit}
-            showMemberTag={showMemberTag}
-          />
-        ))}
-      </View>
-    ),
-    [deleteBill, handleEdit, showMemberTag, s],
+    ({ item }: { item: FlatListItem }) => {
+      if (item.type === "header") {
+        return <DateHeader group={item.group} />;
+      }
+      return (
+        <BillItem
+          bill={item.bill}
+          onDelete={deleteBill}
+          onEdit={handleEdit}
+          showMemberTag={showMemberTag}
+        />
+      );
+    },
+    [deleteBill, handleEdit, showMemberTag],
   );
 
   const listHeader = useCallback(() => <FlowHeader />, []);
@@ -725,8 +766,8 @@ export function BillFlowView() {
   return (
     <View style={s.flowContainer}>
       <FlatList
-        data={flowGroups}
-        keyExtractor={(item) => item.date}
+        data={flatData}
+        keyExtractor={(item) => item.key}
         renderItem={renderItem}
         ListHeaderComponent={listHeader}
         contentContainerStyle={s.listContent}

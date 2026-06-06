@@ -143,7 +143,7 @@ async function semanticParse(
 9. 账单名称note不能直接使用用户输入，比如“买了奶茶”不能直接设置“买了奶茶”，而要提取“奶茶”，比如我今天在淘宝买了衣服，要提取“衣服”
 10. 如果输入中包含“OCR 全文”“OCR 初步字段”等段落，应将其视为图片提取结果，优先依据明确的金额、日期、商户、支付方式进行判断
 11. OCR 文本可能包含噪音、重复行或无关字段，你需要忽略噪音，只提取最可信的账单信息
-12. 如果明确识别出金额为0就不要提取，因为0元的账单没有实际意义。但是未设置金额的账单，要提取
+12. 如果明确识别出金额为0就不要提取，因为0元的账单没有实际意义。但是未设置金额的账单要提取设置为 null。
 
 可用分类：
 ${state.categoriesJson}
@@ -169,19 +169,30 @@ ${state.accountsJson}
       };
     }
 
-    const bills: BillItem[] = result.bills.map((b) => ({
-      type: b.type,
-      amount: b.amount,
-      note: b.note || getFallbackNote(state.input),
-      date: b.date || today,
-      categoryName: b.categoryName,
-      accountName: b.accountName || '',
-      categoryId: '',
-      categoryIcon: '',
-      accountId: '',
-      confidence: b.confidence,
-      warning: b.warning || '',
-    }));
+    const bills: BillItem[] = result.bills
+      .filter((b) => b.amount !== 0)
+      .map((b) => ({
+        type: b.type,
+        amount: b.amount,
+        note: b.note || getFallbackNote(state.input),
+        date: b.date || today,
+        categoryName: b.categoryName,
+        accountName: b.accountName || '',
+        categoryId: '',
+        categoryIcon: '',
+        accountId: '',
+        confidence: b.confidence,
+        warning: b.warning || '',
+      }));
+
+    if (bills.length === 0) {
+      return {
+        parsed: false,
+        bills: [],
+        needsConfirm: false,
+        error: '',
+      };
+    }
 
     return {
       parsed: true,

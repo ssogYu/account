@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   StyleSheet,
   StatusBar,
   KeyboardAvoidingView,
@@ -190,7 +191,7 @@ export default function HomeScreen() {
   const { colors, resolvedScheme } = useTheme();
 
   const [inputText, setInputText] = useState("");
-  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [showMediaTray, setShowMediaTray] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -231,22 +232,23 @@ export default function HomeScreen() {
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
-    if ((!text && !pendingImage) || isSending) return;
+    if ((!text && pendingImages.length === 0) || isSending) return;
     shouldScrollToBottomRef.current = true;
-    const nextPendingImage = pendingImage;
+    const nextPendingImages = pendingImages;
 
     // 立即清空输入区并显示 loading
     setInputText("");
-    setPendingImage(null);
+    setPendingImages([]);
     setShowMediaTray(false);
 
     try {
       let attachments = undefined;
-      if (nextPendingImage) {
+      if (nextPendingImages.length > 0) {
         setIsUploading(true);
-        const attachment =
-          await uploadService.uploadChatImage(nextPendingImage);
-        attachments = [toChatAttachmentPayload(attachment)];
+        const uploaded = await Promise.all(
+          nextPendingImages.map((img) => uploadService.uploadChatImage(img)),
+        );
+        attachments = uploaded.map(toChatAttachmentPayload);
         setIsUploading(false);
       }
 
@@ -260,23 +262,25 @@ export default function HomeScreen() {
       showToast(message);
       setIsUploading(false);
     }
-  }, [inputText, isSending, pendingImage, sendMessage]);
+  }, [inputText, isSending, pendingImages, sendMessage]);
 
   const handlePickImage = useCallback(async () => {
     if (isSending || isUploading) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 9,
     });
     if (result.canceled || result.assets.length === 0) return;
-    const asset = result.assets[0];
-    setPendingImage({
+    const newImages = result.assets.map((asset) => ({
       uri: asset.uri,
       fileName: asset.fileName,
       mimeType: asset.mimeType,
       width: asset.width,
       height: asset.height,
-    });
+    }));
+    setPendingImages((prev) => [...prev, ...newImages].slice(0, 9));
     setShowMediaTray(false);
   }, [isSending]);
 
@@ -294,13 +298,20 @@ export default function HomeScreen() {
     });
     if (result.canceled || result.assets.length === 0) return;
     const asset = result.assets[0];
-    setPendingImage({
-      uri: asset.uri,
-      fileName: asset.fileName,
-      mimeType: asset.mimeType,
-      width: asset.width,
-      height: asset.height,
-    });
+    setPendingImages((prev) =>
+      prev.length >= 9
+        ? prev
+        : [
+            ...prev,
+            {
+              uri: asset.uri,
+              fileName: asset.fileName,
+              mimeType: asset.mimeType,
+              width: asset.width,
+              height: asset.height,
+            },
+          ],
+    );
     setShowMediaTray(false);
   }, [isSending]);
 
@@ -400,11 +411,14 @@ export default function HomeScreen() {
 
   const totalExpense = todaySummary?.totalExpense ?? 0;
   const totalIncome = todaySummary?.totalIncome ?? 0;
-  const pendingImageDescription = pendingImage?.fileName
-    ? pendingImage.fileName
-    : pendingImage?.width && pendingImage?.height
-      ? `${pendingImage.width}×${pendingImage.height}`
-      : "图片待发送";
+  const pendingImageDescription =
+    pendingImages.length > 1
+      ? `${pendingImages.length} 张图片待发送`
+      : pendingImages[0]?.fileName
+        ? pendingImages[0].fileName
+        : pendingImages[0]?.width && pendingImages[0]?.height
+          ? `${pendingImages[0].width}×${pendingImages[0].height}`
+          : "图片待发送";
 
   const styles = useMemo(
     () =>
@@ -546,6 +560,17 @@ export default function HomeScreen() {
         pendingImageDesc: {
           ...typography.caption1,
           color: colors.textSecondary,
+        },
+        pendingRemoveBadge: {
+          position: "absolute",
+          top: -4,
+          right: -4,
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          backgroundColor: "rgba(0,0,0,0.6)",
+          alignItems: "center",
+          justifyContent: "center",
         },
         pendingRemove: {
           width: 30,
@@ -736,26 +761,52 @@ export default function HomeScreen() {
               </View>
             ) : null}
             <View style={styles.inputContainer}>
-              {pendingImage ? (
+              {pendingImages.length > 0 ? (
                 <View style={styles.pendingImageInline}>
-                  <View style={styles.pendingImageCard}>
-                    <Image
-                      source={{ uri: pendingImage.uri }}
-                      style={styles.pendingImage}
-                      contentFit="cover"
-                    />
-                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {pendingImages.map((img, idx) => (
+                      <View
+                        key={`pending-${idx}`}
+                        style={styles.pendingImageCard}
+                      >
+                        <Image
+                          source={{ uri: img.uri }}
+                          style={styles.pendingImage}
+                          contentFit="cover"
+                        />
+                        <TouchableOpacity
+                          style={styles.pendingRemoveBadge}
+                          onPress={() =>
+                            setPendingImages((prev) =>
+                              prev.filter((_, i) => i !== idx),
+                            )
+                          }
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons
+                            name="close"
+                            size={12}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
                   <View style={styles.pendingImageMeta}>
-                    <Text style={styles.pendingImageTitle}>已添加图片账单</Text>
+                    <Text style={styles.pendingImageTitle}>
+                      {pendingImages.length === 1
+                        ? "已添加图片账单"
+                        : `${pendingImages.length} 张图片账单`}
+                    </Text>
                     <Text style={styles.pendingImageDesc} numberOfLines={1}>
                       {pendingImageDescription}
                     </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.pendingRemove}
-                    onPress={() => setPendingImage(null)}
+                    onPress={() => setPendingImages([])}
                     activeOpacity={0.7}
-                    accessibilityLabel="移除图片"
+                    accessibilityLabel="移除全部图片"
                   >
                     <MaterialCommunityIcons
                       name="close"
@@ -770,7 +821,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     style={[
                       styles.mediaIconBtn,
-                      (showMediaTray || pendingImage) &&
+                      (showMediaTray || pendingImages.length > 0) &&
                         styles.mediaIconBtnActive,
                     ]}
                     onPress={() => {
@@ -784,7 +835,7 @@ export default function HomeScreen() {
                       name={showMediaTray ? "close" : "plus"}
                       size={20}
                       color={
-                        showMediaTray || pendingImage
+                        showMediaTray || pendingImages.length > 0
                           ? "#FFFFFF"
                           : colors.textSecondary
                       }
@@ -822,11 +873,11 @@ export default function HomeScreen() {
                     style={[
                       styles.sendBtn,
                       !inputText.trim() &&
-                        !pendingImage &&
+                        pendingImages.length === 0 &&
                         styles.sendBtnDisabled,
                     ]}
                     onPress={handleSend}
-                    disabled={!inputText.trim() && !pendingImage}
+                    disabled={!inputText.trim() && pendingImages.length === 0}
                     activeOpacity={0.7}
                     accessibilityLabel="发送消息"
                   >

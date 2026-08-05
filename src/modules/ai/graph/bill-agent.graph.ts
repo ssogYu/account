@@ -23,7 +23,7 @@ const GraphAnnotation = Annotation.Root({
   conversationId: Annotation<string>(),
   intent: Annotation<'bookkeeping' | 'query' | 'chat'>(),
   intentConfidence: Annotation<number>(),
-  extractedBill: Annotation<any>(),
+  extractedBill: Annotation<GraphState['extractedBill']>(),
   confidence: Annotation<number>(),
   missingFields: Annotation<string[]>(),
   status: Annotation<
@@ -111,18 +111,18 @@ export function compileGraph(deps: GraphDeps) {
 
 /** 输入预处理路由：空内容 → 直接返回提示，不浪费 LLM 调用 */
 function afterInputProcess(state: GraphState): string {
-  return state.status === 'replied' ? 'error' : 'ok';
+  return state.error ? 'error' : 'ok';
 }
 
-/** 意图路由：若节点已标记错误则终止，否则按 intent 分发 */
+/** 意图路由：若节点出错则终止，否则按 intent 分发 */
 function afterIntentClassify(state: GraphState): string {
-  if (state.status === 'replied') return 'error';
+  if (state.error) return 'error';
   return state.intent ?? 'chat';
 }
 
 /** 提取路由：节点失败直接终止，避免空数据走到确认卡片 */
 function afterExtract(state: GraphState): string {
-  return state.status === 'replied' ? 'error' : 'ok';
+  return state.error ? 'error' : 'ok';
 }
 
 /** 置信度路由：>=0.7 自动入库，否则走确认卡片 */

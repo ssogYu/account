@@ -10,6 +10,7 @@ export function createInputProcessor(logger: PinoLogger) {
       return {
         status: 'replied' as const,
         reply: '请输入记账内容，例如：花了50块吃饭',
+        error: 'EMPTY_INPUT',
       };
     }
 

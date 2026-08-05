@@ -8,8 +8,8 @@ export const appConfig = registerAs('app', () => {
     name: process.env.APP_NAME ?? 'common-server',
     nodeEnv,
     isProduction: nodeEnv === 'production',
-    port: parseNumber(process.env.PORT, 3000),
+    port: parseNumber(process.env.PORT, 8080),
     apiPrefix: process.env.API_PREFIX ?? 'api/v1',
-    appOrigin: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    appOrigin: process.env.APP_ORIGIN ?? 'http://localhost:8080',
   };
 });

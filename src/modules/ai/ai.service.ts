@@ -127,7 +127,13 @@ export class AiService {
       this.sessions.delete(dto.sessionId);
       return { status: 'error', reply: '账单数据丢失，请重新记账' };
     }
-    if (typeof extractedBill.amount !== 'number' || extractedBill.amount <= 0) {
+
+    // 前端编辑值覆盖 AI 提取值
+    const amount = dto.amount ?? extractedBill.amount;
+    const billDate = dto.billDate ?? extractedBill.billDate;
+    const type = (dto.type as 'expense' | 'income') ?? extractedBill.type;
+
+    if (typeof amount !== 'number' || amount <= 0) {
       this.sessions.delete(dto.sessionId);
       return { status: 'error', reply: '金额数据无效，请重新记账' };
     }
@@ -149,9 +155,9 @@ export class AiService {
       userId,
       categoryId,
       paymentAccountId,
-      type: extractedBill.type,
-      amount: extractedBill.amount,
-      billDate: extractedBill.billDate,
+      type,
+      amount,
+      billDate,
       note: extractedBill.note,
     });
 

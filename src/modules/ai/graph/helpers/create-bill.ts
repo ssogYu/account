@@ -1,4 +1,5 @@
 import type { DbService } from '../../../../infra/db/db.service';
+import { toDateTime, nowDate } from '../../../../common/utils/date';
 
 interface CreateBillParams {
   userId: string;
@@ -11,17 +12,17 @@ interface CreateBillParams {
 }
 
 /**
- * 创建账单记录，统一 billDate 解析和 include 关系。
- * billDate 期望为 YYYY-MM-DD 格式；解析失败时回退为今天，保证入库日期永远合法。
+ * 创建账单记录。
+ * billDate 期望为 YYYY-MM-DD HH:mm:ss 格式；解析失败时回退为当前时间。
  */
 export async function createBillRecord(
   db: DbService,
   params: CreateBillParams,
 ) {
-  const parsed = params.billDate ? Date.parse(params.billDate) : NaN;
-  const billDate = Number.isNaN(parsed)
-    ? new Date()
-    : new Date(params.billDate!);
+  const validDate =
+    params.billDate &&
+    /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(params.billDate);
+  const billDate = validDate ? toDateTime(params.billDate!) : nowDate();
 
   return db.bill.create({
     data: {

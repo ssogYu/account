@@ -8,7 +8,10 @@ export const BillExtractionSchema = z.object({
   categoryId: z.string().optional().describe('匹配到的分类 ID'),
   paymentAccount: z.string().optional().describe('支付账户名称'),
   paymentAccountId: z.string().optional().describe('支付账户 ID'),
-  billDate: z.string().optional().describe('账单日期 YYYY-MM-DD 格式'),
+  billDate: z
+    .string()
+    .optional()
+    .describe('账单时间 YYYY-MM-DD HH:mm:ss 格式'),
   note: z.string().optional().describe('备注说明'),
 });
 

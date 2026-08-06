@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: common
       POSTGRES_PASSWORD: common123
       POSTGRES_DB: common
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
     ports:
       - '5432:5432'
     volumes:

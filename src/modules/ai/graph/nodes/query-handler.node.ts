@@ -1,6 +1,13 @@
 import type { PinoLogger } from 'nestjs-pino';
 import type { DbService } from '../../../../infra/db/db.service';
 import type { GraphState, NodeUpdate } from '../state';
+import {
+  formatDateTime,
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
+} from '../../../../common/utils/date';
 
 interface BillRow {
   amount: number;
@@ -79,15 +86,9 @@ interface QueryScope {
 
 function resolveScope(content: string, today: Date): QueryScope {
   if (content.includes('今天') || content.includes('今日')) {
-    const start = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-    );
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
     return {
       label: 'today',
-      where: { billDate: { gte: start, lt: end } },
+      where: { billDate: { gte: startOfDay(today), lt: endOfDay(today) } },
       take: 20,
       formatReply: (bills, total, scopeLabel) => {
         const listText = bills
@@ -107,12 +108,12 @@ function resolveScope(content: string, today: Date): QueryScope {
     content.includes('本月') ||
     (!content.includes('上') && content.includes('月'))
   ) {
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 1);
     return {
       label: 'month',
-      where: { billDate: { gte: start, lt: end } },
-      take: 0, // 0 表示不限制，全量
+      where: {
+        billDate: { gte: startOfMonth(today), lt: endOfMonth(today) },
+      },
+      take: 0,
       formatReply: (bills, total, scopeLabel) => {
         const label = scopeLabel ? `本月${scopeLabel}` : '本月';
         return `${label}共 ${bills.length} 笔账单，合计 ¥${total}`;
@@ -129,8 +130,7 @@ function resolveScope(content: string, today: Date): QueryScope {
       const listText = bills
         .map((b) => {
           const prefix = b.type === 'expense' ? '支' : '收';
-          const d = new Date(b.billDate);
-          const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+          const dateStr = formatDateTime(b.billDate);
           const catName = b.category?.name ?? '未分类';
           return `[${prefix}] ${dateStr} ${catName} ¥${b.amount}`;
         })
@@ -146,7 +146,6 @@ function resolveTypeFilter(content: string): 'expense' | 'income' | null {
   const wantExpense = content.includes('花') || content.includes('支出');
   const wantIncome = content.includes('收入') || content.includes('赚');
 
-  // 同时出现时无法确定，不设过滤
   if (wantExpense && wantIncome) return null;
   if (wantExpense) return 'expense';
   if (wantIncome) return 'income';

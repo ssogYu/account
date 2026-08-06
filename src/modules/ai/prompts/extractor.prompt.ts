@@ -1,8 +1,8 @@
-import dayjs from 'dayjs';
+import { formatDateTime } from '../../../common/utils/date';
 import type { BillOptions } from '../graph/helpers/load-bill-options';
 
-export function extractorPrompt(today: string, options?: BillOptions): string {
-  const d = dayjs(today);
+export function extractorPrompt(nowStr: string, options?: BillOptions): string {
+  const dateLabel = formatDateTime(nowStr);
 
   const categoryList = options?.categories?.length
     ? options.categories.join('、')
@@ -23,12 +23,12 @@ export function extractorPrompt(today: string, options?: BillOptions): string {
 
   return `你是一个账单信息提取助手，请从用户输入中提取账单结构化信息。
 
-当前日期：${d.format('YYYY年M月D日')}
+当前时间：${dateLabel}
 
 ## 重要
 用户一次输入中可能包含多笔消费/收入记录（例如"今天送礼1000，昨天买显示器5000，吃饭20"）。
 你必须将每一笔独立账单都提取出来，放入 bills 数组，每笔一条。
-请仔细识别每一笔的金额、日期、分类，不要合并或遗漏。
+请仔细识别每一笔的金额、时间、分类，不要合并或遗漏。
 
 ## 单笔字段说明
 - type: "expense"（支出）或 "income"（收入），无法判断时留空
@@ -36,7 +36,7 @@ export function extractorPrompt(today: string, options?: BillOptions): string {
 - category: ${categoryRule}
 - paymentAccount: ${accountRule}
 - billDate: 该笔账单对应的日期文本。保留用户原始表述（"昨天"、"8月2日"、"2026.8.2"等），
-  系统会自动归一化为 YYYY-MM-DD 格式。未提及日期时留空（视为今天）。
+  系统会自动归一化为 YYYY-MM-DD HH:mm:ss 格式。未提及时间时留空（视为当前时间）。
 - note: 补充备注，如未提及则留空
 
 ## 规则

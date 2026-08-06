@@ -1,12 +1,10 @@
 /**
  * 账单回复文本格式化公共 helper。
- * 供 auto-inserter（自动入库）与 ai.service（手动确认）复用，
- * 保证两个入口产出的回复格式一致。
+ * 供 auto-inserter（自动入库）与 ai.service（手动确认）复用。
  */
 
-import dayjs from 'dayjs';
+import { formatDateTime } from '../../../../common/utils/date';
 
-/** 从账单对象中安全提取字段（避免 Record<string, unknown> 类型窄化问题） */
 function getField(bill: Record<string, unknown>, key: string): unknown {
   return bill[key];
 }
@@ -38,16 +36,12 @@ function getNote(bill: Record<string, unknown>): string | null {
     : null;
 }
 
-/** 获取账单日期并规范为 YYYY-MM-DD（无效/缺失返回 null） */
 function getBillDate(bill: Record<string, unknown>): string | null {
   const date = getField(bill, 'billDate');
-  return dayjs(date as any).format('YYYY-MM-DD');
+  if (!date) return null;
+  return formatDateTime(date as Parameters<typeof formatDateTime>[0]);
 }
 
-/**
- * 格式化单笔账单明细，保证关键信息完整。
- * 首行为「类型 · 金额 · 分类 · 账户」，日期、备注分行展示。
- */
 export function formatBillText(bill: Record<string, unknown>): string {
   const parts: string[] = [
     `${getTypeText(bill)} ¥${String(getField(bill, 'amount'))}（${getCategoryName(bill)}）`,
@@ -55,13 +49,12 @@ export function formatBillText(bill: Record<string, unknown>): string {
   const account = getPaymentAccountName(bill);
   if (account) parts.push(` · ${account}`);
   const date = getBillDate(bill);
-  if (date) parts.push(`\n日期：${date}`);
+  if (date) parts.push(`\n时间：${date}`);
   const note = getNote(bill);
   if (note) parts.push(`\n备注：${note}`);
   return parts.join('');
 }
 
-/** 构建已记录账单的回复文本（单笔或多笔） */
 export function buildBillReply(bills: Record<string, unknown>[]): string {
   if (bills.length === 1) {
     return `已记录：${formatBillText(bills[0])}`;

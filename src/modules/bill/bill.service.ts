@@ -8,6 +8,7 @@ import { PinoLogger } from 'nestjs-pino';
 
 import { DbService } from '../../infra/db/db.service';
 import { FamilyService } from '../family/family.service';
+import { toDateTime, nowDate } from '../../common/utils/date';
 import type { CreateBillDto } from './dto/create-bill.dto';
 import type { QueryBillDto } from './dto/query-bill.dto';
 import type { UpdateBillDto } from './dto/update-bill.dto';
@@ -42,7 +43,6 @@ export class BillService {
       ...this.buildFilters(query),
     };
 
-    // 在家庭组中查询家庭账单，否则查询个人账单
     const familyId = await this.familyService.getFamilyId(userId);
     if (familyId) {
       where.familyId = familyId;
@@ -93,7 +93,7 @@ export class BillService {
   // 增删改
   // ==========================================================
 
-  /** 创建账单：用户在家庭组中时账单自动归属家庭组 */
+  /** 创建账单 */
   async create(userId: string, dto: CreateBillDto) {
     await this.validateCategory(userId, dto.categoryId);
     if (dto.paymentAccountId) {
@@ -111,7 +111,7 @@ export class BillService {
         categoryId: dto.categoryId,
         paymentAccountId: dto.paymentAccountId ?? null,
         note: dto.note ?? null,
-        billDate: dto.billDate ? new Date(dto.billDate) : new Date(),
+        billDate: dto.billDate ? toDateTime(dto.billDate) : nowDate(),
       },
       include: billIncludes,
     });
@@ -139,7 +139,7 @@ export class BillService {
         categoryId: dto.categoryId,
         paymentAccountId: dto.paymentAccountId,
         note: dto.note,
-        billDate: dto.billDate ? new Date(dto.billDate) : undefined,
+        billDate: dto.billDate ? toDateTime(dto.billDate) : undefined,
       },
       include: billIncludes,
     });
@@ -160,7 +160,6 @@ export class BillService {
   // 私有校验方法
   // ==========================================================
 
-  /** 校验分类归属（系统分类 / 家庭组分类 / 用户自有分类均可） */
   private async validateCategory(userId: string, categoryId: string) {
     const category = await this.db.category.findUnique({
       where: { id: categoryId },
@@ -171,15 +170,12 @@ export class BillService {
       throw new NotFoundException('分类不存在');
     }
 
-    // 系统分类
     if (category.isSystem) return;
 
-    // 个人分类
     if (category.userId !== null && category.userId !== userId) {
       throw new ForbiddenException('无权使用该分类');
     }
 
-    // 家庭组分类：检查用户是否属于该家庭组
     if (category.familyId) {
       const userFamilyId = await this.familyService.getFamilyId(userId);
       if (userFamilyId !== category.familyId) {
@@ -188,7 +184,6 @@ export class BillService {
     }
   }
 
-  /** 校验支付账户归属（系统账户 / 家庭组账户 / 用户自有账户均可） */
   private async validatePaymentAccount(userId: string, accountId: string) {
     const account = await this.db.paymentAccount.findUnique({
       where: { id: accountId },
@@ -199,15 +194,12 @@ export class BillService {
       throw new NotFoundException('支付账户不存在');
     }
 
-    // 系统默认账户
     if (account.isSystem) return;
 
-    // 个人账户
     if (account.userId !== null && account.userId !== userId) {
       throw new ForbiddenException('无权使用该支付账户');
     }
 
-    // 家庭组账户
     if (account.familyId) {
       const userFamilyId = await this.familyService.getFamilyId(userId);
       if (userFamilyId !== account.familyId) {
@@ -216,7 +208,6 @@ export class BillService {
     }
   }
 
-  /** 校验账单访问权限：个人账单检查 userId，家庭组账单检查 familyId */
   private async validateBillAccess(
     userId: string,
     bill: { userId: string; familyId: string | null },
@@ -248,8 +239,8 @@ export class BillService {
     }
     if (query.startDate || query.endDate) {
       where.billDate = {};
-      if (query.startDate) where.billDate.gte = new Date(query.startDate);
-      if (query.endDate) where.billDate.lte = new Date(query.endDate);
+      if (query.startDate) where.billDate.gte = toDateTime(query.startDate);
+      if (query.endDate) where.billDate.lte = toDateTime(query.endDate);
     }
 
     return where;

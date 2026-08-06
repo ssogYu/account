@@ -8,7 +8,7 @@ const FIELD_LABELS: Record<string, string> = {
   amount: '金额',
   category: '分类',
   paymentAccount: '支付账户',
-  billDate: '日期',
+  billDate: '时间',
 };
 
 export interface ConfirmationCardsResult {
@@ -54,7 +54,7 @@ export function buildConfirmationCards(
     const prefix = cards.length > 1 ? `${index + 1}. ` : '';
     lines.push(`${prefix}${typeText} ${amountText}${catText}`);
 
-    if (card.billDate) lines.push(`日期：${card.billDate}`);
+    if (card.billDate) lines.push(`时间：${card.billDate}`);
     if (card.paymentAccount) lines.push(`账户：${card.paymentAccount}`);
     if (card.note) lines.push(`备注：${card.note}`);
 

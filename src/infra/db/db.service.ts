@@ -24,6 +24,14 @@ export class DbService
     }
 
     const pool = new Pool({ connectionString: dbUrl });
+
+    // 如果 DATABASE_URL 中没有 timezone 参数，则在新连接建立时设置
+    if (!dbUrl.includes('timezone=')) {
+      pool.on('connect', (client) => {
+        void client.query("SET timezone = 'Asia/Shanghai'");
+      });
+    }
+
     const adapter = new PrismaPg(pool);
 
     super({

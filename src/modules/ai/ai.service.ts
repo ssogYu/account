@@ -2,7 +2,6 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { BaseMessage } from '@langchain/core/messages';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import dayjs from 'dayjs';
 import { DbService } from '../../infra/db/db.service';
 import { AiService as InfraAiService } from '../../infra/ai/ai.service';
 import { compileGraph } from './graph/bill-agent.graph';
@@ -13,8 +12,8 @@ import type { ConfirmDto } from './dto/confirm.dto';
 import { createBillRecord } from './graph/helpers/create-bill';
 import { resolveCategoryId } from './graph/helpers/resolve-category';
 import { resolvePaymentAccountId } from './graph/helpers/resolve-payment-account';
-import { resolveDate } from './graph/helpers/resolve-date';
 import { buildBillReply } from './graph/helpers/format-bill-reply';
+import { parseDateTime, now } from '../../common/utils/date';
 
 /** 注入 LLM 的历史消息条数上限（最近 10 轮对话） */
 const HISTORY_LIMIT = 20;
@@ -129,10 +128,10 @@ export class AiService {
     const type = ['expense', 'income'].includes(dto.type ?? '')
       ? (dto.type as 'expense' | 'income')
       : (bill.type ?? 'expense');
-    const today = dayjs().format('YYYY-MM-DD');
+    const nowStr = now();
     const billDate = dto.billDate
-      ? (resolveDate(dto.billDate, today) ?? today)
-      : (bill.billDate ?? today);
+      ? (parseDateTime(dto.billDate) ?? nowStr)
+      : (bill.billDate ?? nowStr);
 
     if (typeof amount !== 'number' || amount <= 0) {
       return { status: 'error', reply: '金额数据无效，请重新记账' };

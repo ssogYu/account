@@ -43,8 +43,8 @@ export class CreateBillDto {
   note?: string;
 
   @ApiPropertyOptional({
-    example: '2026-07-30T12:00:00.000Z',
-    description: '账单发生日期，默认当天',
+    example: '2026-07-30 14:30:00',
+    description: '账单发生时间 YYYY-MM-DD HH:mm:ss，默认当前时间',
   })
   @IsOptional()
   @IsDateString()

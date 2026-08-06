@@ -14,6 +14,7 @@ import { createBillRecord } from './graph/helpers/create-bill';
 import { resolveCategoryId } from './graph/helpers/resolve-category';
 import { resolvePaymentAccountId } from './graph/helpers/resolve-payment-account';
 import { resolveDate } from './graph/helpers/resolve-date';
+import { buildBillReply } from './graph/helpers/format-bill-reply';
 
 /** 注入 LLM 的历史消息条数上限（最近 10 轮对话） */
 const HISTORY_LIMIT = 20;
@@ -153,7 +154,7 @@ export class AiService {
       type,
       amount,
       billDate,
-      note: bill.note,
+      note: dto.note ?? bill.note,
     });
 
     this.logger.info(
@@ -161,8 +162,7 @@ export class AiService {
       '确认记账完成',
     );
 
-    const typeText = created.type === 'expense' ? '支出' : '收入';
-    const reply = `已记录：${typeText} ¥${String(created.amount)}（${created.category?.name ?? '其他'}）`;
+    const reply = buildBillReply([created as Record<string, unknown>]);
 
     // 存入对话消息记录，保证历史对话中能看到确认结果
     if (dto.conversationId) {

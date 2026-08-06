@@ -4,6 +4,7 @@ import type { GraphState, NodeUpdate } from '../state';
 import { createBillRecord } from '../helpers/create-bill';
 import { resolveCategoryId } from '../helpers/resolve-category';
 import { resolvePaymentAccountId } from '../helpers/resolve-payment-account';
+import { buildBillReply } from '../helpers/format-bill-reply';
 
 /** 自动入库节点：将提取到的账单批量创建 */
 export function createAutoInserter(db: DbService, logger: PinoLogger) {
@@ -53,9 +54,7 @@ export function createAutoInserter(db: DbService, logger: PinoLogger) {
       logger.info({ count: createdBills.length }, '账单自动创建完成');
 
       const single = createdBills.length === 1;
-      const reply = single
-        ? `已记录：${createdBills[0].type === 'income' ? '收入' : '支出'} ¥${String(createdBills[0].amount)}`
-        : `已记录 ${createdBills.length} 笔账单`;
+      const reply = buildBillReply(createdBills);
 
       return {
         status: 'auto_created' as const,

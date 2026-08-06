@@ -72,4 +72,9 @@ export class ConfirmDto {
   @IsOptional()
   @IsString()
   type?: string;
+
+  @ApiPropertyOptional({ description: '用户编辑后的备注（覆盖 AI 提取值）' })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

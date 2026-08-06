@@ -41,7 +41,7 @@ export function extractorPrompt(today: string, options?: BillOptions): string {
 
 ## 规则
 1. amount 必须是纯数字，不要带单位或符号
-2. category 和 paymentAccount 只能从给定列表中匹配，不要输出列表之外的名称
+2. category 和 paymentAccount 只能从给定列表中匹配，不要输出列表之外的名称，而且要严格的匹配是否相关不要随意认为
 3. categoryId、paymentAccountId 留空
 4. billDate 保留用户原始表述，系统会自动归一化处理
 5. 每笔账单独立列出，数量与用户描述中的记录数一致

@@ -23,7 +23,7 @@ const SEED_DATA = {
     { name: '奖金', icon: '🧧', type: CategoryType.income, sortOrder: 2 },
     { name: '投资', icon: '📈', type: CategoryType.income, sortOrder: 3 },
     { name: '兼职', icon: '💼', type: CategoryType.income, sortOrder: 4 },
-    { name: '其他收入', icon: '💵', type: CategoryType.income, sortOrder: 99 },
+    // { name: '其他收入', icon: '💵', type: CategoryType.income, sortOrder: 99 },
   ],
   paymentAccounts: [
     { name: '微信', icon: '💚', sortOrder: 1 },

@@ -37,6 +37,14 @@ export class QueryBillDto {
   categoryId?: string;
 
   @ApiPropertyOptional({
+    example: 'a1b2c3d4-...',
+    description: '按支付账户筛选',
+  })
+  @IsOptional()
+  @IsUUID()
+  paymentAccountId?: string;
+
+  @ApiPropertyOptional({
     enum: BillType,
     example: BillType.expense,
     description: '按类型筛选',

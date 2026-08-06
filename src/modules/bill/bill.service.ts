@@ -236,6 +236,7 @@ export class BillService {
     const where: Prisma.BillWhereInput = {};
 
     if (query.categoryId) where.categoryId = query.categoryId;
+    if (query.paymentAccountId) where.paymentAccountId = query.paymentAccountId;
     if (query.type) where.type = query.type;
     if (query.keyword) {
       where.OR = [

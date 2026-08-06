@@ -38,7 +38,7 @@ export interface GraphState {
   /** 单笔置信度（兼容单笔自动入库路由判断） */
   confidence?: number;
   /** 输出 */
-  status?: 'auto_created' | 'pending_confirm' | 'replied' | 'error';
+  status?: 'auto_created' | 'pending_confirm' | 'mixed' | 'replied' | 'error';
   reply?: string;
   sessionId?: string;
   createdBill?: Record<string, unknown>;

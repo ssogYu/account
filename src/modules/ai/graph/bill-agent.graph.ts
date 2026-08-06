@@ -7,8 +7,7 @@ import { createInputProcessor } from './nodes/input-processor.node';
 import { createIntentClassifier } from './nodes/intent-classifier.node';
 import { createExtractor } from './nodes/extractor.node';
 import { createConfidenceScorer } from './nodes/confidence-scorer.node';
-import { createAutoInserter } from './nodes/auto-inserter.node';
-import { createConfirmationCard } from './nodes/confirmation-card.node';
+import { createMixedHandler } from './nodes/mixed-handler.node';
 import { createQueryHandler } from './nodes/query-handler.node';
 import { createChatHandler } from './nodes/chat-handler.node';
 
@@ -27,7 +26,7 @@ const GraphAnnotation = Annotation.Root({
   billEvaluations: Annotation<GraphState['billEvaluations']>(),
   confidence: Annotation<number>(),
   status: Annotation<
-    'auto_created' | 'pending_confirm' | 'replied' | 'error'
+    'auto_created' | 'pending_confirm' | 'mixed' | 'replied' | 'error'
   >(),
   reply: Annotation<string>(),
   sessionId: Annotation<string>(),
@@ -51,9 +50,8 @@ export interface GraphDeps {
  * 流程：
  *  START → inputProcessor
  *    ├─ 有效 → intentClassifier
- *    │     ├─ bookkeeping → extractor → confidenceScorer
- *    │     │    ├─ high → autoInserter → END
- *    │     │    └─ low  → confirmCard  → END
+ *    │     ├─ bookkeeping → extractor → confidenceScorer → mixedHandler → END
+ *    │     │      逐笔判断：高置信度自动入库，低置信度生成确认卡片
  *    │     ├─ query → queryHandler → END
  *    │     ├─ chat  → chatHandler  → END
  *    │     └─ error → END
@@ -67,8 +65,7 @@ export function compileGraph(deps: GraphDeps) {
     .addNode('intentClassifier', createIntentClassifier(aiService, logger))
     .addNode('extractor', createExtractor(db, aiService, logger))
     .addNode('confidenceScorer', createConfidenceScorer(logger))
-    .addNode('autoInserter', createAutoInserter(db, logger))
-    .addNode('confirmCard', createConfirmationCard(logger))
+    .addNode('mixedHandler', createMixedHandler(db, logger))
     .addNode('queryHandler', createQueryHandler(db, logger))
     .addNode('chatHandler', createChatHandler(aiService, logger))
 
@@ -95,15 +92,11 @@ export function compileGraph(deps: GraphDeps) {
       error: END,
     })
 
-    // 评分路由：高置信度自动入库，否则确认
-    .addConditionalEdges('confidenceScorer', routeConfidence, {
-      auto: 'autoInserter',
-      confirm: 'confirmCard',
-    })
+    // 评分后统一进入混合处理节点：逐笔判断自动入库或确认
+    .addEdge('confidenceScorer', 'mixedHandler')
 
     // 终端节点 → END
-    .addEdge('autoInserter', '__end__')
-    .addEdge('confirmCard', '__end__')
+    .addEdge('mixedHandler', '__end__')
     .addEdge('queryHandler', '__end__')
     .addEdge('chatHandler', '__end__');
 
@@ -127,15 +120,4 @@ function afterExtract(state: GraphState): string {
   return state.extractedBills && state.extractedBills.length > 0
     ? 'ok'
     : 'error';
-}
-
-/**
- * 置信度路由：
- * - 单笔且置信度 >=0.7 自动入库
- * - 多笔或低置信度统一走确认卡片（多笔需要用户逐笔核对）
- */
-function routeConfidence(state: GraphState): string {
-  const bills = state.extractedBills ?? [];
-  if (bills.length === 1 && (state.confidence ?? 0) >= 0.7) return 'auto';
-  return 'confirm';
 }

@@ -4,6 +4,8 @@
  * 保证两个入口产出的回复格式一致。
  */
 
+import dayjs from 'dayjs';
+
 /** 从账单对象中安全提取字段（避免 Record<string, unknown> 类型窄化问题） */
 function getField(bill: Record<string, unknown>, key: string): unknown {
   return bill[key];
@@ -36,13 +38,24 @@ function getNote(bill: Record<string, unknown>): string | null {
     : null;
 }
 
-/** 格式化单笔账单明细（类型 · 金额 · 分类 · 账户 · 备注），保证关键信息完整 */
+/** 获取账单日期并规范为 YYYY-MM-DD（无效/缺失返回 null） */
+function getBillDate(bill: Record<string, unknown>): string | null {
+  const date = getField(bill, 'billDate');
+  return dayjs(date as any).format('YYYY-MM-DD');
+}
+
+/**
+ * 格式化单笔账单明细，保证关键信息完整。
+ * 首行为「类型 · 金额 · 分类 · 账户」，日期、备注分行展示。
+ */
 export function formatBillText(bill: Record<string, unknown>): string {
   const parts: string[] = [
     `${getTypeText(bill)} ¥${String(getField(bill, 'amount'))}（${getCategoryName(bill)}）`,
   ];
   const account = getPaymentAccountName(bill);
   if (account) parts.push(` · ${account}`);
+  const date = getBillDate(bill);
+  if (date) parts.push(`\n日期：${date}`);
   const note = getNote(bill);
   if (note) parts.push(`\n备注：${note}`);
   return parts.join('');

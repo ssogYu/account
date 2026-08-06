@@ -26,8 +26,8 @@ const SEED_DATA = {
     // { name: '其他收入', icon: '💵', type: CategoryType.income, sortOrder: 99 },
   ],
   paymentAccounts: [
-    { name: '微信', icon: '💚', sortOrder: 1 },
-    { name: '支付宝', icon: '💙', sortOrder: 2 },
+    { name: '微信', icon: '💬', sortOrder: 1 },
+    { name: '支付宝', icon: '💰', sortOrder: 2 },
     { name: '现金', icon: '💴', sortOrder: 3 },
     { name: '银行卡', icon: '💳', sortOrder: 4 },
   ],

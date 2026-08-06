@@ -52,8 +52,8 @@ export function createMixedHandler(db: DbService, logger: PinoLogger) {
       for (const bill of autoBills) {
         if (!bill.amount || bill.amount <= 0) continue;
         const [categoryId, paymentAccountId] = await Promise.all([
-          resolveCategoryId(db, userId, bill.category),
-          resolvePaymentAccountId(db, userId, bill.paymentAccount),
+          resolveCategoryId(db, userId, bill.category ?? undefined),
+          resolvePaymentAccountId(db, userId, bill.paymentAccount ?? undefined),
         ]);
         const created = await createBillRecord(db, {
           userId,
@@ -80,7 +80,7 @@ export function createMixedHandler(db: DbService, logger: PinoLogger) {
 
       // 3) 合并 reply 与 status
       const autoReply = buildBillReply(createdBills);
-      const replies: string[] = [];
+      const replies: string[] = [`共识别到${extractedBills.length}笔账单`];
       if (createdBills.length > 0) replies.push(autoReply);
       //   if (confirmBills.length > 0) replies.push(confirmReply);
       if (confirmBills.length > 0)

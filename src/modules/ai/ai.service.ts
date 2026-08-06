@@ -2,6 +2,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { BaseMessage } from '@langchain/core/messages';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
+import dayjs from 'dayjs';
 import { DbService } from '../../infra/db/db.service';
 import { AiService as InfraAiService } from '../../infra/ai/ai.service';
 import { compileGraph } from './graph/bill-agent.graph';
@@ -11,6 +12,7 @@ import type { ConfirmDto } from './dto/confirm.dto';
 import { createBillRecord } from './graph/helpers/create-bill';
 import { resolveCategoryId } from './graph/helpers/resolve-category';
 import { resolvePaymentAccountId } from './graph/helpers/resolve-payment-account';
+import { resolveDate } from './graph/helpers/resolve-date';
 
 /** 注入 LLM 的历史消息条数上限（最近 10 轮对话） */
 const HISTORY_LIMIT = 20;
@@ -122,19 +124,26 @@ export class AiService {
       return { status: 'cancelled', reply: '已取消，不记录该账单' };
     }
 
+    // 乐观消费：校验通过即移除会话，防止创建期间重复确认导致重复入账
+    this.sessions.delete(dto.sessionId);
+
     const { extractedBill } = session;
     if (!extractedBill) {
-      this.sessions.delete(dto.sessionId);
       return { status: 'error', reply: '账单数据丢失，请重新记账' };
     }
 
     // 前端编辑值覆盖 AI 提取值
     const amount = dto.amount ?? extractedBill.amount;
-    const billDate = dto.billDate ?? extractedBill.billDate;
-    const type = (dto.type as 'expense' | 'income') ?? extractedBill.type;
+    const type = ['expense', 'income'].includes(dto.type ?? '')
+      ? (dto.type as 'expense' | 'income')
+      : (extractedBill.type ?? 'expense');
+    // 复用 resolveDate 归一化用户编辑的日期；解析失败时回退为今天，保证格式统一为 YYYY-MM-DD
+    const today = dayjs().format('YYYY-MM-DD');
+    const billDate = dto.billDate
+      ? (resolveDate(dto.billDate, today) ?? today)
+      : (extractedBill.billDate ?? today);
 
     if (typeof amount !== 'number' || amount <= 0) {
-      this.sessions.delete(dto.sessionId);
       return { status: 'error', reply: '金额数据无效，请重新记账' };
     }
 
@@ -161,7 +170,6 @@ export class AiService {
       note: extractedBill.note,
     });
 
-    this.sessions.delete(dto.sessionId);
     this.logger.info({ billId: bill.id, amount: bill.amount }, '确认记账完成');
 
     const typeText = bill.type === 'expense' ? '支出' : '收入';

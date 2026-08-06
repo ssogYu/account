@@ -2,19 +2,27 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import dayjs from 'dayjs';
 import type { PinoLogger } from 'nestjs-pino';
 import type { AiService } from '../../../../infra/ai/ai.service';
+import type { DbService } from '../../../../infra/db/db.service';
 import { extractorPrompt } from '../../prompts/extractor.prompt';
 import { BillExtractionSchema } from '../../schemas/extraction.schema';
 import type { GraphState, NodeUpdate } from '../state';
 import { resolveDate } from '../helpers/resolve-date';
+import { loadBillOptions } from '../helpers/load-bill-options';
 
 /** 结构化提取节点：仅从当前输入提取账单字段，不注入历史 */
-export function createExtractor(aiService: AiService, logger: PinoLogger) {
+export function createExtractor(
+  db: DbService,
+  aiService: AiService,
+  logger: PinoLogger,
+) {
   return async (state: GraphState): Promise<NodeUpdate> => {
     try {
       const today = dayjs().format('YYYY-MM-DD');
+      // 预加载用户可见的分类与支付账户，约束 AI 仅限列表内匹配
+      const options = await loadBillOptions(db, state.userId);
       const result = await aiService.structuredInvoke(
         [
-          new SystemMessage(extractorPrompt(today)),
+          new SystemMessage(extractorPrompt(today, options)),
           new HumanMessage(state.content),
         ],
         BillExtractionSchema,

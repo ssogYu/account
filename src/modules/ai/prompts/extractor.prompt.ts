@@ -1,7 +1,25 @@
 import dayjs from 'dayjs';
+import type { BillOptions } from '../graph/helpers/load-bill-options';
 
-export function extractorPrompt(today: string): string {
+export function extractorPrompt(today: string, options?: BillOptions): string {
   const d = dayjs(today);
+
+  const categoryList = options?.categories?.length
+    ? options.categories.join('、')
+    : '';
+  const accountList = options?.paymentAccounts?.length
+    ? options.paymentAccounts.join('、')
+    : '';
+
+  const categoryRule = categoryList
+    ? `category 必须从以下列表中选择一个：${categoryList}。
+   若用户描述无法匹配列表中任何一项，则留空。`
+    : 'category 从描述推断，不要编造。';
+
+  const accountRule = accountList
+    ? `paymentAccount 必须从以下列表中选择一个：${accountList}。
+   若用户未提及支付方式或无法匹配列表中任何一项，则留空。`
+    : 'paymentAccount 仅在用户明确提及支付方式时填写。';
 
   return `你是一个账单信息提取助手，请从用户输入中提取账单结构化信息。
 
@@ -10,8 +28,8 @@ export function extractorPrompt(today: string): string {
 ## 字段说明
 - type: "expense"（支出）或 "income"（收入），无法判断时留空
 - amount: 金额数字（正数），去除"元""块"等单位
-- category: 交易分类中文名称，如：餐饮、交通、购物、工资、娱乐等
-- paymentAccount: 支付方式名称，如：微信、支付宝、银行卡、现金等
+- category: ${categoryRule}
+- paymentAccount: ${accountRule}
 - billDate: 用户提及的日期原文。直接抄用户原话，不要做任何转换。
   例如用户说"昨天"就填"昨天"，说"8月2日"就填"8月2日"，说"2026.8.2"就填"2026.8.2"。
   用户未提及任何日期时才留空。
@@ -19,7 +37,7 @@ export function extractorPrompt(today: string): string {
 
 ## 规则
 1. amount 必须是纯数字，不要带单位或符号
-2. category 从描述推断，不要编造
+2. category 和 paymentAccount 只能从给定列表中匹配，不要输出列表之外的名称
 3. categoryId、paymentAccountId 留空
 4. billDate 保持原文，不要转换格式
 

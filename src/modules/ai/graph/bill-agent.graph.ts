@@ -64,7 +64,7 @@ export function compileGraph(deps: GraphDeps) {
   const workflow = new StateGraph(GraphAnnotation)
     .addNode('inputProcessor', createInputProcessor(logger))
     .addNode('intentClassifier', createIntentClassifier(aiService, logger))
-    .addNode('extractor', createExtractor(aiService, logger))
+    .addNode('extractor', createExtractor(db, aiService, logger))
     .addNode('confidenceScorer', createConfidenceScorer(logger))
     .addNode('autoInserter', createAutoInserter(db, logger))
     .addNode('confirmCard', createConfirmationCard(logger))

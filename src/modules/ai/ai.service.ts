@@ -7,6 +7,7 @@ import { DbService } from '../../infra/db/db.service';
 import { AiService as InfraAiService } from '../../infra/ai/ai.service';
 import { compileGraph } from './graph/bill-agent.graph';
 import type { GraphState } from './graph/state';
+import type { BillExtractionResult } from './schemas/extraction.schema';
 import type { ChatDto } from './dto/chat.dto';
 import type { ConfirmDto } from './dto/confirm.dto';
 import { createBillRecord } from './graph/helpers/create-bill';
@@ -17,18 +18,9 @@ import { resolveDate } from './graph/helpers/resolve-date';
 /** 注入 LLM 的历史消息条数上限（最近 10 轮对话） */
 const HISTORY_LIMIT = 20;
 
-interface PendingSession {
-  extractedBill: GraphState['extractedBill'];
-  assistantMessageId: string;
-  userId: string;
-  conversationId: string;
-  createdAt: number;
-}
-
 @Injectable()
 export class AiService {
   private readonly graph: ReturnType<typeof compileGraph>;
-  private readonly sessions = new Map<string, PendingSession>();
 
   constructor(
     private readonly db: DbService,
@@ -71,7 +63,7 @@ export class AiService {
     });
 
     // 存 AI 回复（所有状态统一存储）
-    const assistantMsg = await this.db.message.create({
+    await this.db.message.create({
       data: {
         conversationId,
         role: 'assistant',
@@ -81,21 +73,14 @@ export class AiService {
           ...(result.createdBill
             ? { createdBill: JSON.parse(JSON.stringify(result.createdBill)) }
             : {}),
+          ...(result.createdBills?.length
+            ? {
+                createdBills: JSON.parse(JSON.stringify(result.createdBills)),
+              }
+            : {}),
         },
       },
     });
-
-    // pending_confirm 时缓存，后续 confirm 会更新这条消息
-    if (result.status === 'pending_confirm' && result.sessionId) {
-      this.sessions.set(result.sessionId, {
-        extractedBill: result.extractedBill,
-        assistantMessageId: assistantMsg.id,
-        userId,
-        conversationId,
-        createdAt: Date.now(),
-      });
-      this.cleanExpiredSessions();
-    }
 
     const response: Record<string, unknown> = {
       status: result.status,
@@ -104,44 +89,49 @@ export class AiService {
     };
     if (result.sessionId) response.sessionId = result.sessionId;
     if (result.createdBill) response.createdBill = result.createdBill;
-    if (result.confirmationCard)
-      response.confirmationCard = result.confirmationCard;
+    if (result.createdBills) response.createdBills = result.createdBills;
+    if (result.confirmationCards)
+      response.confirmationCards = result.confirmationCards;
 
     this.logger.info({ status: result.status, conversationId }, 'AI 对话完成');
     return response;
   }
 
+  /**
+   * 确认记账（无状态设计）：
+   * 前端从 confirmationCard 中取内嵌的 bill 数据回传，
+   * 服务端用编辑值覆盖原始提取值后直接创建账单，不依赖任何会话缓存。
+   */
   async confirm(userId: string, dto: ConfirmDto) {
-    const session = this.sessions.get(dto.sessionId);
-
-    if (!session) return { status: 'error', reply: '会话已过期，请重新记账' };
-    if (session.userId !== userId)
-      return { status: 'error', reply: '无权操作此会话' };
-
     if (!dto.confirm) {
-      this.sessions.delete(dto.sessionId);
-      this.logger.info({ sessionId: dto.sessionId }, '用户取消确认记账');
+      this.logger.info({ userId }, '用户取消确认记账');
+      if (dto.conversationId) {
+        await this.db.message.create({
+          data: {
+            conversationId: dto.conversationId,
+            role: 'assistant',
+            content: '已取消，不记录该账单',
+            metadata: { status: 'cancelled' },
+          },
+        });
+      }
       return { status: 'cancelled', reply: '已取消，不记录该账单' };
     }
 
-    // 乐观消费：校验通过即移除会话，防止创建期间重复确认导致重复入账
-    this.sessions.delete(dto.sessionId);
-
-    const { extractedBill } = session;
-    if (!extractedBill) {
+    const bill = dto.bill as BillExtractionResult | undefined;
+    if (!bill) {
       return { status: 'error', reply: '账单数据丢失，请重新记账' };
     }
 
     // 前端编辑值覆盖 AI 提取值
-    const amount = dto.amount ?? extractedBill.amount;
+    const amount = dto.amount ?? bill.amount;
     const type = ['expense', 'income'].includes(dto.type ?? '')
       ? (dto.type as 'expense' | 'income')
-      : (extractedBill.type ?? 'expense');
-    // 复用 resolveDate 归一化用户编辑的日期；解析失败时回退为今天，保证格式统一为 YYYY-MM-DD
+      : (bill.type ?? 'expense');
     const today = dayjs().format('YYYY-MM-DD');
     const billDate = dto.billDate
       ? (resolveDate(dto.billDate, today) ?? today)
-      : (extractedBill.billDate ?? today);
+      : (bill.billDate ?? today);
 
     if (typeof amount !== 'number' || amount <= 0) {
       return { status: 'error', reply: '金额数据无效，请重新记账' };
@@ -149,42 +139,44 @@ export class AiService {
 
     const categoryId =
       dto.categoryId ??
-      extractedBill.categoryId ??
-      (await resolveCategoryId(this.db, userId, extractedBill.category));
+      bill.categoryId ??
+      (await resolveCategoryId(this.db, userId, bill.category));
     const paymentAccountId =
       dto.paymentAccountId ??
-      extractedBill.paymentAccountId ??
-      (await resolvePaymentAccountId(
-        this.db,
-        userId,
-        extractedBill.paymentAccount,
-      ));
+      bill.paymentAccountId ??
+      (await resolvePaymentAccountId(this.db, userId, bill.paymentAccount));
 
-    const bill = await createBillRecord(this.db, {
+    const created = await createBillRecord(this.db, {
       userId,
       categoryId,
       paymentAccountId,
       type,
       amount,
       billDate,
-      note: extractedBill.note,
+      note: bill.note,
     });
 
-    this.logger.info({ billId: bill.id, amount: bill.amount }, '确认记账完成');
+    this.logger.info(
+      { billId: created.id, amount: created.amount },
+      '确认记账完成',
+    );
 
-    const typeText = bill.type === 'expense' ? '支出' : '收入';
-    const reply = `已记录：${typeText} ¥${String(bill.amount)}（${bill.category?.name ?? '其他'}）`;
+    const typeText = created.type === 'expense' ? '支出' : '收入';
+    const reply = `已记录：${typeText} ¥${String(created.amount)}（${created.category?.name ?? '其他'}）`;
 
-    // 更新之前在 chat() 中存的 assistant 消息
-    await this.db.message.update({
-      where: { id: session.assistantMessageId },
-      data: {
-        content: reply,
-        metadata: { status: 'created', createdBill: bill },
-      },
-    });
+    // 存入对话消息记录，保证历史对话中能看到确认结果
+    if (dto.conversationId) {
+      await this.db.message.create({
+        data: {
+          conversationId: dto.conversationId,
+          role: 'assistant',
+          content: reply,
+          metadata: { status: 'created', createdBill: created },
+        },
+      });
+    }
 
-    return { status: 'created', reply, createdBill: bill };
+    return { status: 'created', reply, createdBill: created };
   }
 
   // ---- 查询 ----
@@ -263,12 +255,5 @@ export class AiService {
           ? new HumanMessage(m.content)
           : new AIMessage(m.content),
       );
-  }
-
-  private cleanExpiredSessions() {
-    const now = Date.now();
-    for (const [key, s] of this.sessions.entries()) {
-      if (now - s.createdAt > 5 * 60 * 1000) this.sessions.delete(key);
-    }
   }
 }

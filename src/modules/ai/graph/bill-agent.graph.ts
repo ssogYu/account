@@ -23,16 +23,17 @@ const GraphAnnotation = Annotation.Root({
   conversationId: Annotation<string>(),
   intent: Annotation<'bookkeeping' | 'query' | 'chat'>(),
   intentConfidence: Annotation<number>(),
-  extractedBill: Annotation<GraphState['extractedBill']>(),
+  extractedBills: Annotation<GraphState['extractedBills']>(),
+  billEvaluations: Annotation<GraphState['billEvaluations']>(),
   confidence: Annotation<number>(),
-  missingFields: Annotation<string[]>(),
   status: Annotation<
     'auto_created' | 'pending_confirm' | 'replied' | 'error'
   >(),
   reply: Annotation<string>(),
   sessionId: Annotation<string>(),
   createdBill: Annotation<Record<string, unknown>>(),
-  confirmationCard: Annotation<Record<string, unknown>>(),
+  createdBills: Annotation<Record<string, unknown>[]>(),
+  confirmationCards: Annotation<GraphState['confirmationCards']>(),
   error: Annotation<string>(),
 });
 
@@ -120,12 +121,21 @@ function afterIntentClassify(state: GraphState): string {
   return state.intent ?? 'chat';
 }
 
-/** 提取路由：节点失败直接终止，避免空数据走到确认卡片 */
+/** 提取路由：节点失败或未提取到任何账单时终止 */
 function afterExtract(state: GraphState): string {
-  return state.error ? 'error' : 'ok';
+  if (state.error) return 'error';
+  return state.extractedBills && state.extractedBills.length > 0
+    ? 'ok'
+    : 'error';
 }
 
-/** 置信度路由：>=0.7 自动入库，否则走确认卡片 */
+/**
+ * 置信度路由：
+ * - 单笔且置信度 >=0.7 自动入库
+ * - 多笔或低置信度统一走确认卡片（多笔需要用户逐笔核对）
+ */
 function routeConfidence(state: GraphState): string {
-  return (state.confidence ?? 0) >= 0.7 ? 'auto' : 'confirm';
+  const bills = state.extractedBills ?? [];
+  if (bills.length === 1 && (state.confidence ?? 0) >= 0.7) return 'auto';
+  return 'confirm';
 }

@@ -17,7 +17,7 @@ const SEED_DATA = {
     { name: '教育', icon: '📚', type: CategoryType.expense, sortOrder: 8 },
     { name: '日用', icon: '🧴', type: CategoryType.expense, sortOrder: 9 },
     { name: '服饰', icon: '👔', type: CategoryType.expense, sortOrder: 10 },
-    { name: '其他支出', icon: '💸', type: CategoryType.expense, sortOrder: 99 },
+    // { name: '其他支出', icon: '💸', type: CategoryType.expense, sortOrder: 99 },
     // 收入
     { name: '工资', icon: '💰', type: CategoryType.income, sortOrder: 1 },
     { name: '奖金', icon: '🧧', type: CategoryType.income, sortOrder: 2 },

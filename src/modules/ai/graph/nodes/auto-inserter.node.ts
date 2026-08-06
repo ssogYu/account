@@ -5,45 +5,63 @@ import { createBillRecord } from '../helpers/create-bill';
 import { resolveCategoryId } from '../helpers/resolve-category';
 import { resolvePaymentAccountId } from '../helpers/resolve-payment-account';
 
-/** 自动入库节点：置信度足够高时直接创建账单 */
+/** 自动入库节点：将提取到的账单批量创建 */
 export function createAutoInserter(db: DbService, logger: PinoLogger) {
   return async (state: GraphState): Promise<NodeUpdate> => {
-    const { userId, extractedBill } = state;
+    const { userId, extractedBills = [] } = state;
 
-    // 防御性校验：理论上 confidenceScorer 已拦截，但保留以防状态异常
-    if (!extractedBill?.amount || extractedBill.amount <= 0) {
+    if (extractedBills.length === 0) {
       return {
         status: 'error' as const,
-        reply: '账单金额无效，请重新输入',
-        error: 'INVALID_AMOUNT',
+        reply: '未识别到有效的账单信息，请重新输入',
+        error: 'EMPTY_BILLS',
       };
     }
 
     try {
-      const [categoryId, paymentAccountId] = await Promise.all([
-        resolveCategoryId(db, userId, extractedBill.category),
-        resolvePaymentAccountId(db, userId, extractedBill.paymentAccount),
-      ]);
+      const createdBills: Record<string, unknown>[] = [];
 
-      const bill = await createBillRecord(db, {
-        userId,
-        categoryId,
-        paymentAccountId,
-        type: extractedBill.type ?? 'expense',
-        amount: extractedBill.amount,
-        billDate: extractedBill.billDate,
-        note: extractedBill.note,
-      });
+      for (const bill of extractedBills) {
+        if (!bill.amount || bill.amount <= 0) continue;
 
-      logger.info({ billId: bill.id, amount: bill.amount }, '账单自动创建完成');
+        const [categoryId, paymentAccountId] = await Promise.all([
+          resolveCategoryId(db, userId, bill.category),
+          resolvePaymentAccountId(db, userId, bill.paymentAccount),
+        ]);
 
-      const typeLabel = extractedBill.type === 'income' ? '收入' : '支出';
-      const catLabel = extractedBill.category ?? '未分类';
+        const created = await createBillRecord(db, {
+          userId,
+          categoryId,
+          paymentAccountId,
+          type: bill.type ?? 'expense',
+          amount: bill.amount,
+          billDate: bill.billDate,
+          note: bill.note,
+        });
+
+        createdBills.push(created as Record<string, unknown>);
+      }
+
+      if (createdBills.length === 0) {
+        return {
+          status: 'error' as const,
+          reply: '账单金额无效，请重新输入',
+          error: 'INVALID_AMOUNT',
+        };
+      }
+
+      logger.info({ count: createdBills.length }, '账单自动创建完成');
+
+      const single = createdBills.length === 1;
+      const reply = single
+        ? `已记录：${createdBills[0].type === 'income' ? '收入' : '支出'} ¥${String(createdBills[0].amount)}`
+        : `已记录 ${createdBills.length} 笔账单`;
 
       return {
         status: 'auto_created' as const,
-        createdBill: bill as Record<string, unknown>,
-        reply: `已记录：${typeLabel} ¥${extractedBill.amount}（${catLabel}）`,
+        createdBill: single ? createdBills[0] : undefined,
+        createdBills,
+        reply,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '未知错误';

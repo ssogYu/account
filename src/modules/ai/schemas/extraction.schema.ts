@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** 账单结构化提取结果 */
+/** 单笔账单结构化提取结果 */
 export const BillExtractionSchema = z.object({
   type: z.enum(['expense', 'income']).optional().describe('支出或收入'),
   amount: z.number().optional().describe('金额'),
@@ -12,4 +12,12 @@ export const BillExtractionSchema = z.object({
   note: z.string().optional().describe('备注说明'),
 });
 
+/** 多笔结构化提取结果：一次输入可包含多笔账单 */
+export const BillExtractionsSchema = z.object({
+  bills: z
+    .array(BillExtractionSchema)
+    .describe('从用户输入中提取到的所有账单，每笔一条'),
+});
+
 export type BillExtractionResult = z.infer<typeof BillExtractionSchema>;
+export type BillExtractionsResult = z.infer<typeof BillExtractionsSchema>;

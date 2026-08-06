@@ -1,4 +1,5 @@
 import type { PinoLogger } from 'nestjs-pino';
+import type { BillExtractionResult } from '../../schemas/extraction.schema';
 import type { GraphState, NodeUpdate } from '../state';
 
 /**
@@ -10,7 +11,7 @@ import type { GraphState, NodeUpdate } from '../state';
  *   - 备注 —— 不影响置信度
  */
 const FIELD_CHECKS: {
-  key: keyof NonNullable<GraphState['extractedBill']>;
+  key: keyof BillExtractionResult;
   weight: number;
 }[] = [
   { key: 'type', weight: 0.3 },
@@ -20,66 +21,67 @@ const FIELD_CHECKS: {
 ];
 
 /**
- * 置信度评分节点
+ * 置信度评分节点（逐笔）
  *
  * 评分规则：
- * 1. amount 为硬门槛——无效时直接 0 分，走 confirmCard
+ * 1. amount 为硬门槛——无效时直接 0 分
  * 2. 其余 4 个字段按权重累加
- * 3. 阈值 0.7 在路由函数 routeConfidence 中判断
+ * 3. 阈值 0.7 在路由函数中判断（单笔高置信才自动入库）
  */
 export function createConfidenceScorer(logger: PinoLogger) {
   return (state: GraphState): NodeUpdate => {
-    const { extractedBill } = state;
-    const missingFields: string[] = [];
+    const { extractedBills = [] } = state;
 
-    if (!extractedBill) {
-      return {
-        confidence: 0,
-        missingFields: [
-          'amount',
-          'type',
-          'category',
-          'paymentAccount',
-          'billDate',
-        ],
-      };
-    }
+    const billEvaluations = extractedBills.map((bill) => evaluateBill(bill));
 
-    // 硬门槛：金额必须有效
-    if (typeof extractedBill.amount !== 'number' || extractedBill.amount <= 0) {
-      missingFields.push('amount');
-      // 同时检查其他字段，让 confirmCard 知道缺了什么
-      for (const { key } of FIELD_CHECKS) {
-        if (!isFieldValid(key, extractedBill)) {
-          missingFields.push(key);
-        }
-      }
-      logger.info(
-        { confidence: 0, missingFields },
-        '置信度评估完成（金额无效）',
-      );
-      return { confidence: 0, missingFields };
-    }
+    // 路由依据：单笔时用该笔置信度，多笔时取最低（多笔始终走确认，此处仅供展示）
+    const minConfidence = billEvaluations.reduce(
+      (min, e) => Math.min(min, e.confidence),
+      1,
+    );
 
-    let score = 0;
+    logger.info(
+      { count: billEvaluations.length, minConfidence },
+      '置信度评估完成',
+    );
 
-    for (const { key, weight } of FIELD_CHECKS) {
-      if (isFieldValid(key, extractedBill)) {
-        score += weight;
-      } else {
-        missingFields.push(key);
-      }
-    }
-
-    logger.info({ confidence: score, missingFields }, '置信度评估完成');
-
-    return { confidence: score, missingFields };
+    return {
+      billEvaluations,
+      confidence: minConfidence,
+    };
   };
 }
 
+function evaluateBill(bill: BillExtractionResult): {
+  confidence: number;
+  missingFields: string[];
+} {
+  const missingFields: string[] = [];
+
+  // 硬门槛：金额必须有效
+  if (typeof bill.amount !== 'number' || bill.amount <= 0) {
+    missingFields.push('amount');
+    for (const { key } of FIELD_CHECKS) {
+      if (!isFieldValid(key, bill)) missingFields.push(key);
+    }
+    return { confidence: 0, missingFields };
+  }
+
+  let score = 0;
+  for (const { key, weight } of FIELD_CHECKS) {
+    if (isFieldValid(key, bill)) {
+      score += weight;
+    } else {
+      missingFields.push(key);
+    }
+  }
+
+  return { confidence: score, missingFields };
+}
+
 function isFieldValid(
-  field: keyof NonNullable<GraphState['extractedBill']>,
-  bill: NonNullable<GraphState['extractedBill']>,
+  field: keyof BillExtractionResult,
+  bill: BillExtractionResult,
 ): boolean {
   switch (field) {
     case 'amount':

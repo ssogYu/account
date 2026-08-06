@@ -4,12 +4,12 @@ import type { PinoLogger } from 'nestjs-pino';
 import type { AiService } from '../../../../infra/ai/ai.service';
 import type { DbService } from '../../../../infra/db/db.service';
 import { extractorPrompt } from '../../prompts/extractor.prompt';
-import { BillExtractionSchema } from '../../schemas/extraction.schema';
+import { BillExtractionsSchema } from '../../schemas/extraction.schema';
 import type { GraphState, NodeUpdate } from '../state';
 import { resolveDate } from '../helpers/resolve-date';
 import { loadBillOptions } from '../helpers/load-bill-options';
 
-/** 结构化提取节点：仅从当前输入提取账单字段，不注入历史 */
+/** 结构化提取节点：仅从当前输入提取账单字段，支持多笔，不注入历史 */
 export function createExtractor(
   db: DbService,
   aiService: AiService,
@@ -25,19 +25,21 @@ export function createExtractor(
           new SystemMessage(extractorPrompt(today, options)),
           new HumanMessage(state.content),
         ],
-        BillExtractionSchema,
+        BillExtractionsSchema,
       );
 
-      // 日期后处理：用代码解析 LLM 提取的原始日期文本
-      const resolved = resolveDate(result.billDate, today);
-      result.billDate = resolved ?? today;
+      // 日期后处理：逐笔用代码解析 LLM 提取的原始日期文本
+      const bills = (result.bills ?? []).map((bill) => {
+        const resolved = resolveDate(bill.billDate, today);
+        return { ...bill, billDate: resolved ?? today };
+      });
 
       logger.info(
-        { type: result.type, amount: result.amount, billDate: result.billDate },
+        { count: bills.length, amounts: bills.map((b) => b.amount) },
         '账单提取完成',
       );
 
-      return { extractedBill: result };
+      return { extractedBills: bills };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '未知错误';
       const name = error instanceof Error ? error.name : 'UnknownError';

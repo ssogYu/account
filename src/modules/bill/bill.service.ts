@@ -172,15 +172,20 @@ export class BillService {
 
     if (category.isSystem) return;
 
-    if (category.userId !== null && category.userId !== userId) {
-      throw new ForbiddenException('无权使用该分类');
-    }
+    if (category.isSystem) return;
 
+    // 家庭分类：用户必须在同一家庭中
     if (category.familyId) {
       const userFamilyId = await this.familyService.getFamilyId(userId);
       if (userFamilyId !== category.familyId) {
         throw new ForbiddenException('无权使用该分类');
       }
+      return;
+    }
+
+    // 个人分类：必须是分类所有者
+    if (category.userId !== userId) {
+      throw new ForbiddenException('无权使用该分类');
     }
   }
 
@@ -196,15 +201,18 @@ export class BillService {
 
     if (account.isSystem) return;
 
-    if (account.userId !== null && account.userId !== userId) {
-      throw new ForbiddenException('无权使用该支付账户');
-    }
-
+    // 家庭账户：用户必须在同一家庭中
     if (account.familyId) {
       const userFamilyId = await this.familyService.getFamilyId(userId);
       if (userFamilyId !== account.familyId) {
         throw new ForbiddenException('无权使用该支付账户');
       }
+      return;
+    }
+
+    // 个人账户：必须是账户所有者
+    if (account.userId !== userId) {
+      throw new ForbiddenException('无权使用该支付账户');
     }
   }
 

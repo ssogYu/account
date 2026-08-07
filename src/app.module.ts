@@ -13,6 +13,7 @@ import { CategoryModule } from './modules/category/category.module';
 import { FamilyModule } from './modules/family/family.module';
 import { HealthModule } from './modules/health/health.module';
 import { PaymentAccountModule } from './modules/payment-account/payment-account.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PaymentAccountModule } from './modules/payment-account/payment-account.
     FamilyModule,
     HealthModule,
     PaymentAccountModule,
+    StatisticsModule,
   ],
   providers: [
     {

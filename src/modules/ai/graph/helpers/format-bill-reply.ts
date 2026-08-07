@@ -5,6 +5,16 @@
 
 import { formatDateTime } from '../../../../common/utils/date';
 
+/**
+ * 格式化金额：始终保留两位小数。
+ * 入参可能是 Decimal 对象（toString 已包含小数点）或 string。
+ */
+function fmtAmt(raw: unknown): string {
+  const n = Number(raw);
+  if (Number.isNaN(n)) return '0.00';
+  return n.toFixed(2);
+}
+
 function getField(bill: Record<string, unknown>, key: string): unknown {
   return bill[key];
 }
@@ -44,7 +54,7 @@ function getBillDate(bill: Record<string, unknown>): string | null {
 
 export function formatBillText(bill: Record<string, unknown>): string {
   const parts: string[] = [
-    `${getTypeText(bill)} ¥${String(getField(bill, 'amount'))}（${getCategoryName(bill)}）`,
+    `${getTypeText(bill)} ¥${fmtAmt(getField(bill, 'amount'))}（${getCategoryName(bill)}）`,
   ];
   const account = getPaymentAccountName(bill);
   if (account) parts.push(` · ${account}`);

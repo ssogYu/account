@@ -11,6 +11,16 @@ const FIELD_LABELS: Record<string, string> = {
   billDate: '时间',
 };
 
+/**
+ * 格式化金额：始终保留两位小数。
+ * 入参可能是 Decimal 对象或 number。
+ */
+function fmtAmt(raw: unknown): string {
+  const n = Number(raw);
+  if (Number.isNaN(n)) return '?';
+  return n.toFixed(2);
+}
+
 export interface ConfirmationCardsResult {
   sessionId: string;
   cards: ConfirmationCardItem[];
@@ -49,7 +59,7 @@ export function buildConfirmationCards(
     const typeText =
       card.type === 'income' ? '收入' : card.type === 'expense' ? '支出' : '？';
     const amountText =
-      card.amount && card.amount > 0 ? `¥${card.amount}` : '¥?';
+      card.amount && card.amount > 0 ? `¥${fmtAmt(card.amount)}` : '¥?';
     const catText = card.category ? `（${card.category}）` : '';
     const prefix = cards.length > 1 ? `${index + 1}. ` : '';
     lines.push(`${prefix}${typeText} ${amountText}${catText}`);

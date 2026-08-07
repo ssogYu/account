@@ -16,6 +16,11 @@ interface BillRow {
   category: { name: string } | null;
 }
 
+/** 格式化金额：始终保留两位小数 */
+function fmtAmt(amount: number): string {
+  return amount.toFixed(2);
+}
+
 /**
  * 查询处理节点：根据用户查询意图分查询范围，支持今日/本月汇总与明细。
  */
@@ -95,11 +100,11 @@ function resolveScope(content: string, today: Date): QueryScope {
           .map((b) => {
             const prefix = b.type === 'expense' ? '支' : '收';
             const catName = b.category?.name ?? '未分类';
-            return `[${prefix}] ${catName} ¥${b.amount}`;
+            return `[${prefix}] ${catName} ¥${fmtAmt(b.amount)}`;
           })
           .join('\n');
         const label = scopeLabel ? `今日${scopeLabel}` : '今日';
-        return `${label}共 ${bills.length} 笔，合计 ¥${total}\n${listText || '暂无记录'}`;
+        return `${label}共 ${bills.length} 笔，合计 ¥${fmtAmt(total)}\n${listText || '暂无记录'}`;
       },
     };
   }
@@ -116,7 +121,7 @@ function resolveScope(content: string, today: Date): QueryScope {
       take: 0,
       formatReply: (bills, total, scopeLabel) => {
         const label = scopeLabel ? `本月${scopeLabel}` : '本月';
-        return `${label}共 ${bills.length} 笔账单，合计 ¥${total}`;
+        return `${label}共 ${bills.length} 笔账单，合计 ¥${fmtAmt(total)}`;
       },
     };
   }
@@ -132,7 +137,7 @@ function resolveScope(content: string, today: Date): QueryScope {
           const prefix = b.type === 'expense' ? '支' : '收';
           const dateStr = formatDateTime(b.billDate);
           const catName = b.category?.name ?? '未分类';
-          return `[${prefix}] ${dateStr} ${catName} ¥${b.amount}`;
+          return `[${prefix}] ${dateStr} ${catName} ¥${fmtAmt(b.amount)}`;
         })
         .join('\n');
       return `最近账单：\n${listText || '暂无记录'}`;

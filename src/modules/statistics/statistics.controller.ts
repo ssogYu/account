@@ -5,6 +5,7 @@ import { User } from '../../common/decorators/user.decorator';
 import { StatisticsService } from './statistics.service';
 import type {
   Summary,
+  ProfileSummary,
   CategoryStats,
   TrendData,
   RankingData,
@@ -33,6 +34,18 @@ export class StatisticsController {
     @Query() query: QueryStatisticsDto,
   ): Promise<Summary> {
     return this.statisticsService.getSummary(userId, query);
+  }
+
+  @Get('profile-summary')
+  @ApiOperation({
+    summary: '个人主页统计',
+    description: '返回记账天数、账单总数、累计金额。用于"我的"页面用户卡片。',
+  })
+  @ApiResponse({ status: 200, description: '返回个人主页统计数据' })
+  async getProfileSummary(
+    @User('userId') userId: string,
+  ): Promise<ProfileSummary> {
+    return this.statisticsService.getProfileSummary(userId);
   }
 
   @Get('category-stats')

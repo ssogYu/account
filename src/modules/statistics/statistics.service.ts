@@ -28,6 +28,16 @@ export interface Summary {
   periodLabel: string;
 }
 
+/** "我的"页面用户卡片统计数据 */
+export interface ProfileSummary {
+  /** 记账天数（有账单记录的不同日期数） */
+  billingDays: number;
+  /** 账单总笔数 */
+  billCount: number;
+  /** 累计记录金额（expense 总额） */
+  totalAmount: string;
+}
+
 export interface CategoryStat {
   categoryId: string;
   categoryName: string;
@@ -130,6 +140,34 @@ export class StatisticsService {
       billCount,
       periodLabel: label,
     };
+  }
+
+  // ==========================================================
+  // 1.1 个人主页统计（记账天数 + 账单总数 + 累计金额）
+  // ==========================================================
+
+  async getProfileSummary(userId: string): Promise<ProfileSummary> {
+    const where = await this.buildWhere(userId);
+
+    // 总笔数 + 累计金额
+    const agg = await this.db.bill.aggregate({
+      where: { ...where, type: 'expense' },
+      _count: { id: true },
+      _sum: { amount: true },
+    });
+
+    // 记账天数（不同日期的数量）
+    const daysResult = await this.db.bill.findMany({
+      where,
+      select: { billDate: true },
+      distinct: ['billDate'],
+    });
+
+    const billingDays = daysResult.length;
+    const billCount = agg._count.id;
+    const totalAmount = (agg._sum.amount ?? new Prisma.Decimal(0)).toFixed(2);
+
+    return { billingDays, billCount, totalAmount };
   }
 
   // ==========================================================

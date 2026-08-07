@@ -28,18 +28,9 @@ export function createExtractor(
         BillExtractionsSchema,
       );
 
-      // 日期后处理：逐笔用代码解析 LLM 提取的原始日期文本
-      const bills = (result.bills ?? []).map((bill) => {
-        const resolved = parseDateTime(bill.billDate);
-        return { ...bill, billDate: resolved ?? nowStr };
-      });
+      logger.info({ result: result.bills }, '账单提取完成');
 
-      logger.info(
-        { count: bills.length, amounts: bills.map((b) => b.amount) },
-        '账单提取完成',
-      );
-
-      return { extractedBills: bills };
+      return { extractedBills: result.bills };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '未知错误';
       const name = error instanceof Error ? error.name : 'UnknownError';

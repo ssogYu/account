@@ -35,15 +35,14 @@ export function extractorPrompt(nowStr: string, options?: BillOptions): string {
 - amount: 金额数字（正数），去除"元""块"等单位
 - category: ${categoryRule}
 - paymentAccount: ${accountRule}
-- billDate: 该笔账单对应的日期文本。保留用户原始表述（"昨天"、"8月2日"、"2026.8.2"等），
-  系统会自动归一化为 YYYY-MM-DD HH:mm:ss 格式。未提及时间时留空（视为当前时间）。
+- billDate: 该笔账单对应的日期文本。你要直接解析为YYYY-MM-DD HH:mm:ss 格式。未提及时间则（视为当前时间）。
 - note: 补充备注，如未提及则留空
 
 ## 规则
 1. amount 必须是纯数字，不要带单位或符号。**无法确定金额时直接省略该字段，不要输出 null**
 2. category 和 paymentAccount 只能从给定列表中匹配，不要输出列表之外的名称，而且要严格的匹配是否相关不要随意认为
 3. categoryId、paymentAccountId 留空
-4. billDate 保留用户原始表述，系统会自动归一化处理
+4. billDate 解析为YYYY-MM-DD HH:mm:ss 未提及时间则视为当前时间
 5. 每笔账单独立列出，数量与用户描述中的记录数一致
 6. **所有字段，如果无法确定值，直接省略不写，不要输出 null 或空字符串**
 

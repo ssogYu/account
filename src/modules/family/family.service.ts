@@ -86,7 +86,13 @@ export class FamilyService {
     });
 
     // 将创建者所有个人账单迁移至家庭组
-    const migrationResult = await this.db.bill.updateMany({
+    const billMigration = await this.db.bill.updateMany({
+      where: { userId, familyId: null },
+      data: { familyId: family.id },
+    });
+
+    // 将创建者所有个人支付账户迁移至家庭组（保留 userId 便于退出时精确恢复）
+    const paMigration = await this.db.paymentAccount.updateMany({
       where: { userId, familyId: null },
       data: { familyId: family.id },
     });
@@ -96,7 +102,8 @@ export class FamilyService {
         familyId: family.id,
         name: family.name,
         userId,
-        migratedBills: migrationResult.count,
+        migratedBills: billMigration.count,
+        migratedPaymentAccounts: paMigration.count,
       },
       '家庭组创建成功',
     );
@@ -132,7 +139,13 @@ export class FamilyService {
     });
 
     // 将该用户所有个人账单迁移至家庭组
-    const migrationResult = await this.db.bill.updateMany({
+    const billMigration = await this.db.bill.updateMany({
+      where: { userId, familyId: null },
+      data: { familyId: family.id },
+    });
+
+    // 将该用户所有个人支付账户迁移至家庭组（保留 userId 便于退出时精确恢复）
+    const paMigration = await this.db.paymentAccount.updateMany({
       where: { userId, familyId: null },
       data: { familyId: family.id },
     });
@@ -142,7 +155,8 @@ export class FamilyService {
         familyId: family.id,
         familyName: family.name,
         userId,
-        migratedBills: migrationResult.count,
+        migratedBills: billMigration.count,
+        migratedPaymentAccounts: paMigration.count,
       },
       '成员加入家庭组',
     );
@@ -177,6 +191,12 @@ export class FamilyService {
       data: { familyId: null },
     });
 
+    // 将该用户在家庭组中的支付账户恢复为个人账户（userId 在入组时保留，直接精确恢复）
+    await this.db.paymentAccount.updateMany({
+      where: { userId, familyId: member.familyId },
+      data: { familyId: null },
+    });
+
     this.logger.info({ familyId: member.familyId, userId }, '成员退出家庭组');
 
     return { left: true };
@@ -205,6 +225,12 @@ export class FamilyService {
 
     // 将所有成员的账单恢复为个人账单
     await this.db.bill.updateMany({
+      where: { familyId },
+      data: { familyId: null },
+    });
+
+    // 将所有成员的支付账户恢复为个人账户
+    await this.db.paymentAccount.updateMany({
       where: { familyId },
       data: { familyId: null },
     });
@@ -251,6 +277,12 @@ export class FamilyService {
 
     // 将被移除成员的账单恢复为个人账单
     await this.db.bill.updateMany({
+      where: { userId: targetUserId, familyId: owner.familyId },
+      data: { familyId: null },
+    });
+
+    // 将被移除成员在家庭组中的支付账户恢复为个人账户
+    await this.db.paymentAccount.updateMany({
       where: { userId: targetUserId, familyId: owner.familyId },
       data: { familyId: null },
     });

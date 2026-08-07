@@ -65,7 +65,10 @@ export class PaymentAccountController {
   @ApiResponse({ status: 403, description: '系统账户不可删除' })
   @ApiResponse({ status: 404, description: '支付账户不存在' })
   @ApiResponse({ status: 409, description: '账户下存在账单，无法删除' })
-  remove(@User('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+  remove(
+    @User('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.paymentAccountService.remove(userId, id);
   }
 }

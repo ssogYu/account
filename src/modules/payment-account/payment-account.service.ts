@@ -45,13 +45,13 @@ export class PaymentAccountService {
   // 创建
   // ==========================================================
 
-  /** 创建支付账户：用户加入了家庭组则创建为家庭共享账户，否则为个人账户 */
+  /** 创建支付账户：用户加入了家庭组则创建为家庭共享账户（保留 userId），否则为个人账户 */
   async create(userId: string, dto: CreatePaymentAccountDto) {
     const familyId = await this.familyService.getFamilyId(userId);
 
     const existing = familyId
       ? await this.db.paymentAccount.findFirst({
-          where: { familyId, userId: null, name: dto.name },
+          where: { familyId, name: dto.name },
         })
       : await this.db.paymentAccount.findFirst({
           where: { userId, familyId: null, name: dto.name },
@@ -63,7 +63,7 @@ export class PaymentAccountService {
 
     const account = await this.db.paymentAccount.create({
       data: {
-        userId: familyId ? null : userId,
+        userId,
         familyId: familyId ?? null,
         name: dto.name,
         icon: dto.icon ?? null,
@@ -95,7 +95,7 @@ export class PaymentAccountService {
     if (dto.name) {
       const duplicate = familyId
         ? await this.db.paymentAccount.findFirst({
-            where: { familyId, userId: null, name: dto.name },
+            where: { familyId, name: dto.name },
           })
         : await this.db.paymentAccount.findFirst({
             where: { userId, familyId: null, name: dto.name },
@@ -169,15 +169,7 @@ export class PaymentAccountService {
       return account;
     }
 
-    // 个人账户：仅所有者可操作
-    if (account.userId) {
-      if (account.userId !== userId) {
-        throw new ForbiddenException('无权操作该支付账户');
-      }
-      return account;
-    }
-
-    // 家庭组账户：需要确认用户属于同一家庭组
+    // 家庭组账户：同组内任何成员可操作
     if (account.familyId) {
       const userFamilyId = await this.familyService.getFamilyId(userId);
       if (userFamilyId !== account.familyId) {
@@ -186,6 +178,10 @@ export class PaymentAccountService {
       return account;
     }
 
-    throw new ForbiddenException('无权操作该支付账户');
+    // 个人账户：仅所有者可操作
+    if (account.userId && account.userId !== userId) {
+      throw new ForbiddenException('无权操作该支付账户');
+    }
+    return account;
   }
 }

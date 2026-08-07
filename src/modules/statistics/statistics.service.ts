@@ -144,10 +144,11 @@ export class StatisticsService {
 
   // ==========================================================
   // 1.1 个人主页统计（记账天数 + 账单总数 + 累计金额）
+  // 始终统计该用户个人的数据，不受家庭组影响
   // ==========================================================
 
   async getProfileSummary(userId: string): Promise<ProfileSummary> {
-    const where = await this.buildWhere(userId);
+    const where = { userId };
 
     // 总笔数 + 累计金额
     const agg = await this.db.bill.aggregate({

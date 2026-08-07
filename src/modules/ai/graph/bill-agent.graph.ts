@@ -2,6 +2,7 @@ import { Annotation, END, StateGraph } from '@langchain/langgraph';
 import type { PinoLogger } from 'nestjs-pino';
 import type { AiService } from '../../../infra/ai/ai.service';
 import type { DbService } from '../../../infra/db/db.service';
+import type { FamilyService } from '../../family/family.service';
 import type { GraphState } from './state';
 import { createInputProcessor } from './nodes/input-processor.node';
 import { createIntentClassifier } from './nodes/intent-classifier.node';
@@ -41,6 +42,7 @@ export type BillAgentGraph = ReturnType<typeof compileGraph>;
 export interface GraphDeps {
   aiService: AiService;
   db: DbService;
+  familyService: FamilyService;
   logger: PinoLogger;
 }
 
@@ -58,15 +60,15 @@ export interface GraphDeps {
  *    └─ 空输入/extractor失败 → END
  */
 export function compileGraph(deps: GraphDeps) {
-  const { aiService, db, logger } = deps;
+  const { aiService, db, familyService, logger } = deps;
 
   const workflow = new StateGraph(GraphAnnotation)
     .addNode('inputProcessor', createInputProcessor(logger))
     .addNode('intentClassifier', createIntentClassifier(aiService, logger))
     .addNode('extractor', createExtractor(db, aiService, logger))
     .addNode('confidenceScorer', createConfidenceScorer(logger))
-    .addNode('mixedHandler', createMixedHandler(db, logger))
-    .addNode('queryHandler', createQueryHandler(db, logger))
+    .addNode('mixedHandler', createMixedHandler(db, familyService, logger))
+    .addNode('queryHandler', createQueryHandler(db, familyService, logger))
     .addNode('chatHandler', createChatHandler(aiService, logger))
 
     // 入口

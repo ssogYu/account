@@ -1,5 +1,6 @@
 import type { PinoLogger } from 'nestjs-pino';
 import type { DbService } from '../../../../infra/db/db.service';
+import type { FamilyService } from '../../../family/family.service';
 import type { GraphState, NodeUpdate } from '../state';
 import {
   formatDateTime,
@@ -23,8 +24,13 @@ function fmtAmt(amount: number): string {
 
 /**
  * 查询处理节点：根据用户查询意图分查询范围，支持今日/本月汇总与明细。
+ * 根据用户是否在家庭组中决定查询范围。
  */
-export function createQueryHandler(db: DbService, logger: PinoLogger) {
+export function createQueryHandler(
+  db: DbService,
+  familyService: FamilyService,
+  logger: PinoLogger,
+) {
   return async (state: GraphState): Promise<NodeUpdate> => {
     try {
       const { userId, content } = state;
@@ -40,13 +46,17 @@ export function createQueryHandler(db: DbService, logger: PinoLogger) {
             ? '收入'
             : '';
 
+      const familyId = await familyService.getFamilyId(userId);
+      const whereBase: Record<string, unknown> = familyId
+        ? { familyId }
+        : { userId, familyId: null };
+
       const rawBills = await db.bill.findMany({
         where: {
-          userId,
-          familyId: null,
+          ...whereBase,
           ...scope.where,
           ...(typeFilter ? { type: typeFilter } : {}),
-        },
+        } as any,
         orderBy: { billDate: 'desc' as const },
         include: { category: { select: { name: true } } },
         ...(scope.take > 0 ? { take: scope.take } : {}),

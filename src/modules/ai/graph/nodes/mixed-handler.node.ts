@@ -1,5 +1,6 @@
 import type { PinoLogger } from 'nestjs-pino';
 import type { DbService } from '../../../../infra/db/db.service';
+import type { FamilyService } from '../../../family/family.service';
 import type { BillExtractionResult } from '../../schemas/extraction.schema';
 import type { GraphState, NodeUpdate } from '../state';
 import { createBillRecord } from '../helpers/create-bill';
@@ -17,7 +18,11 @@ const AUTO_THRESHOLD = 0.7;
  * - 信息不完整的账单生成确认卡片，用户二次确认
  * - 支持纯自动、纯确认、混合三种终态
  */
-export function createMixedHandler(db: DbService, logger: PinoLogger) {
+export function createMixedHandler(
+  db: DbService,
+  familyService: FamilyService,
+  logger: PinoLogger,
+) {
   return async (state: GraphState): Promise<NodeUpdate> => {
     const { userId, extractedBills = [], billEvaluations = [] } = state;
 
@@ -55,15 +60,19 @@ export function createMixedHandler(db: DbService, logger: PinoLogger) {
           resolveCategoryId(db, userId, bill.category ?? undefined),
           resolvePaymentAccountId(db, userId, bill.paymentAccount ?? undefined),
         ]);
-        const created = await createBillRecord(db, {
-          userId,
-          categoryId,
-          paymentAccountId,
-          type: bill.type ?? 'expense',
-          amount: bill.amount,
-          billDate: bill.billDate,
-          note: bill.note,
-        });
+        const created = await createBillRecord(
+          db,
+          {
+            userId,
+            categoryId,
+            paymentAccountId,
+            type: bill.type ?? 'expense',
+            amount: bill.amount,
+            billDate: bill.billDate,
+            note: bill.note,
+          },
+          familyService,
+        );
         createdBills.push(created as Record<string, unknown>);
       }
 

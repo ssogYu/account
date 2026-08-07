@@ -4,6 +4,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { DbService } from '../../infra/db/db.service';
 import { AiService as InfraAiService } from '../../infra/ai/ai.service';
+import { FamilyService } from '../family/family.service';
 import { compileGraph } from './graph/bill-agent.graph';
 import type { GraphState } from './graph/state';
 import type { BillExtractionResult } from './schemas/extraction.schema';
@@ -25,10 +26,16 @@ export class AiService {
   constructor(
     private readonly db: DbService,
     infraAiService: InfraAiService,
+    private readonly familyService: FamilyService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext('AiService');
-    this.graph = compileGraph({ aiService: infraAiService, db, logger });
+    this.graph = compileGraph({
+      aiService: infraAiService,
+      db,
+      familyService,
+      logger,
+    });
     this.logger.info('AI 记账图谱已编译');
   }
 
@@ -150,15 +157,19 @@ export class AiService {
         bill.paymentAccount ?? undefined,
       ));
 
-    const created = await createBillRecord(this.db, {
-      userId,
-      categoryId,
-      paymentAccountId,
-      type,
-      amount,
-      billDate,
-      note: dto.note ?? bill.note,
-    });
+    const created = await createBillRecord(
+      this.db,
+      {
+        userId,
+        categoryId,
+        paymentAccountId,
+        type,
+        amount,
+        billDate,
+        note: dto.note ?? bill.note,
+      },
+      this.familyService,
+    );
 
     this.logger.info(
       { billId: created.id, amount: created.amount },

@@ -85,11 +85,22 @@ export class FamilyService {
       include: { members: true },
     });
 
+    // 将创建者所有个人账单迁移至家庭组
+    const migrationResult = await this.db.bill.updateMany({
+      where: { userId, familyId: null },
+      data: { familyId: family.id },
+    });
+
     this.logger.info(
-      { familyId: family.id, name: family.name, userId },
+      {
+        familyId: family.id,
+        name: family.name,
+        userId,
+        migratedBills: migrationResult.count,
+      },
       '家庭组创建成功',
     );
-    return family;
+    return this.getByUser(userId);
   }
 
   // ==========================================================
@@ -120,8 +131,19 @@ export class FamilyService {
       },
     });
 
+    // 将该用户所有个人账单迁移至家庭组
+    const migrationResult = await this.db.bill.updateMany({
+      where: { userId, familyId: null },
+      data: { familyId: family.id },
+    });
+
     this.logger.info(
-      { familyId: family.id, familyName: family.name, userId },
+      {
+        familyId: family.id,
+        familyName: family.name,
+        userId,
+        migratedBills: migrationResult.count,
+      },
       '成员加入家庭组',
     );
 
@@ -144,17 +166,18 @@ export class FamilyService {
     }
 
     if (member.role === FamilyRole.owner) {
-      throw new ForbiddenException(
-        '家庭组创建者无法直接退出，请先解散家庭组',
-      );
+      throw new ForbiddenException('家庭组创建者无法直接退出，请先解散家庭组');
     }
 
     await this.db.familyMember.delete({ where: { userId } });
 
-    this.logger.info(
-      { familyId: member.familyId, userId },
-      '成员退出家庭组',
-    );
+    // 将该用户账单移出家庭组，恢复为个人账单
+    await this.db.bill.updateMany({
+      where: { userId, familyId: member.familyId },
+      data: { familyId: null },
+    });
+
+    this.logger.info({ familyId: member.familyId, userId }, '成员退出家庭组');
 
     return { left: true };
   }
@@ -179,6 +202,12 @@ export class FamilyService {
     }
 
     const familyId = member.familyId;
+
+    // 将所有成员的账单恢复为个人账单
+    await this.db.bill.updateMany({
+      where: { familyId },
+      data: { familyId: null },
+    });
 
     // 先删除所有成员关系（Cascade 已在 Prisma 层设置，这里显式删除确保清理）
     await this.db.familyMember.deleteMany({ where: { familyId } });
@@ -219,6 +248,12 @@ export class FamilyService {
     }
 
     await this.db.familyMember.delete({ where: { userId: targetUserId } });
+
+    // 将被移除成员的账单恢复为个人账单
+    await this.db.bill.updateMany({
+      where: { userId: targetUserId, familyId: owner.familyId },
+      data: { familyId: null },
+    });
 
     this.logger.info(
       { familyId: owner.familyId, targetUserId },

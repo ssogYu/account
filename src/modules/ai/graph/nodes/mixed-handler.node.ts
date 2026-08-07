@@ -57,8 +57,18 @@ export function createMixedHandler(
       for (const bill of autoBills) {
         if (!bill.amount || bill.amount <= 0) continue;
         const [categoryId, paymentAccountId] = await Promise.all([
-          resolveCategoryId(db, userId, bill.category ?? undefined),
-          resolvePaymentAccountId(db, userId, bill.paymentAccount ?? undefined),
+          resolveCategoryId(
+            db,
+            userId,
+            bill.category ?? undefined,
+            familyService,
+          ),
+          resolvePaymentAccountId(
+            db,
+            userId,
+            bill.paymentAccount ?? undefined,
+            familyService,
+          ),
         ]);
         const created = await createBillRecord(
           db,
@@ -125,7 +135,10 @@ export function createMixedHandler(
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '未知错误';
       const name = error instanceof Error ? error.name : 'UnknownError';
-      logger.error({ error: message, errorType: name }, '账单处理失败');
+      logger.error(
+        { error: message, errorType: name, data: billEvaluations },
+        '账单处理失败',
+      );
       return {
         status: 'error' as const,
         reply: '账单处理失败，请稍后重试',

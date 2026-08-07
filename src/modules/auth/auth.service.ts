@@ -88,6 +88,16 @@ export class AuthService {
     };
   }
 
+  async logout(userId: string) {
+    await this.db.user.update({
+      where: { id: userId },
+      data: { lastLogoutAt: new Date() },
+    });
+
+    this.logger.info({ userId }, '用户登出');
+    return { success: true };
+  }
+
   private generateToken(userId: string, email: string, username: string) {
     return this.jwtService.sign(
       { sub: userId, email, username },

@@ -2,6 +2,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { PinoLogger } from 'nestjs-pino';
 import type { AiService } from '../../../../infra/ai/ai.service';
 import type { DbService } from '../../../../infra/db/db.service';
+import type { FamilyService } from '../../../family/family.service';
 import { extractorPrompt } from '../../prompts/extractor.prompt';
 import { BillExtractionsSchema } from '../../schemas/extraction.schema';
 import type { GraphState, NodeUpdate } from '../state';
@@ -12,12 +13,13 @@ import { loadBillOptions } from '../helpers/load-bill-options';
 export function createExtractor(
   db: DbService,
   aiService: AiService,
+  familyService: FamilyService,
   logger: PinoLogger,
 ) {
   return async (state: GraphState): Promise<NodeUpdate> => {
     try {
       const nowStr = now();
-      const options = await loadBillOptions(db, state.userId);
+      const options = await loadBillOptions(db, state.userId, familyService);
       const result = await aiService.structuredInvoke(
         [
           new SystemMessage(extractorPrompt(nowStr, options)),

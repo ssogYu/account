@@ -1,4 +1,5 @@
 import type { DbService } from '../../../../infra/db/db.service';
+import type { FamilyService } from '../../../family/family.service';
 
 const FALLBACK_CATEGORY = [
   '其他支出' as const,
@@ -7,30 +8,44 @@ const FALLBACK_CATEGORY = [
 ];
 
 /**
- * 按分类名称查找用户或系统分类 ID。
- * 找不到或 name 为空时，返回系统的兜底分类 ID。
- * 兜底存在性由 seed 保证，若仍为空则抛错。
+ * 按分类名称查找分类 ID。
+ * 优先级：用户个人 > 家庭组共享 > 系统默认 > 兜底。
  */
 export async function resolveCategoryId(
   db: DbService,
   userId: string,
   name?: string,
+  familyService?: FamilyService,
 ): Promise<string> {
   if (!name) {
     return resolveFallback(db);
   }
 
-  const userCategory = await db.category.findFirst({
-    where: { userId, name },
+  // 1. 用户个人分类
+  const personal = await db.category.findFirst({
+    where: { userId, familyId: null, name },
     select: { id: true },
   });
-  if (userCategory) return userCategory.id;
+  if (personal) return personal.id;
 
-  const systemCategory = await db.category.findFirst({
+  // 2. 家庭组共享分类
+  const familyId = familyService
+    ? await familyService.getFamilyId(userId)
+    : null;
+  if (familyId) {
+    const shared = await db.category.findFirst({
+      where: { familyId, name },
+      select: { id: true },
+    });
+    if (shared) return shared.id;
+  }
+
+  // 3. 系统默认分类
+  const system = await db.category.findFirst({
     where: { isSystem: true, name },
     select: { id: true },
   });
-  if (systemCategory) return systemCategory.id;
+  if (system) return system.id;
 
   return resolveFallback(db);
 }

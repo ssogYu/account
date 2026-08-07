@@ -2,6 +2,7 @@ import { Body, Controller, Post, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { Public } from '../../common/decorators/public.decorator';
+import { User } from '../../common/decorators/user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -34,5 +35,15 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '邮箱或密码错误' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('logout')
+  @ApiOperation({
+    summary: '用户登出',
+    description: '记录登出时间，JWT token 在客户端清除即可。',
+  })
+  @ApiResponse({ status: 200, description: '登出成功' })
+  logout(@User('userId') userId: string) {
+    return this.authService.logout(userId);
   }
 }

@@ -46,8 +46,9 @@ model User {
   passwordHash String     @db.VarChar(255)
   avatar       String?
   status       UserStatus @default(ACTIVE)
-  lastLoginAt  DateTime?  @db.Timestamptz
-  createdAt    DateTime   @default(now()) @db.Timestamptz
+  lastLoginAt   DateTime?  @db.Timestamptz
+  lastLogoutAt  DateTime?  @db.Timestamptz
+  createdAt     DateTime   @default(now()) @db.Timestamptz
   updatedAt    DateTime   @updatedAt @db.Timestamptz
 
   bills           Bill[]

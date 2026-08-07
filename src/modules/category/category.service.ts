@@ -45,14 +45,14 @@ export class CategoryService {
   // 创建
   // ==========================================================
 
-  /** 创建分类：用户加入了家庭组则创建为家庭共享分类，否则为个人分类 */
+  /** 创建分类：用户加入了家庭组则创建为家庭共享分类（保留 userId），否则为个人分类 */
   async create(userId: string, dto: CreateCategoryDto) {
     const familyId = await this.familyService.getFamilyId(userId);
 
     // 名称冲突检查
     const existing = familyId
       ? await this.db.category.findFirst({
-          where: { familyId, userId: null, name: dto.name },
+          where: { familyId, name: dto.name },
         })
       : await this.db.category.findFirst({
           where: { userId, familyId: null, name: dto.name },
@@ -64,7 +64,7 @@ export class CategoryService {
 
     const category = await this.db.category.create({
       data: {
-        userId: familyId ? null : userId,
+        userId,
         familyId: familyId ?? null,
         name: dto.name,
         icon: dto.icon ?? null,
@@ -96,7 +96,7 @@ export class CategoryService {
     if (dto.name) {
       const duplicate = familyId
         ? await this.db.category.findFirst({
-            where: { familyId, userId: null, name: dto.name },
+            where: { familyId, name: dto.name },
           })
         : await this.db.category.findFirst({
             where: { userId, familyId: null, name: dto.name },
@@ -166,15 +166,7 @@ export class CategoryService {
       return category;
     }
 
-    // 个人分类：仅所有者可操作
-    if (category.userId) {
-      if (category.userId !== userId) {
-        throw new ForbiddenException('无权操作该分类');
-      }
-      return category;
-    }
-
-    // 家庭组分类：需要确认用户属于同一家庭组
+    // 家庭组分类：同组内任何成员可操作
     if (category.familyId) {
       const userFamilyId = await this.familyService.getFamilyId(userId);
       if (userFamilyId !== category.familyId) {
@@ -183,6 +175,10 @@ export class CategoryService {
       return category;
     }
 
-    throw new ForbiddenException('无权操作该分类');
+    // 个人分类：仅所有者可操作
+    if (category.userId && category.userId !== userId) {
+      throw new ForbiddenException('无权操作该分类');
+    }
+    return category;
   }
 }

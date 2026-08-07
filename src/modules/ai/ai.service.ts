@@ -147,7 +147,7 @@ export class AiService {
     const categoryId =
       dto.categoryId ??
       bill.categoryId ??
-      (await resolveCategoryId(this.db, userId, bill.category ?? undefined));
+      (await resolveCategoryId(this.db, userId, bill.category ?? undefined, this.familyService));
     const paymentAccountId =
       dto.paymentAccountId ??
       bill.paymentAccountId ??
@@ -155,6 +155,7 @@ export class AiService {
         this.db,
         userId,
         bill.paymentAccount ?? undefined,
+        this.familyService,
       ));
 
     const created = await createBillRecord(

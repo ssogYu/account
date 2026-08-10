@@ -2,6 +2,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
@@ -14,6 +15,7 @@ import { authConfig } from '../../config/configuration/auth.config';
 import { DbService } from '../../infra/db/db.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -96,6 +98,40 @@ export class AuthService {
 
     this.logger.info({ userId }, '用户登出');
     return { success: true };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    // 如果修改用户名，检查唯一性
+    if (dto.username && dto.username !== user.username) {
+      const conflict = await this.db.user.findFirst({
+        where: { username: dto.username, NOT: { id: userId } },
+      });
+      if (conflict) {
+        throw new ConflictException('用户名已被占用');
+      }
+    }
+
+    const data: Record<string, unknown> = {};
+    if (dto.username !== undefined) data.username = dto.username;
+    if (dto.avatar !== undefined) data.avatar = dto.avatar;
+
+    if (Object.keys(data).length === 0) {
+      return { user: this.sanitizeUser(user) };
+    }
+
+    const updated = await this.db.user.update({
+      where: { id: userId },
+      data,
+    });
+
+    this.logger.info({ userId, fields: Object.keys(data) }, '用户资料已更新');
+
+    return { user: this.sanitizeUser(updated) };
   }
 
   private generateToken(userId: string, email: string, username: string) {

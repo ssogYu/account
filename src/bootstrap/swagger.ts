@@ -22,6 +22,7 @@ export function setupSwagger(
     .addBearerAuth()
     .addTag('health', '健康检查')
     .addTag('auth', '认证')
+    .addTag('upload', '文件上传')
     .build();
 
   const document = SwaggerModule.createDocument(app, builder);

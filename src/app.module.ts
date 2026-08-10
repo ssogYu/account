@@ -14,6 +14,7 @@ import { FamilyModule } from './modules/family/family.module';
 import { HealthModule } from './modules/health/health.module';
 import { PaymentAccountModule } from './modules/payment-account/payment-account.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
     HealthModule,
     PaymentAccountModule,
     StatisticsModule,
+    UploadModule,
   ],
   providers: [
     {

@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -14,6 +15,14 @@ export async function setupApp(app: NestFastifyApplication) {
   await app.register(cors, {
     origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
+  });
+
+  // 文件上传（multipart/form-data）支持
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 单文件最大 10MB
+      files: 1, // 单次最多 1 个文件
+    },
   });
 
   // 全局路由前缀 /api/v1，排除健康检查、根路径、API 文档

@@ -52,7 +52,9 @@ const docsConfigSchema = {
 
   DOCS_TITLE: Joi.string().trim().default('CommonServer API'),
 
-  DOCS_DESCRIPTION: Joi.string().trim().default('CommonServer backend API scaffold'),
+  DOCS_DESCRIPTION: Joi.string()
+    .trim()
+    .default('CommonServer backend API scaffold'),
 };
 
 const databaseConfigSchema = {
@@ -98,7 +100,14 @@ const storageConfigSchema = {
     .falsy('false', '0', 'no', 'off')
     .default(false),
 
+  STORAGE_REGION: Joi.string().trim().default('us-east-1'),
+
   STORAGE_BUCKET: Joi.string().trim().default('common-dev'),
+
+  STORAGE_PUBLIC_URL: Joi.string()
+    .trim()
+    .uri({ scheme: ['http', 'https'] })
+    .default('http://127.0.0.1:9000'),
 
   STORAGE_ACCESS_KEY: optionalString(''),
 

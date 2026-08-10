@@ -46,6 +46,10 @@ export class BillService {
     const familyId = await this.familyService.getFamilyId(userId);
     if (familyId) {
       where.familyId = familyId;
+      // 家庭组模式下支持按成员筛选
+      if (query.memberId) {
+        where.userId = query.memberId;
+      }
     } else {
       where.userId = userId;
       where.familyId = null;

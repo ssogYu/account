@@ -70,4 +70,12 @@ export class QueryBillDto {
   @IsOptional()
   @IsString()
   keyword?: string;
+
+  @ApiPropertyOptional({
+    example: 'a1b2c3d4-...',
+    description: '按家庭成员筛选（仅在家庭组模式下有效）',
+  })
+  @IsOptional()
+  @IsUUID()
+  memberId?: string;
 }

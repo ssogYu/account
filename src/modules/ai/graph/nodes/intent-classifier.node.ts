@@ -13,6 +13,20 @@ export function createIntentClassifier(
 ) {
   return async (state: GraphState): Promise<NodeUpdate> => {
     try {
+      // 有图片即为记账意图，直接短路，不调用 LLM 意图分类
+      const hasImages =
+        state.imageUrls !== undefined && state.imageUrls.length > 0;
+      if (hasImages) {
+        logger.info(
+          { imageCount: state.imageUrls?.length },
+          '图片输入，强制记账意图',
+        );
+        return {
+          intent: 'bookkeeping' as const,
+          intentConfidence: 1,
+        };
+      }
+
       const history = state.messages ?? [];
 
       // 裁剪历史：只保留最近 N 轮对话，避免 token 膨胀

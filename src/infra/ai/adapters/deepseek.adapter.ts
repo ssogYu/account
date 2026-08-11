@@ -9,54 +9,50 @@ import type { z } from 'zod';
 import type { AdapterProvider, IAiAdapter, ProviderConfig } from '../types';
 
 /**
- * OpenAI 兼容适配器
+ * DeepSeek 适配器
  *
- * 适用于所有兼容 OpenAI API 的厂商（OpenAI 官方、Qwen、Kimi 等）。
- * 只需传入不同的 baseUrl 和 apiKey 即可切换。
- * 注意：DeepSeek 已有独立适配器（DeepSeekAdapter），不在此处处理。
+ * DeepSeek 完全兼容 OpenAI API，图片通过标准 content 数组传递
+ * （image_url 块），统一走 ChatOpenAI.withStructuredOutput（function calling）。
  */
-export class OpenAiAdapter implements IAiAdapter {
-  public readonly provider: AdapterProvider = 'openai';
+export class DeepSeekAdapter implements IAiAdapter {
+  public readonly provider: AdapterProvider = 'deepseek';
 
-  /** 底层 ChatOpenAI 实例 */
   private readonly client: ChatOpenAI;
 
   constructor(config: ProviderConfig) {
     this.model = config.model;
+    const baseUrl = (config.baseUrl ?? '').replace(/\/+$/, '');
 
     this.client = new ChatOpenAI({
       model: config.model,
       apiKey: config.apiKey,
-      configuration: { baseURL: config.baseUrl },
+      configuration: { baseURL: baseUrl },
       temperature: config.temperature ?? 1,
       maxTokens: config.maxTokens ?? 4096,
+      modelKwargs: { thinking: { type: 'disabled' } },
     });
   }
 
   public readonly model: string;
 
   async invoke(messages: BaseMessage[]): Promise<AIMessage> {
-    return await this.client.invoke(messages);
+    return this.client.invoke(messages);
   }
 
-  async stream(
-    messages: BaseMessage[],
-  ): Promise<AsyncIterable<AIMessageChunk>> {
-    return await this.client.stream(messages);
+  stream(messages: BaseMessage[]): Promise<AsyncIterable<AIMessageChunk>> {
+    return this.client.stream(messages) as any;
   }
 
   async structuredInvoke<T extends z.ZodSchema>(
     messages: BaseMessage[],
     schema: T,
   ): Promise<z.infer<T>> {
-    // 显式指定 functionCalling 模式。
-    // 不指定 method 时，LangChain 可能根据模型名自动选 jsonSchema/jsonMode，
-    // 但并非所有 OpenAI 兼容模型都支持 response_format，functionCalling 兼容性最广。
+    // 显式指定 functionCalling 模式，兼容图片与文本统一走结构化输出。
     const runnable = this.client.withStructuredOutput(schema, {
       name: 'extract',
       method: 'functionCalling',
     });
 
-    return await runnable.invoke(messages);
+    return runnable.invoke(messages);
   }
 }

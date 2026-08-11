@@ -125,11 +125,11 @@ const vectorConfigSchema = {
 const aiConfigSchema = {
   AI_PROVIDER: Joi.string()
     .trim()
-    .valid('openai-compatible', 'anthropic', 'deepseek')
+    .valid('openai-compatible', 'anthropic', 'deepseek', 'qwen')
     .default('openai-compatible')
     .messages({
       'any.only':
-        'AI_PROVIDER 必须是 openai-compatible / anthropic / deepseek 之一',
+        'AI_PROVIDER 必须是 openai-compatible / anthropic / deepseek / qwen 之一',
     }),
 
   AI_MODEL: Joi.string().trim().default(''),
@@ -145,6 +145,17 @@ const aiConfigSchema = {
     .optional(),
 
   AI_MAX_TOKENS: Joi.string().trim().allow('').pattern(/^\d+$/).optional(),
+
+  AI_VISION_PROVIDER: Joi.string()
+    .trim()
+    .valid('openai-compatible', 'anthropic', 'deepseek', 'qwen')
+    .optional(),
+
+  AI_VISION_MODEL: Joi.string().trim().allow('').optional(),
+
+  AI_VISION_BASE_URL: optionalString(''),
+
+  AI_VISION_API_KEY: optionalString(''),
 };
 
 const authConfigSchema = {

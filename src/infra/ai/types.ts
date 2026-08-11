@@ -8,14 +8,21 @@ import type { z } from 'zod';
 // ---- 厂商枚举 ----
 
 /** 适配器内部使用的厂商标识 */
-export type AdapterProvider = 'openai' | 'anthropic';
+export type AdapterProvider = 'openai' | 'anthropic' | 'deepseek' | 'qwen';
 
 /** ai.config.ts 中 AI_PROVIDER 环境变量的合法值 */
-export type ConfigProvider = 'openai-compatible' | 'anthropic' | 'deepseek';
+export type ConfigProvider =
+  | 'openai-compatible'
+  | 'anthropic'
+  | 'deepseek'
+  | 'qwen';
 
 /** 将配置中的 provider 值映射为适配器类型 */
 export function mapProvider(raw: ConfigProvider): AdapterProvider {
-  return raw === 'anthropic' ? 'anthropic' : 'openai';
+  if (raw === 'anthropic') return 'anthropic';
+  if (raw === 'deepseek') return 'deepseek';
+  if (raw === 'qwen') return 'qwen';
+  return 'openai';
 }
 
 // ---- 配置接口 ----
@@ -37,6 +44,11 @@ export interface AiConfig {
   baseUrl: string;
   temperature?: number;
   maxTokens?: number;
+  /** 视觉模型配置（用于图片识别，如 gpt-4o-mini / claude-3-5-haiku） */
+  visionProvider?: ConfigProvider;
+  visionModel?: string;
+  visionApiKey?: string;
+  visionBaseUrl?: string;
 }
 
 // ---- 适配器接口 ----

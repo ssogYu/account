@@ -1,5 +1,6 @@
 import type { BaseMessage } from '@langchain/core/messages';
 import type { BillExtractionResult } from '../schemas/extraction.schema';
+import type { BillOptions } from './helpers/load-bill-options';
 
 /** 单笔账单的评分结果 */
 export interface BillEvaluation {
@@ -26,6 +27,8 @@ export interface GraphState {
   userId: string;
   messages: BaseMessage[];
   content: string;
+  /** 账单图片 URL 列表（多模态输入，先通过 /upload 上传获取） */
+  imageUrls?: string[];
   /** 对话历史记录 ID */
   conversationId?: string;
   /** 意图分类 */
@@ -47,6 +50,8 @@ export interface GraphState {
   confirmationCards?: ConfirmationCardItem[];
   /** 错误 */
   error?: string;
+  /** 用户可用的分类和支付账户列表（extractor 加载后传递给下游节点） */
+  billOptions?: BillOptions;
 }
 
 /** 节点返回值：部分状态更新 */

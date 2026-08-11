@@ -1,6 +1,7 @@
 import { Annotation, END, StateGraph } from '@langchain/langgraph';
 import type { PinoLogger } from 'nestjs-pino';
 import type { AiService } from '../../../infra/ai/ai.service';
+import type { VisionService } from '../../../infra/ai/vision.service';
 import type { DbService } from '../../../infra/db/db.service';
 import type { FamilyService } from '../../family/family.service';
 import type { GraphState } from './state';
@@ -20,6 +21,10 @@ const GraphAnnotation = Annotation.Root({
     default: () => [],
   }),
   content: Annotation<string>,
+  imageUrls: Annotation<string[]>({
+    reducer: (_, next) => next,
+    default: () => [],
+  }),
   conversationId: Annotation<string>(),
   intent: Annotation<'bookkeeping' | 'query' | 'chat'>(),
   intentConfidence: Annotation<number>(),
@@ -34,6 +39,7 @@ const GraphAnnotation = Annotation.Root({
   createdBill: Annotation<Record<string, unknown>>(),
   createdBills: Annotation<Record<string, unknown>[]>(),
   confirmationCards: Annotation<GraphState['confirmationCards']>(),
+  billOptions: Annotation<GraphState['billOptions']>(),
   error: Annotation<string>(),
 });
 
@@ -44,6 +50,8 @@ export interface GraphDeps {
   db: DbService;
   familyService: FamilyService;
   logger: PinoLogger;
+  /** 视觉识别服务（独立于 AiService，专管图片识别） */
+  visionService?: VisionService;
 }
 
 /**
@@ -60,12 +68,15 @@ export interface GraphDeps {
  *    └─ 空输入/extractor失败 → END
  */
 export function compileGraph(deps: GraphDeps) {
-  const { aiService, db, familyService, logger } = deps;
+  const { aiService, db, familyService, logger, visionService } = deps;
 
   const workflow = new StateGraph(GraphAnnotation)
     .addNode('inputProcessor', createInputProcessor(logger))
     .addNode('intentClassifier', createIntentClassifier(aiService, logger))
-    .addNode('extractor', createExtractor(db, aiService, familyService, logger))
+    .addNode(
+      'extractor',
+      createExtractor(db, aiService, familyService, logger, visionService),
+    )
     .addNode('confidenceScorer', createConfidenceScorer(logger))
     .addNode('mixedHandler', createMixedHandler(db, familyService, logger))
     .addNode('queryHandler', createQueryHandler(db, familyService, logger))
@@ -80,7 +91,7 @@ export function compileGraph(deps: GraphDeps) {
       error: END,
     })
 
-    // 意图路由（含错误终止）
+    // 意图分类→按意图分支
     .addConditionalEdges('intentClassifier', afterIntentClassify, {
       bookkeeping: 'extractor',
       query: 'queryHandler',
@@ -88,7 +99,7 @@ export function compileGraph(deps: GraphDeps) {
       error: END,
     })
 
-    // 提取：成功→评分，失败→终止
+    // 提取→评分（失败则终止）
     .addConditionalEdges('extractor', afterExtract, {
       ok: 'confidenceScorer',
       error: END,
@@ -97,10 +108,10 @@ export function compileGraph(deps: GraphDeps) {
     // 评分后统一进入混合处理节点：逐笔判断自动入库或确认
     .addEdge('confidenceScorer', 'mixedHandler')
 
-    // 终端节点 → END
-    .addEdge('mixedHandler', '__end__')
-    .addEdge('queryHandler', '__end__')
-    .addEdge('chatHandler', '__end__');
+    // 混合处理→END
+    .addEdge('mixedHandler', END)
+    .addEdge('queryHandler', END)
+    .addEdge('chatHandler', END);
 
   return workflow.compile();
 }

@@ -92,6 +92,36 @@ export class StorageService implements OnModuleInit {
     this.logger.info({ objectName }, '文件删除成功');
   }
 
+  /**
+   * 生成 MinIO Presigned URL（临时访问链接）。
+   * 本地开发时 STORAGE_PUBLIC_URL 为 127.0.0.1，大模型无法访问，
+   * 可通过此方法生成有时效的 presigned URL 让外部服务临时访问 MinIO。
+   *
+   * 生产环境 STORAGE_PUBLIC_URL 已配公网 CDN 则不需要此方法。
+   *
+   * @param objectName MinIO 对象名
+   * @param expirySeconds 有效期（秒），默认 600（10分钟）
+   */
+  async presignedUrl(objectName: string, expirySeconds = 600): Promise<string> {
+    const { bucket } = this.config;
+    return this.client.presignedGetObject(bucket, objectName, expirySeconds);
+  }
+
+  /** 从完整文件 URL 提取 objectName */
+  extractObjectName(fileUrl: string): string {
+    const prefix = `${this.config.publicUrl.replace(/\/$/, '')}/${this.config.bucket}/`;
+    if (fileUrl.startsWith(prefix)) {
+      return fileUrl.slice(prefix.length);
+    }
+    try {
+      const url = new URL(fileUrl);
+      const parts = url.pathname.split('/').filter(Boolean);
+      return parts.slice(1).join('/');
+    } catch {
+      return fileUrl;
+    }
+  }
+
   /** 构建文件公网访问 URL */
   getFileUrl(objectName: string) {
     return `${this.config.publicUrl.replace(/\/$/, '')}/${this.config.bucket}/${objectName}`;

@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 
 export class ChatDto {
   @ApiProperty({ description: '用户输入的自然语言文本', maxLength: 2000 })
@@ -12,4 +20,13 @@ export class ChatDto {
   @IsOptional()
   @IsUUID()
   conversationId?: string;
+
+  @ApiPropertyOptional({
+    description: '账单图片 URL 列表（先通过 POST /upload 上传获取 fileId/url）',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUrl({}, { each: true, message: 'imageUrls 每项必须是合法的 URL' })
+  imageUrls?: string[];
 }

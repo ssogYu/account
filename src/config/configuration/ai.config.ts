@@ -4,7 +4,7 @@ import { registerAs } from '@nestjs/config';
 export interface AiModelItem {
   id: string;
   name: string;
-  provider: 'openai-compatible' | 'anthropic' | 'deepseek';
+  provider: 'openai-compatible' | 'anthropic' | 'deepseek' | 'qwen';
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -19,6 +19,11 @@ type AiConfig = {
   baseUrl: string;
   temperature?: number;
   maxTokens?: number;
+  /** 视觉模型配置（用于图片识别，如 gpt-4o-mini / claude-3-5-haiku） */
+  visionProvider?: AiModelItem['provider'];
+  visionModel?: string;
+  visionApiKey?: string;
+  visionBaseUrl?: string;
 };
 
 export const aiConfig = registerAs(
@@ -35,5 +40,10 @@ export const aiConfig = registerAs(
     maxTokens: process.env.AI_MAX_TOKENS
       ? Number(process.env.AI_MAX_TOKENS)
       : undefined,
+    visionProvider:
+      (process.env.AI_VISION_PROVIDER as AiConfig['provider']) || undefined,
+    visionModel: process.env.AI_VISION_MODEL || undefined,
+    visionApiKey: process.env.AI_VISION_API_KEY || undefined,
+    visionBaseUrl: process.env.AI_VISION_BASE_URL || undefined,
   }),
 );

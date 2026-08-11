@@ -4,6 +4,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { DbService } from '../../infra/db/db.service';
 import { AiService as InfraAiService } from '../../infra/ai/ai.service';
+import { VisionService } from '../../infra/ai/vision.service';
 import { FamilyService } from '../family/family.service';
 import { compileGraph } from './graph/bill-agent.graph';
 import type { GraphState } from './graph/state';
@@ -28,6 +29,7 @@ export class AiService {
     infraAiService: InfraAiService,
     private readonly familyService: FamilyService,
     private readonly logger: PinoLogger,
+    visionService: VisionService,
   ) {
     this.logger.setContext('AiService');
     this.graph = compileGraph({
@@ -35,6 +37,7 @@ export class AiService {
       db,
       familyService,
       logger,
+      visionService,
     });
     this.logger.info('AI 记账图谱已编译');
   }
@@ -53,12 +56,18 @@ export class AiService {
     const startState: Partial<GraphState> = {
       userId,
       content: dto.content,
+      imageUrls: dto.imageUrls,
       conversationId,
       messages: historyMessages,
     };
 
     this.logger.info(
-      { userId, conversationId, content: dto.content.slice(0, 50) },
+      {
+        userId,
+        conversationId,
+        content: dto.content.slice(0, 50),
+        imageCount: dto.imageUrls?.length ?? 0,
+      },
       '开始 AI 对话',
     );
 
@@ -66,7 +75,14 @@ export class AiService {
 
     // 存用户消息
     await this.db.message.create({
-      data: { conversationId, role: 'user', content: dto.content },
+      data: {
+        conversationId,
+        role: 'user',
+        content: dto.content,
+        metadata: dto.imageUrls?.length
+          ? { imageUrls: dto.imageUrls }
+          : undefined,
+      },
     });
 
     // 存 AI 回复（所有状态统一存储）
@@ -147,7 +163,12 @@ export class AiService {
     const categoryId =
       dto.categoryId ??
       bill.categoryId ??
-      (await resolveCategoryId(this.db, userId, bill.category ?? undefined, this.familyService));
+      (await resolveCategoryId(
+        this.db,
+        userId,
+        bill.category ?? undefined,
+        this.familyService,
+      ));
     const paymentAccountId =
       dto.paymentAccountId ??
       bill.paymentAccountId ??

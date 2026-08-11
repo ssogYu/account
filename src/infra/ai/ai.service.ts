@@ -10,6 +10,8 @@ import type { z } from 'zod';
 import { aiConfig } from '../../config/configuration/ai.config';
 import { OpenAiAdapter } from './adapters/openai.adapter';
 import { AnthropicAdapter } from './adapters/anthropic.adapter';
+import { DeepSeekAdapter } from './adapters/deepseek.adapter';
+import { QwenAdapter } from './adapters/qwen.adapter';
 import type {
   AdapterProvider,
   AiConfig,
@@ -24,6 +26,8 @@ const adapterRegistry: Record<
 > = {
   openai: OpenAiAdapter,
   anthropic: AnthropicAdapter,
+  deepseek: DeepSeekAdapter,
+  qwen: QwenAdapter,
 };
 
 /**
@@ -65,7 +69,10 @@ export class AiService {
     });
 
     this.logger.info(
-      { provider: config.provider, model: config.model },
+      {
+        provider: config.provider,
+        model: config.model,
+      },
       'AI 服务初始化完成',
     );
   }

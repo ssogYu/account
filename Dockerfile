@@ -27,4 +27,8 @@ COPY package.json ./
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# 启动前自动运行数据库迁移，再启动应用
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
+
+CMD ["./entrypoint.sh"]

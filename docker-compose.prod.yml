@@ -61,6 +61,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       AI_API_KEY: ${AI_API_KEY}
       AI_VISION_API_KEY: ${AI_VISION_API_KEY}
+      # 直接拼出完整 DATABASE_URL，供 prisma migrate deploy 等命令使用
+      DATABASE_URL: postgresql://${POSTGRES_USER:-account}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-account}?schema=public&timezone=Asia%2FShanghai
     ports:
       - '127.0.0.1:3000:3000'
     depends_on:

@@ -1,0 +1,47 @@
+# 依赖
+node_modules
+
+# 构建产物
+dist
+build
+
+# 环境变量文件（防止密钥泄露到镜像层）
+.env
+.env.*
+!.env.production
+
+# 日志
+logs
+*.log
+
+# 测试
+coverage
+.nyc_output
+test
+
+# IDE
+.idea
+.vscode
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+docker-compose.prod.yml
+Dockerfile
+.dockerignore
+
+# 临时文件
+.temp
+.tmp
+
+# 文档
+docs
+README.md

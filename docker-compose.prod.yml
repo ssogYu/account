@@ -1,0 +1,74 @@
+services:
+  # ===== PostgreSQL =====
+  postgres:
+    image: postgres:16-alpine
+    container_name: account-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-account}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-account}
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-account} -d ${POSTGRES_DB:-account}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== MinIO (对象存储) =====
+  minio:
+    image: minio/minio:latest
+    container_name: account-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-account}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== NestJS Server =====
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: account-server
+    restart: always
+    env_file:
+      - .env
+      - .env.production
+    environment:
+      # 将 .env 中的变量显式注入容器环境，确保 NestJS ConfigModule 的 expandVariables 能展开 .env.production 中的 ${VAR} 引用
+      POSTGRES_USER: ${POSTGRES_USER:-account}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-account}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-account}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_VISION_API_KEY: ${AI_VISION_API_KEY}
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:

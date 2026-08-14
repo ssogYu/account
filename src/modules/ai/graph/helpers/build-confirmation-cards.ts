@@ -27,27 +27,48 @@ export interface ConfirmationCardsResult {
   reply: string;
 }
 
+/** 单笔确认卡片的重复标记信息 */
+export interface DuplicateMark {
+  bill: {
+    id: string;
+    amount: number;
+    type: string;
+    categoryName: string;
+    billDate: string;
+    note: string;
+  };
+}
+
 /**
  * 为指定账单生成确认卡片（带唯一 id）与可读确认文本。
  * 供 confirmationCard 节点与 mixedHandler 复用。
+ *
+ * @param bills 待确认账单
+ * @param evaluations 逐笔字段缺失评估
+ * @param duplicateMap 按账单在数组中的下标标记疑似重复（命中重复账单 ID）
  */
 export function buildConfirmationCards(
   bills: BillExtractionResult[],
   evaluations: { missingFields: string[] }[],
+  duplicateMap?: Map<number, DuplicateMark>,
 ): ConfirmationCardsResult {
   const sessionId = randomUUID();
 
-  const cards: ConfirmationCardItem[] = bills.map((bill, index) => ({
-    id: randomUUID(),
-    type: bill.type ?? '',
-    amount: bill.amount ?? 0,
-    category: bill.category ?? '',
-    paymentAccount: bill.paymentAccount ?? '',
-    billDate: bill.billDate ?? '',
-    note: bill.note ?? '',
-    missingFields: evaluations[index]?.missingFields ?? [],
-    bill,
-  }));
+  const cards: ConfirmationCardItem[] = bills.map((bill, index) => {
+    const dup = duplicateMap?.get(index);
+    return {
+      id: randomUUID(),
+      type: bill.type ?? '',
+      amount: bill.amount ?? 0,
+      category: bill.category ?? '',
+      paymentAccount: bill.paymentAccount ?? '',
+      billDate: bill.billDate ?? '',
+      note: bill.note ?? '',
+      missingFields: evaluations[index]?.missingFields ?? [],
+      bill,
+      ...(dup ? { duplicate: true, duplicateBill: dup.bill } : {}),
+    };
+  });
 
   const lines: string[] = [
     cards.length > 1
@@ -67,6 +88,14 @@ export function buildConfirmationCards(
     if (card.billDate) lines.push(`时间：${card.billDate}`);
     if (card.paymentAccount) lines.push(`账户：${card.paymentAccount}`);
     if (card.note) lines.push(`备注：${card.note}`);
+
+    if (card.duplicate && card.duplicateBill) {
+      const dup = card.duplicateBill;
+      const dupNote = dup.note ? ` · 备注：${dup.note}` : '';
+      lines.push(
+        `⚠️疑似与已记录账单重复：${dup.billDate} · ¥${fmtAmt(dup.amount)} · ${dup.categoryName}${dupNote}`,
+      );
+    }
 
     if (card.missingFields.length > 0) {
       const fieldNames = card.missingFields

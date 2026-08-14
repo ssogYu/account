@@ -20,6 +20,17 @@ export interface ConfirmationCardItem {
   missingFields: string[];
   /** 原始提取数据，供 confirm 逐笔确认时使用 */
   bill: BillExtractionResult;
+  /** 是否疑似重复账单（由查重命中，需用户确认是否仍要记录） */
+  duplicate?: boolean;
+  /** 命中的重复账单摘要（用于前端展示「与哪笔账单重复」） */
+  duplicateBill?: {
+    id: string;
+    amount: number;
+    type: string;
+    categoryName: string;
+    billDate: string;
+    note: string;
+  };
 }
 
 /** LangGraph 全局状态 */

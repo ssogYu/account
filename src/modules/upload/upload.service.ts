@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { PinoLogger } from 'nestjs-pino';
 import * as path from 'node:path';
 
 import { StorageService } from '../../infra/storage/storage.service';
+import { DbService } from '../../infra/db/db.service';
 
 /** 上传场景，决定文件存放目录 */
 export type UploadScene = 'bill' | 'avatar';
@@ -31,6 +33,7 @@ const MIME_EXT_MAP: Record<string, string> = {
 export class UploadService {
   constructor(
     private readonly storageService: StorageService,
+    private readonly db: DbService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext('UploadService');
@@ -69,6 +72,30 @@ export class UploadService {
 
     this.validateFile({ buffer: fileBuffer, mimetype, filename, scene });
 
+    // 计算内容指纹（sha256），用于跨会话去重
+    const contentHash = createHash('sha256').update(fileBuffer).digest('hex');
+
+    // 账单图片去重：同一用户上传同一张图片时直接复用已存对象，不再重复存储
+    if (scene === 'bill') {
+      const existing = await this.findExistingAttachment(userId, contentHash);
+
+      if (existing) {
+        this.logger.info(
+          { userId, contentHash, objectName: existing.objectName },
+          '账单图片命中重复，复用已存对象',
+        );
+        return {
+          fileId: existing.objectName,
+          url: existing.url,
+          filename,
+          size: fileBuffer.length,
+          mimetype,
+          scene,
+          duplicated: true,
+        };
+      }
+    }
+
     const objectName = this.buildObjectName({ scene, mimetype, userId });
     const { objectName: storedName, url } =
       await this.storageService.uploadFile({
@@ -76,6 +103,11 @@ export class UploadService {
         objectName,
         mimetype,
       });
+
+    // 账单图片落指纹记录，供后续跨会话去重
+    if (scene === 'bill') {
+      await this.saveAttachment(userId, contentHash, storedName, url);
+    }
 
     this.logger.info(
       { userId, scene, objectName: storedName, size: fileBuffer.length },
@@ -89,7 +121,50 @@ export class UploadService {
       size: fileBuffer.length,
       mimetype,
       scene,
+      duplicated: false,
     };
+  }
+
+  /**
+   * 查找已存在的账单图片指纹记录。
+   * 表未就绪或查询异常时降级为 null（不查重、直接上传），保证上传功能不受去重影响。
+   */
+  private async findExistingAttachment(userId: string, contentHash: string) {
+    try {
+      return await this.db.billAttachment.findUnique({
+        where: { userId_contentHash: { userId, contentHash } },
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      this.logger.warn(
+        { userId, contentHash, error: message },
+        '账单图片去重查询失败，跳过查重',
+      );
+      return null;
+    }
+  }
+
+  /**
+   * 保存账单图片指纹记录。
+   * 写入失败仅记录日志，不影响上传结果（去重能力降级，上传仍成功）。
+   */
+  private async saveAttachment(
+    userId: string,
+    contentHash: string,
+    objectName: string,
+    url: string,
+  ) {
+    try {
+      await this.db.billAttachment.create({
+        data: { userId, contentHash, objectName, url },
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      this.logger.warn(
+        { userId, contentHash, objectName, error: message },
+        '账单图片指纹记录写入失败，去重能力降级',
+      );
+    }
   }
 
   /** 校验文件类型、大小、扩展名 */

@@ -52,6 +52,7 @@ model User {
   updatedAt    DateTime   @updatedAt @db.Timestamptz
 
   bills           Bill[]
+  billAttachments BillAttachment[]
   categories      Category[]
   conversations   Conversation[]
   paymentAccounts PaymentAccount[]
@@ -130,10 +131,32 @@ model Bill {
   family           Family?         @relation(fields: [familyId], references: [id])
   category         Category        @relation(fields: [categoryId], references: [id])
   paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  attachments      BillAttachment[]
 
   @@index([userId, billDate(sort: Desc)])
   @@index([familyId, billDate(sort: Desc)])
   @@map("bills")
+}
+
+// ==============================
+// 账单图片附件（用于跨会话图片指纹去重）
+// ==============================
+
+model BillAttachment {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  contentHash String   @db.VarChar(64)
+  objectName  String   @db.VarChar(255)
+  url         String   @db.VarChar(500)
+  billId      String?  @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bill Bill? @relation(fields: [billId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, contentHash])
+  @@index([billId])
+  @@map("bill_attachments")
 }
 
 // ==============================

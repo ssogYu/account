@@ -7,7 +7,12 @@ import { createBillRecord } from '../helpers/create-bill';
 import { resolveCategoryId } from '../helpers/resolve-category';
 import { resolvePaymentAccountId } from '../helpers/resolve-payment-account';
 import { buildBillReply } from '../helpers/format-bill-reply';
-import { buildConfirmationCards } from '../helpers/build-confirmation-cards';
+import {
+  buildConfirmationCards,
+  type DuplicateMark,
+} from '../helpers/build-confirmation-cards';
+import { findDuplicateBill } from '../helpers/find-duplicate-bill';
+import { formatDateTime } from '../../../../common/utils/date';
 
 /** 自动入库阈值：置信度 >= 0.7 直接入库，否则走确认卡片 */
 const AUTO_THRESHOLD = 0.7;
@@ -52,8 +57,12 @@ export function createMixedHandler(
     });
 
     try {
-      // 1) 自动入库部分
+      // 1) 自动入库部分：入库前查重，命中重复的转入确认卡片让用户抉择
       const createdBills: Record<string, unknown>[] = [];
+      // duplicateMap 以确认卡片数组下标为键，记录命中的重复账单 ID
+      const duplicateMap = new Map<number, DuplicateMark>();
+      let duplicateCount = 0;
+
       for (const bill of autoBills) {
         if (!bill.amount || bill.amount <= 0) continue;
         const [categoryId, paymentAccountId] = await Promise.all([
@@ -70,13 +79,43 @@ export function createMixedHandler(
             familyService,
           ),
         ]);
+
+        const type = bill.type ?? 'expense';
+        const duplicate = bill.billDate
+          ? await findDuplicateBill(db, userId, familyService, {
+              amount: bill.amount,
+              type,
+              categoryId,
+              billDate: bill.billDate,
+            })
+          : null;
+
+        if (duplicate) {
+          // 疑似重复：不自动入库，转入确认卡片，让用户决定「仍记录 / 跳过」
+          const dupIndex = confirmBills.length;
+          confirmBills.push(bill);
+          confirmEvaluations.push({ missingFields: [] });
+          duplicateMap.set(dupIndex, {
+            bill: {
+              id: duplicate.id,
+              amount: Number(duplicate.amount),
+              type: duplicate.type,
+              categoryName: duplicate.category?.name ?? '',
+              billDate: formatDateTime(duplicate.billDate),
+              note: duplicate.note ?? '',
+            },
+          });
+          duplicateCount++;
+          continue;
+        }
+
         const created = await createBillRecord(
           db,
           {
             userId,
             categoryId,
             paymentAccountId,
-            type: bill.type ?? 'expense',
+            type,
             amount: bill.amount,
             billDate: bill.billDate,
             note: bill.note,
@@ -89,21 +128,28 @@ export function createMixedHandler(
       // 2) 确认卡片部分
       let sessionId: string | undefined;
       let confirmationCards: GraphState['confirmationCards'];
-      let confirmReply = '';
       if (confirmBills.length > 0) {
-        const built = buildConfirmationCards(confirmBills, confirmEvaluations);
+        const built = buildConfirmationCards(
+          confirmBills,
+          confirmEvaluations,
+          duplicateMap.size > 0 ? duplicateMap : undefined,
+        );
         sessionId = built.sessionId;
         confirmationCards = built.cards;
-        confirmReply = built.reply;
       }
 
       // 3) 合并 reply 与 status
       const autoReply = buildBillReply(createdBills);
       const replies: string[] = [`共识别到${extractedBills.length}笔账单`];
       if (createdBills.length > 0) replies.push(autoReply);
-      //   if (confirmBills.length > 0) replies.push(confirmReply);
-      if (confirmBills.length > 0)
-        replies.push(`⚠️有${confirmBills.length}笔账单需要确认`);
+      // 疑似重复与普通待确认分别独立提示，两者可能同时存在
+      if (duplicateCount > 0)
+        replies.push(
+          `⚠️检测到${duplicateCount}笔疑似重复账单，请确认是否仍要记录`,
+        );
+      const normalConfirmCount = confirmBills.length - duplicateCount;
+      if (normalConfirmCount > 0)
+        replies.push(`⚠️有${normalConfirmCount}笔账单需要确认`);
       const reply = replies.join('\n\n');
 
       const hasAuto = createdBills.length > 0;
@@ -119,6 +165,7 @@ export function createMixedHandler(
         {
           autoCount: createdBills.length,
           confirmCount: confirmBills.length,
+          duplicateCount,
           status,
         },
         '账单混合处理完成',

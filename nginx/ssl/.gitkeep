@@ -1,5 +1,0 @@
-# 证书文件存放目录
-# 部署时放入以下文件：
-#   account.tankswift.top.pem  (SSL 证书)
-#   account.tankswift.top.key  (SSL 私钥)
-# 这些文件不应提交到 Git
